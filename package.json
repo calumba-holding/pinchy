@@ -1,0 +1,15 @@
+{
+  "name": "pinchy",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Enterprise AI agent platform built on OpenClaw",
+  "scripts": {
+    "dev": "pnpm --filter @pinchy/web dev",
+    "build": "pnpm --filter @pinchy/web build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Clemens Helm",
+  "license": "AGPL-3.0",
+  "packageManager": "pnpm@10.29.3"
+}
