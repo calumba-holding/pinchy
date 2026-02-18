@@ -23,7 +23,7 @@ services:
     expose:
       - "18789"
     volumes:
-      - ~/.openclaw:/root/.openclaw
+      - openclaw-config:/root/.openclaw
     restart: unless-stopped
 
   db:
@@ -42,3 +42,4 @@ services:
 
 volumes:
   pgdata:
+  openclaw-config:
