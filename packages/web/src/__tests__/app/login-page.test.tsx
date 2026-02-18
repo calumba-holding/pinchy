@@ -14,7 +14,10 @@ vi.mock("next-auth/react", () => ({
 }));
 
 vi.mock("next/image", () => ({
-  default: ({ priority, ...props }: React.ImgHTMLAttributes<HTMLImageElement> & { priority?: boolean }) => {
+  default: ({
+    priority,
+    ...props
+  }: React.ImgHTMLAttributes<HTMLImageElement> & { priority?: boolean }) => {
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
     return <img {...props} />;
   },
@@ -39,11 +42,7 @@ describe("Login Page", () => {
 
   it("should display login description", () => {
     render(<LoginPage />);
-    expect(
-      screen.getByText(
-        "Enter the credentials you created during setup."
-      )
-    ).toBeInTheDocument();
+    expect(screen.getByText("Enter the credentials you created during setup.")).toBeInTheDocument();
   });
 
   it("should render email and password fields", () => {
@@ -54,8 +53,6 @@ describe("Login Page", () => {
 
   it("should have a 'Sign in' button", () => {
     render(<LoginPage />);
-    expect(
-      screen.getByRole("button", { name: /sign in/i })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
   });
 });

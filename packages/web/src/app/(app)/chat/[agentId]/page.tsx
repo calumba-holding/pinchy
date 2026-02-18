@@ -4,11 +4,7 @@ import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { Chat } from "@/components/chat";
 
-export default async function ChatPage({
-  params,
-}: {
-  params: Promise<{ agentId: string }>;
-}) {
+export default async function ChatPage({ params }: { params: Promise<{ agentId: string }> }) {
   const { agentId } = await params;
 
   const agent = await db.query.agents.findFirst({

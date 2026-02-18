@@ -8,11 +8,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 
 export const dynamic = "force-dynamic";
 
-export default async function AppLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const setupComplete = await isSetupComplete();
   if (!setupComplete) redirect("/setup");
 

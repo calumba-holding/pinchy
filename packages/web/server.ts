@@ -18,9 +18,6 @@ app.prepare().then(() => {
   const wss = new WebSocketServer({ server, path: "/api/ws" });
 
   wss.on("connection", (clientWs, req) => {
-    const url = new URL(req.url!, `http://${req.headers.host}`);
-    const agentId = url.searchParams.get("agentId");
-
     // Connect to OpenClaw Gateway
     const openclawWs = new WebSocket(OPENCLAW_WS_URL);
     let currentMessageId = crypto.randomUUID();

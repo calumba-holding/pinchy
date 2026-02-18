@@ -18,4 +18,6 @@ EXPOSE 7777
 ENV PORT=7777
 ENV NODE_ENV=production
 
-CMD ["npx", "tsx", "packages/web/server.ts"]
+WORKDIR /app/packages/web
+
+CMD ["sh", "-c", "pnpm db:migrate && pnpm start"]

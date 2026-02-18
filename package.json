@@ -6,10 +6,24 @@
   "scripts": {
     "dev": "pnpm --filter @pinchy/web dev",
     "build": "pnpm --filter @pinchy/web build",
-    "test": "pnpm --filter @pinchy/web test"
+    "test": "pnpm --filter @pinchy/web test",
+    "prepare": "husky"
   },
   "keywords": [],
   "author": "Clemens Helm",
   "license": "AGPL-3.0",
-  "packageManager": "pnpm@10.29.3"
+  "packageManager": "pnpm@10.29.3",
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7"
+  },
+  "lint-staged": {
+    "packages/web/src/**/*.{ts,tsx}": [
+      "pnpm -C packages/web exec eslint --no-warn-ignored",
+      "pnpm -C packages/web exec prettier --check"
+    ],
+    "packages/web/src/**/*.{json,css,md}": [
+      "pnpm -C packages/web exec prettier --check"
+    ]
+  }
 }

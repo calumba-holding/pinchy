@@ -17,9 +17,7 @@ export function Chat({ agentId, agentName }: ChatProps) {
       <div className="flex flex-col h-full">
         <header className="p-4 border-b flex items-center justify-between">
           <h1 className="font-bold">{agentName}</h1>
-          <span
-            className={`text-xs ${isConnected ? "text-green-600" : "text-destructive"}`}
-          >
+          <span className={`text-xs ${isConnected ? "text-green-600" : "text-destructive"}`}>
             {isConnected ? "Connected" : "Disconnected"}
           </span>
         </header>

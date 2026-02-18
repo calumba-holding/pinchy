@@ -6,13 +6,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2 } from "lucide-react";
 
 export default function SetupPage() {
@@ -53,13 +47,7 @@ export default function SetupPage() {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-full max-w-md flex flex-col items-center gap-6">
-        <Image
-          src="/pinchy-logo.png"
-          alt="Pinchy"
-          width={80}
-          height={85}
-          priority
-        />
+        <Image src="/pinchy-logo.png" alt="Pinchy" width={80} height={85} priority />
 
         <Card className="w-full">
           {success ? (
@@ -69,15 +57,10 @@ export default function SetupPage() {
                   <CheckCircle2 className="size-12 text-primary" />
                 </div>
                 <CardTitle>Account created successfully!</CardTitle>
-                <CardDescription>
-                  You can now sign in with your credentials.
-                </CardDescription>
+                <CardDescription>You can now sign in with your credentials.</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button
-                  onClick={() => router.push("/login")}
-                  className="w-full"
-                >
+                <Button onClick={() => router.push("/login")} className="w-full">
                   Continue to sign in
                 </Button>
               </CardContent>
@@ -87,8 +70,7 @@ export default function SetupPage() {
               <CardHeader>
                 <CardTitle>Welcome to Pinchy</CardTitle>
                 <CardDescription>
-                  Create your admin account. You&apos;ll use these credentials
-                  to sign in.
+                  Create your admin account. You&apos;ll use these credentials to sign in.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -97,30 +79,15 @@ export default function SetupPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      required
-                    />
+                    <Input id="email" name="email" type="email" required />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      name="password"
-                      type="password"
-                      required
-                      minLength={8}
-                    />
+                    <Input id="password" name="password" type="password" required minLength={8} />
                   </div>
 
-                  <Button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full"
-                  >
+                  <Button type="submit" disabled={loading} className="w-full">
                     {loading ? "Creating account..." : "Create account"}
                   </Button>
                 </form>

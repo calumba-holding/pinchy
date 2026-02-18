@@ -7,10 +7,7 @@ export async function POST(request: NextRequest) {
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: "A valid email address is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "A valid email address is required" }, { status: 400 });
     }
     if (!password || password.length < 8) {
       return NextResponse.json(
@@ -23,14 +20,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(user, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "Setup already complete") {
-      return NextResponse.json(
-        { error: "Setup already complete" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "Setup already complete" }, { status: 403 });
     }
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

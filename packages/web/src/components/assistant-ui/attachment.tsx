@@ -10,17 +10,8 @@ import {
   useAui,
 } from "@assistant-ui/react";
 import { useShallow } from "zustand/shallow";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogTitle, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { cn } from "@/lib/utils";
@@ -50,11 +41,10 @@ const useAttachmentSrc = () => {
     useShallow((s): { file?: File; src?: string } => {
       if (s.attachment.type !== "image") return {};
       if (s.attachment.file) return { file: s.attachment.file };
-      const src = s.attachment.content?.filter((c) => c.type === "image")[0]
-        ?.image;
+      const src = s.attachment.content?.filter((c) => c.type === "image")[0]?.image;
       if (!src) return {};
       return { src };
-    }),
+    })
   );
 
   return useFileSrc(file) ?? src;
@@ -74,7 +64,7 @@ const AttachmentPreview: FC<AttachmentPreviewProps> = ({ src }) => {
         "block h-auto max-h-[80vh] w-auto max-w-full object-contain",
         isLoaded
           ? "aui-attachment-preview-image-loaded"
-          : "aui-attachment-preview-image-loading invisible",
+          : "aui-attachment-preview-image-loading invisible"
       )}
       onLoad={() => setIsLoaded(true)}
     />
@@ -95,9 +85,7 @@ const AttachmentPreviewDialog: FC<PropsWithChildren> = ({ children }) => {
         {children}
       </DialogTrigger>
       <DialogContent className="aui-attachment-preview-dialog-content p-2 sm:max-w-3xl [&>button]:rounded-full [&>button]:bg-foreground/60 [&>button]:p-1 [&>button]:opacity-100 [&>button]:ring-0! [&_svg]:text-background [&>button]:hover:[&_svg]:text-destructive">
-        <DialogTitle className="aui-sr-only sr-only">
-          Image Attachment Preview
-        </DialogTitle>
+        <DialogTitle className="aui-sr-only sr-only">Image Attachment Preview</DialogTitle>
         <div className="aui-attachment-preview relative mx-auto flex max-h-[80dvh] w-full items-center justify-center overflow-hidden bg-background">
           <AttachmentPreview src={src} />
         </div>
@@ -149,8 +137,7 @@ const AttachmentUI: FC = () => {
       <AttachmentPrimitive.Root
         className={cn(
           "aui-attachment-root relative",
-          isImage &&
-            "aui-attachment-root-composer only:[&>#attachment-tile]:size-24",
+          isImage && "aui-attachment-root-composer only:[&>#attachment-tile]:size-24"
         )}
       >
         <AttachmentPreviewDialog>
@@ -158,8 +145,7 @@ const AttachmentUI: FC = () => {
             <div
               className={cn(
                 "aui-attachment-tile size-14 cursor-pointer overflow-hidden rounded-[14px] border bg-muted transition-opacity hover:opacity-75",
-                isComposer &&
-                  "aui-attachment-tile-composer border-foreground/20",
+                isComposer && "aui-attachment-tile-composer border-foreground/20"
               )}
               role="button"
               id="attachment-tile"
@@ -203,9 +189,7 @@ export const UserMessageAttachments: FC = () => {
 export const ComposerAttachments: FC = () => {
   return (
     <div className="aui-composer-attachments mb-2 flex w-full flex-row items-center gap-2 overflow-x-auto px-1.5 pt-0.5 pb-1 empty:hidden">
-      <ComposerPrimitive.Attachments
-        components={{ Attachment: AttachmentUI }}
-      />
+      <ComposerPrimitive.Attachments components={{ Attachment: AttachmentUI }} />
     </div>
   );
 };

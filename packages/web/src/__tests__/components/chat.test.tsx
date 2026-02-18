@@ -13,9 +13,7 @@ vi.mock("@/hooks/use-ws-runtime", () => ({
 
 // Mock assistant-ui
 vi.mock("@assistant-ui/react", () => ({
-  AssistantRuntimeProvider: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  AssistantRuntimeProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 // Mock the Thread component

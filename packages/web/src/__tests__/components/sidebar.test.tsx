@@ -5,7 +5,10 @@ import { AppSidebar } from "@/components/sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
 vi.mock("next/image", () => ({
-  default: ({ priority, ...props }: React.ImgHTMLAttributes<HTMLImageElement> & { priority?: boolean }) => {
+  default: ({
+    priority,
+    ...props
+  }: React.ImgHTMLAttributes<HTMLImageElement> & { priority?: boolean }) => {
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
     return <img {...props} />;
   },
@@ -33,9 +36,7 @@ describe("AppSidebar", () => {
   });
 
   it("should render agent names", () => {
-    const agents = [
-      { id: "1", name: "Smithers", model: "anthropic/claude-sonnet-4-20250514" },
-    ];
+    const agents = [{ id: "1", name: "Smithers", model: "anthropic/claude-sonnet-4-20250514" }];
     render(
       <SidebarProvider>
         <AppSidebar agents={agents} />

@@ -36,9 +36,7 @@ export function useWsRuntime(agentId: string): {
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(
-      `${protocol}//${window.location.host}/api/ws?agentId=${agentId}`,
-    );
+    const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws?agentId=${agentId}`);
 
     ws.onopen = () => setIsConnected(true);
 
@@ -59,10 +57,7 @@ export function useWsRuntime(agentId: string): {
           setMessages((prev) => {
             const last = prev[prev.length - 1];
             if (last?.role === "assistant" && last.id === data.messageId) {
-              return [
-                ...prev.slice(0, -1),
-                { ...last, content: last.content + data.content },
-              ];
+              return [...prev.slice(0, -1), { ...last, content: last.content + data.content }];
             }
             return [
               ...prev,
@@ -100,12 +95,8 @@ export function useWsRuntime(agentId: string): {
   const onNew = useCallback(
     async (message: AppendMessage) => {
       // Extract text content from the AppendMessage
-      const textParts = message.content.filter(
-        (part) => part.type === "text",
-      );
-      const text = textParts
-        .map((part) => ("text" in part ? part.text : ""))
-        .join("");
+      const textParts = message.content.filter((part) => part.type === "text");
+      const text = textParts.map((part) => ("text" in part ? part.text : "")).join("");
 
       if (!text.trim()) return;
 
@@ -123,16 +114,13 @@ export function useWsRuntime(agentId: string): {
           type: "message",
           content: text,
           agentId,
-        }),
+        })
       );
     },
-    [agentId],
+    [agentId]
   );
 
-  const convertedMessages = useMemo(
-    () => messages.map(convertMessage),
-    [messages],
-  );
+  const convertedMessages = useMemo(() => messages.map(convertMessage), [messages]);
 
   const runtime = useExternalStoreRuntime({
     messages: convertedMessages,

@@ -1,11 +1,4 @@
-import {
-  pgTable,
-  text,
-  timestamp,
-  boolean,
-  integer,
-  primaryKey,
-} from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, integer, primaryKey } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
 // ── Auth.js tables ─────────────────────────────────────────────────────
@@ -43,7 +36,7 @@ export const accounts = pgTable(
     primaryKey({
       columns: [account.provider, account.providerAccountId],
     }),
-  ],
+  ]
 );
 
 export const sessions = pgTable("session", {
@@ -65,7 +58,7 @@ export const verificationTokens = pgTable(
     primaryKey({
       columns: [verificationToken.identifier, verificationToken.token],
     }),
-  ],
+  ]
 );
 
 // ── Application tables ─────────────────────────────────────────────────

@@ -9,18 +9,11 @@ export async function getSetting(key: string): Promise<string | null> {
   return row?.value ?? null;
 }
 
-export async function setSetting(
-  key: string,
-  value: string,
-  encrypted = false,
-) {
-  await db
-    .insert(settings)
-    .values({ key, value, encrypted })
-    .onConflictDoUpdate({
-      target: settings.key,
-      set: { value, encrypted },
-    });
+export async function setSetting(key: string, value: string, encrypted = false) {
+  await db.insert(settings).values({ key, value, encrypted }).onConflictDoUpdate({
+    target: settings.key,
+    set: { value, encrypted },
+  });
 }
 
 export async function getAllSettings() {

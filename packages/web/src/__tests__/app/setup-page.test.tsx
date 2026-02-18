@@ -12,7 +12,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next/image", () => ({
-  default: ({ priority, ...props }: React.ImgHTMLAttributes<HTMLImageElement> & { priority?: boolean }) => {
+  default: ({
+    priority,
+    ...props
+  }: React.ImgHTMLAttributes<HTMLImageElement> & { priority?: boolean }) => {
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
     return <img {...props} />;
   },
@@ -40,9 +43,7 @@ describe("Setup Page", () => {
   it("should display setup description", () => {
     render(<SetupPage />);
     expect(
-      screen.getByText(
-        "Create your admin account. You'll use these credentials to sign in."
-      )
+      screen.getByText("Create your admin account. You'll use these credentials to sign in.")
     ).toBeInTheDocument();
   });
 
@@ -54,9 +55,7 @@ describe("Setup Page", () => {
 
   it("should have a 'Create account' button", () => {
     render(<SetupPage />);
-    expect(
-      screen.getByRole("button", { name: /create account/i })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create account/i })).toBeInTheDocument();
   });
 
   it("should show success state after successful setup", async () => {
@@ -76,14 +75,10 @@ describe("Setup Page", () => {
     fireEvent.click(screen.getByRole("button", { name: /create account/i }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Account created successfully!")
-      ).toBeInTheDocument();
+      expect(screen.getByText("Account created successfully!")).toBeInTheDocument();
     });
 
-    expect(
-      screen.getByRole("button", { name: /continue to sign in/i })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continue to sign in/i })).toBeInTheDocument();
   });
 
   it("should navigate to /login when clicking 'Continue to sign in'", async () => {
@@ -103,14 +98,10 @@ describe("Setup Page", () => {
     fireEvent.click(screen.getByRole("button", { name: /create account/i }));
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /continue to sign in/i })
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /continue to sign in/i })).toBeInTheDocument();
     });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /continue to sign in/i })
-    );
+    fireEvent.click(screen.getByRole("button", { name: /continue to sign in/i }));
     expect(pushMock).toHaveBeenCalledWith("/login");
   });
 

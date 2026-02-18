@@ -5,12 +5,14 @@ vi.mock("@/db", () => {
   const updateMock = vi.fn().mockReturnValue({
     set: vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{
-          id: "1",
-          name: "Updated Smithers",
-          model: "anthropic/claude-opus-4-6",
-          systemPrompt: "You are helpful.",
-        }]),
+        returning: vi.fn().mockResolvedValue([
+          {
+            id: "1",
+            name: "Updated Smithers",
+            model: "anthropic/claude-opus-4-6",
+            systemPrompt: "You are helpful.",
+          },
+        ]),
       }),
     }),
   });

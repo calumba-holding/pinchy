@@ -4,12 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function SettingsPage() {
   const [apiKey, setApiKey] = useState("");
@@ -46,9 +41,7 @@ export default function SettingsPage() {
                 placeholder="sk-ant-..."
               />
             </div>
-            <Button onClick={handleSave}>
-              Speichern
-            </Button>
+            <Button onClick={handleSave}>Speichern</Button>
             {saved && <p className="text-green-600">Gespeichert!</p>}
           </div>
         </CardContent>

@@ -13,13 +13,16 @@ vi.mock("@/db", () => {
       values: vi.fn().mockReturnValue({
         returning: vi.fn().mockImplementation(() => {
           if (isAgentsTable) {
-            return Promise.resolve([{
-              id: "agent-1",
-              name: "Smithers",
-              model: "anthropic/claude-sonnet-4-20250514",
-              systemPrompt: "You are Smithers, a helpful and loyal AI assistant. You are professional, efficient, and always ready to help.",
-              createdAt: new Date(),
-            }]);
+            return Promise.resolve([
+              {
+                id: "agent-1",
+                name: "Smithers",
+                model: "anthropic/claude-sonnet-4-20250514",
+                systemPrompt:
+                  "You are Smithers, a helpful and loyal AI assistant. You are professional, efficient, and always ready to help.",
+                createdAt: new Date(),
+              },
+            ]);
           }
           return Promise.resolve([{ id: "1", email: "admin@test.com" }]);
         }),
@@ -74,9 +77,7 @@ describe("createAdmin", () => {
       role: "admin",
     });
 
-    await expect(createAdmin("new@test.com", "pass")).rejects.toThrow(
-      "Setup already complete"
-    );
+    await expect(createAdmin("new@test.com", "pass")).rejects.toThrow("Setup already complete");
   });
 });
 

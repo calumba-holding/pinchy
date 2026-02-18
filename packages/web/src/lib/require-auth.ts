@@ -4,12 +4,7 @@ import { auth } from "@/lib/auth";
 export async function requireAuth() {
   const session = await auth();
 
-  if (
-    !session ||
-    typeof session !== "object" ||
-    !("user" in session) ||
-    !session.user
-  ) {
+  if (!session || typeof session !== "object" || !("user" in session) || !session.user) {
     redirect("/login");
   }
 

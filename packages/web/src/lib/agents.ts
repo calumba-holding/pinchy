@@ -9,11 +9,7 @@ interface UpdateAgentInput {
 }
 
 export async function updateAgent(id: string, data: UpdateAgentInput) {
-  const [updated] = await db
-    .update(agents)
-    .set(data)
-    .where(eq(agents.id, id))
-    .returning();
+  const [updated] = await db.update(agents).set(data).where(eq(agents.id, id)).returning();
 
   return updated;
 }

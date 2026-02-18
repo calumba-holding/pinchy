@@ -6,12 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AgentSettingsPage() {
   const params = useParams();
@@ -71,9 +66,7 @@ export default function AgentSettingsPage() {
                 rows={5}
               />
             </div>
-            <Button type="submit">
-              Speichern
-            </Button>
+            <Button type="submit">Speichern</Button>
           </form>
         </CardContent>
       </Card>
