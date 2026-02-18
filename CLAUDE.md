@@ -84,6 +84,7 @@ pinchy/
 - TypeScript strict mode
 - Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`
 - One feature/fix per PR, small and focused
+- **Test-Driven Development (TDD)**: Write the failing test first, then the implementation. No exceptions.
 - Tests for all new features
 - Update docs when behavior changes
 
