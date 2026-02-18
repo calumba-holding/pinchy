@@ -1,24 +1,137 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import SetupPage from "@/app/setup/page";
 
-// Mock next/navigation
+const pushMock = vi.fn();
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: pushMock,
   }),
 }));
 
-// Mock fetch
+vi.mock("next/image", () => ({
+  default: ({ priority, ...props }: React.ImgHTMLAttributes<HTMLImageElement> & { priority?: boolean }) => {
+    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+    return <img {...props} />;
+  },
+}));
+
 global.fetch = vi.fn();
 
 describe("Setup Page", () => {
-  it("should render setup form with email and password fields", () => {
-    render(<SetupPage />);
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
+  it("should render the Pinchy logo", () => {
+    render(<SetupPage />);
+    const logo = screen.getByAltText("Pinchy");
+    expect(logo).toBeInTheDocument();
+    expect(logo).toHaveAttribute("src", "/pinchy-logo.png");
+  });
+
+  it("should display 'Welcome to Pinchy' as title", () => {
+    render(<SetupPage />);
+    expect(screen.getByText("Welcome to Pinchy")).toBeInTheDocument();
+  });
+
+  it("should display setup description", () => {
+    render(<SetupPage />);
+    expect(
+      screen.getByText(
+        "Create your admin account. You'll use these credentials to sign in."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("should render email and password fields", () => {
+    render(<SetupPage />);
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /einrichten|setup/i })).toBeInTheDocument();
+  });
+
+  it("should have a 'Create account' button", () => {
+    render(<SetupPage />);
+    expect(
+      screen.getByRole("button", { name: /create account/i })
+    ).toBeInTheDocument();
+  });
+
+  it("should show success state after successful setup", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({}),
+    });
+
+    render(<SetupPage />);
+
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "admin@test.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: "password123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Account created successfully!")
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByRole("button", { name: /continue to sign in/i })
+    ).toBeInTheDocument();
+  });
+
+  it("should navigate to /login when clicking 'Continue to sign in'", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({}),
+    });
+
+    render(<SetupPage />);
+
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "admin@test.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: "password123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /continue to sign in/i })
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /continue to sign in/i })
+    );
+    expect(pushMock).toHaveBeenCalledWith("/login");
+  });
+
+  it("should show error message on failed setup", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: "Setup already completed" }),
+    });
+
+    render(<SetupPage />);
+
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "admin@test.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: "password123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Setup already completed")).toBeInTheDocument();
+    });
   });
 });
