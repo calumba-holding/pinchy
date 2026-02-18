@@ -1,8 +1,29 @@
 services:
-  pinchy:
-    build: .
+  db:
+    image: postgres:16
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=pinchy
+      - POSTGRES_USER=pinchy
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-pinchy_dev}
     ports:
-      - "18789:18789"
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pinchy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  openclaw:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - "18789"
     volumes:
       - ~/.openclaw:/root/.openclaw
     restart: unless-stopped
+
+volumes:
+  pgdata:
