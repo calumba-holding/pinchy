@@ -50,6 +50,6 @@ describe("AppSidebar", () => {
         <AppSidebar agents={[]} />
       </SidebarProvider>
     );
-    expect(screen.getByRole("link", { name: /settings|einstellungen/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /settings/i })).toBeInTheDocument();
   });
 });

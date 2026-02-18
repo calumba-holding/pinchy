@@ -31,7 +31,7 @@ describe("Chat", () => {
 
   it("should show connected status", () => {
     render(<Chat agentId="agent-1" agentName="Smithers" />);
-    expect(screen.getByText("Verbunden")).toBeInTheDocument();
+    expect(screen.getByText("Connected")).toBeInTheDocument();
   });
 
   it("should render the Thread component", () => {

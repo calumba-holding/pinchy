@@ -20,7 +20,7 @@ export function Chat({ agentId, agentName }: ChatProps) {
           <span
             className={`text-xs ${isConnected ? "text-green-600" : "text-destructive"}`}
           >
-            {isConnected ? "Verbunden" : "Getrennt"}
+            {isConnected ? "Connected" : "Disconnected"}
           </span>
         </header>
         <div className="flex-1">

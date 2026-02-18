@@ -9,5 +9,5 @@ export default async function HomePage() {
     redirect(`/chat/${allAgents[0].id}`);
   }
 
-  return <div className="p-8">Kein Agent konfiguriert.</div>;
+  return <div className="p-8">No agent configured.</div>;
 }
