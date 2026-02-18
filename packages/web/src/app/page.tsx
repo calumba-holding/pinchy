@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { isSetupComplete } from "@/lib/setup";
-import { auth } from "@/lib/auth";
+import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/db";
 import { agents } from "@/db/schema";
 
@@ -13,11 +13,7 @@ export default async function Home() {
     redirect("/setup");
   }
 
-  const session = await auth();
-
-  if (!session) {
-    redirect("/login");
-  }
+  await requireAuth();
 
   const allAgents = await db.select().from(agents);
 
