@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Bot, Settings } from "lucide-react";
 import {
   Sidebar,
@@ -24,7 +25,10 @@ export function AppSidebar({ agents }: AppSidebarProps) {
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="p-4 font-bold text-lg">Pinchy</div>
+        <div className="p-4 flex items-center gap-2">
+          <Image src="/pinchy-logo.png" alt="Pinchy" width={28} height={30} />
+          <span className="font-bold text-lg">Pinchy</span>
+        </div>
       </SidebarHeader>
 
       <SidebarContent>

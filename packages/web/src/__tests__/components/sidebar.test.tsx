@@ -1,8 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { AppSidebar } from "@/components/sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
+
+vi.mock("next/image", () => ({
+  default: ({ priority, ...props }: React.ImgHTMLAttributes<HTMLImageElement> & { priority?: boolean }) => {
+    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+    return <img {...props} />;
+  },
+}));
 
 describe("AppSidebar", () => {
   it("should render Pinchy branding", () => {
@@ -12,6 +19,17 @@ describe("AppSidebar", () => {
       </SidebarProvider>
     );
     expect(screen.getByText("Pinchy")).toBeInTheDocument();
+  });
+
+  it("should render the Pinchy logo in the header", () => {
+    render(
+      <SidebarProvider>
+        <AppSidebar agents={[]} />
+      </SidebarProvider>
+    );
+    const logo = screen.getByAltText("Pinchy");
+    expect(logo).toBeInTheDocument();
+    expect(logo).toHaveAttribute("src", "/pinchy-logo.png");
   });
 
   it("should render agent names", () => {
