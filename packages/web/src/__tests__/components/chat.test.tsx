@@ -3,18 +3,25 @@ import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { Chat } from "@/components/chat";
 
-// Mock WebSocket
-class MockWebSocket {
-  onopen: (() => void) | null = null;
-  onmessage: ((event: { data: string }) => void) | null = null;
-  onclose: (() => void) | null = null;
-  onerror: (() => void) | null = null;
-  readyState = 1;
-  send = vi.fn();
-  close = vi.fn();
-}
+// Mock the runtime hook
+vi.mock("@/hooks/use-ws-runtime", () => ({
+  useWsRuntime: () => ({
+    runtime: {},
+    isConnected: true,
+  }),
+}));
 
-vi.stubGlobal("WebSocket", MockWebSocket);
+// Mock assistant-ui
+vi.mock("@assistant-ui/react", () => ({
+  AssistantRuntimeProvider: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+}));
+
+// Mock the Thread component
+vi.mock("@/components/assistant-ui/thread", () => ({
+  Thread: () => <div data-testid="thread">Thread</div>,
+}));
 
 describe("Chat", () => {
   it("should render agent name in header", () => {
@@ -22,17 +29,13 @@ describe("Chat", () => {
     expect(screen.getByText("Smithers")).toBeInTheDocument();
   });
 
-  it("should render message input", () => {
+  it("should show connected status", () => {
     render(<Chat agentId="agent-1" agentName="Smithers" />);
-    expect(
-      screen.getByPlaceholderText("Nachricht an Smithers..."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Verbunden")).toBeInTheDocument();
   });
 
-  it("should render send button", () => {
+  it("should render the Thread component", () => {
     render(<Chat agentId="agent-1" agentName="Smithers" />);
-    expect(
-      screen.getByRole("button", { name: "Senden" }),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("thread")).toBeInTheDocument();
   });
 });
