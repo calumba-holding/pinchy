@@ -232,50 +232,38 @@ describe("ProviderKeyForm", () => {
       expect(screen.getByText("Active")).toBeInTheDocument();
     });
 
-    it("should show masked key with hint when clicking a configured provider", () => {
+    it("should always show input with masked placeholder for configured provider", () => {
       render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
 
       fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
-
-      expect(screen.getByText(/····xY9z/)).toBeInTheDocument();
-    });
-
-    it("should not show API key input when clicking a configured provider", () => {
-      render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
-
-      fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
-
-      expect(screen.queryByLabelText(/api key/i)).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /replace key/i })).toBeInTheDocument();
-    });
-
-    it("should show API key input after clicking Replace key", () => {
-      render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
-
-      fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
-      fireEvent.click(screen.getByRole("button", { name: /replace key/i }));
 
       expect(screen.getByLabelText(/api key/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("sk-ant-····xY9z")).toBeInTheDocument();
     });
 
-    it("should hide input and show masked key again after clicking Cancel", () => {
+    it("should show configured indicator when configured provider is selected", () => {
       render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
 
       fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
-      fireEvent.click(screen.getByRole("button", { name: /replace key/i }));
-      fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
 
-      expect(screen.queryByLabelText(/api key/i)).not.toBeInTheDocument();
-      expect(screen.getByText(/····xY9z/)).toBeInTheDocument();
+      expect(screen.getByTestId("key-configured-indicator")).toBeInTheDocument();
     });
 
-    it("should show API key input directly for unconfigured provider", () => {
+    it("should not show configured indicator when unconfigured provider is selected", () => {
+      render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /openai/i }));
+
+      expect(screen.queryByTestId("key-configured-indicator")).not.toBeInTheDocument();
+    });
+
+    it("should show normal placeholder for unconfigured provider", () => {
       render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
 
       fireEvent.click(screen.getByRole("button", { name: /openai/i }));
 
       expect(screen.getByLabelText(/api key/i)).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /replace key/i })).not.toBeInTheDocument();
+      expect(screen.getByPlaceholderText("sk-...")).toBeInTheDocument();
     });
 
     it("should not show status indicators without configuredProviders prop", () => {
@@ -285,7 +273,7 @@ describe("ProviderKeyForm", () => {
       expect(screen.queryByText("Active")).not.toBeInTheDocument();
     });
 
-    it("should show success feedback after saving", async () => {
+    it("should show configured indicator after successful save", async () => {
       vi.mocked(global.fetch).mockResolvedValueOnce({
         ok: true,
         json: async () => ({ success: true }),
@@ -293,15 +281,14 @@ describe("ProviderKeyForm", () => {
 
       render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
 
-      fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
-      fireEvent.click(screen.getByRole("button", { name: /replace key/i }));
+      fireEvent.click(screen.getByRole("button", { name: /openai/i }));
       fireEvent.change(screen.getByLabelText(/api key/i), {
-        target: { value: "sk-ant-new-key" },
+        target: { value: "sk-new-key" },
       });
       fireEvent.click(screen.getByRole("button", { name: /save/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/saved/i)).toBeInTheDocument();
+        expect(screen.getByTestId("key-configured-indicator")).toBeInTheDocument();
       });
     });
   });
