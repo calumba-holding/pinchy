@@ -1,23 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProviderKeyForm } from "@/components/provider-key-form";
 
 export default function SettingsPage() {
-  const [apiKey, setApiKey] = useState("");
   const [saved, setSaved] = useState(false);
 
-  async function handleSave() {
-    await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: "anthropic_api_key", value: apiKey }),
-    });
+  function handleSuccess() {
     setSaved(true);
-    setApiKey("");
     setTimeout(() => setSaved(false), 3000);
   }
 
@@ -30,20 +21,8 @@ export default function SettingsPage() {
           <CardTitle>LLM Provider</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="apiKey">Anthropic API Key</Label>
-              <Input
-                id="apiKey"
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-ant-..."
-              />
-            </div>
-            <Button onClick={handleSave}>Speichern</Button>
-            {saved && <p className="text-green-600">Gespeichert!</p>}
-          </div>
+          <ProviderKeyForm onSuccess={handleSuccess} submitLabel="Save" />
+          {saved && <p className="text-green-600 mt-4">Settings saved!</p>}
         </CardContent>
       </Card>
     </div>
