@@ -4,33 +4,37 @@ import { join } from "path";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
-const KEY_FILE_DIR = process.env.ENCRYPTION_KEY_DIR || "/data";
-const KEY_FILE_PATH = join(KEY_FILE_DIR, ".encryption_key");
 
 export function getEncryptionKey(): Buffer {
+  const keyFileDir = process.env.ENCRYPTION_KEY_DIR || "/data";
+  const keyFilePath = join(keyFileDir, ".encryption_key");
+
   // Priority 1: Environment variable
   const envKey = process.env.ENCRYPTION_KEY;
-  if (envKey && envKey.length === 64) {
+  if (envKey && envKey.length === 64 && /^[0-9a-fA-F]+$/.test(envKey)) {
     return Buffer.from(envKey, "hex");
   }
 
   // Priority 2: Auto-generated key file
-  if (existsSync(KEY_FILE_PATH)) {
-    const fileKey = readFileSync(KEY_FILE_PATH, "utf-8").trim();
+  if (existsSync(keyFilePath)) {
+    const fileKey = readFileSync(keyFilePath, "utf-8").trim();
+    if (fileKey.length !== 64 || !/^[0-9a-fA-F]+$/.test(fileKey)) {
+      throw new Error(`Invalid encryption key in ${keyFilePath}: expected 64 hex characters`);
+    }
     return Buffer.from(fileKey, "hex");
   }
 
   // Priority 3: Auto-generate and persist
-  if (existsSync(KEY_FILE_DIR)) {
+  if (existsSync(keyFileDir)) {
     const newKey = randomBytes(32).toString("hex");
-    writeFileSync(KEY_FILE_PATH, newKey, { mode: 0o600 });
+    writeFileSync(keyFilePath, newKey, { mode: 0o600 });
     return Buffer.from(newKey, "hex");
   }
 
   throw new Error(
     "ENCRYPTION_KEY environment variable is required (64 hex characters) " +
       "or a writable directory at " +
-      KEY_FILE_DIR
+      keyFileDir
   );
 }
 
@@ -54,6 +58,9 @@ export function decrypt(ciphertext: string): string {
   }
 
   const [ivHex, authTagHex, encrypted] = parts;
+  if (!ivHex || !authTagHex || !encrypted) {
+    throw new Error("Invalid ciphertext format");
+  }
   const decipher = createDecipheriv(ALGORITHM, key, Buffer.from(ivHex, "hex"));
   decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
 
