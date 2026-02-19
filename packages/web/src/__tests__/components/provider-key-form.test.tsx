@@ -4,13 +4,17 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { ProviderKeyForm } from "@/components/provider-key-form";
 
-global.fetch = vi.fn();
-
 describe("ProviderKeyForm", () => {
   const onSuccess = vi.fn();
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    fetchSpy = vi.spyOn(global, "fetch").mockImplementation(vi.fn());
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
   });
 
   it("should render three provider buttons", () => {
@@ -54,7 +58,7 @@ describe("ProviderKeyForm", () => {
   });
 
   it("should call onSuccess after successful submission", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce({
+    vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ success: true }),
     } as Response);
@@ -73,7 +77,7 @@ describe("ProviderKeyForm", () => {
   });
 
   it("should show error on failed validation", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce({
+    vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: false,
       json: async () => ({ error: "Invalid API key. Please check and try again." }),
     } as Response);
@@ -92,7 +96,7 @@ describe("ProviderKeyForm", () => {
   });
 
   it("should show loading state during submission", async () => {
-    vi.mocked(fetch).mockImplementation(
+    vi.mocked(global.fetch).mockImplementation(
       () =>
         new Promise((resolve) =>
           setTimeout(
@@ -178,6 +182,28 @@ describe("ProviderKeyForm", () => {
       fireEvent.click(screen.getByText(/need help getting a key/i));
 
       expect(screen.getByRole("link", { name: /go to.*openai/i })).toBeInTheDocument();
+    });
+
+    it("should link the provider domain in the signup step", () => {
+      render(<ProviderKeyForm onSuccess={onSuccess} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
+      fireEvent.click(screen.getByText(/need help getting a key/i));
+
+      const signupLink = screen.getByRole("link", { name: /platform\.claude\.com/i });
+      expect(signupLink).toHaveAttribute("href", "https://platform.claude.com");
+      expect(signupLink).toHaveAttribute("target", "_blank");
+    });
+
+    it("should link Google domain in the signup step", () => {
+      render(<ProviderKeyForm onSuccess={onSuccess} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /google/i }));
+      fireEvent.click(screen.getByText(/need help getting a key/i));
+
+      const signupLink = screen.getByRole("link", { name: /aistudio\.google\.com/i });
+      expect(signupLink).toHaveAttribute("href", "https://aistudio.google.com");
+      expect(signupLink).toHaveAttribute("target", "_blank");
     });
   });
 });

@@ -1,0 +1,12 @@
+services:
+  pinchy:
+    build:
+      context: .
+      dockerfile: Dockerfile.pinchy.dev
+    volumes:
+      - ./packages/web:/app/packages/web
+      - /app/packages/web/node_modules
+      - /app/packages/web/.next
+  db:
+    ports:
+      - "5432:5432"

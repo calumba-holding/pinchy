@@ -9,9 +9,15 @@ import { Lock, ChevronDown, ExternalLink } from "lucide-react";
 
 type ProviderName = "anthropic" | "openai" | "google";
 
+interface ProviderStep {
+  label: string;
+  optional?: boolean;
+  link?: { text: string; url: string };
+}
+
 interface ProviderGuide {
   keyUrl: string;
-  steps: { label: string; optional?: boolean }[];
+  steps: ProviderStep[];
 }
 
 const PROVIDERS: Record<ProviderName, { name: string; placeholder: string; guide: ProviderGuide }> =
@@ -22,7 +28,11 @@ const PROVIDERS: Record<ProviderName, { name: string; placeholder: string; guide
       guide: {
         keyUrl: "https://platform.claude.com/settings/keys",
         steps: [
-          { label: "Sign up at platform.claude.com", optional: true },
+          {
+            label: "Sign up at platform.claude.com",
+            optional: true,
+            link: { text: "platform.claude.com", url: "https://platform.claude.com" },
+          },
           { label: "Open API Keys in the left sidebar" },
           { label: "Click Create Key and copy it immediately" },
           { label: "Add a payment method under Plans & Billing", optional: true },
@@ -35,7 +45,11 @@ const PROVIDERS: Record<ProviderName, { name: string; placeholder: string; guide
       guide: {
         keyUrl: "https://platform.openai.com/api-keys",
         steps: [
-          { label: "Sign up at platform.openai.com", optional: true },
+          {
+            label: "Sign up at platform.openai.com",
+            optional: true,
+            link: { text: "platform.openai.com", url: "https://platform.openai.com" },
+          },
           { label: "Open API Keys in the left sidebar" },
           { label: "Click Create new secret key and copy it immediately" },
           { label: "Add a payment method under Billing", optional: true },
@@ -48,13 +62,38 @@ const PROVIDERS: Record<ProviderName, { name: string; placeholder: string; guide
       guide: {
         keyUrl: "https://aistudio.google.com/apikey",
         steps: [
-          { label: "Sign in with your Google account at aistudio.google.com", optional: true },
+          {
+            label: "Sign in with your Google account at aistudio.google.com",
+            optional: true,
+            link: { text: "aistudio.google.com", url: "https://aistudio.google.com" },
+          },
           { label: "Click Get API key in the left sidebar" },
           { label: "Click Create API key and copy it" },
         ],
       },
     },
   };
+
+function renderStepWithLink(label: string, link: { text: string; url: string }) {
+  const index = label.indexOf(link.text);
+  if (index === -1) return label;
+  const before = label.slice(0, index);
+  const after = label.slice(index + link.text.length);
+  return (
+    <>
+      {before}
+      <a
+        href={link.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary hover:underline"
+      >
+        {link.text}
+      </a>
+      {after}
+    </>
+  );
+}
 
 interface ProviderKeyFormProps {
   onSuccess: () => void;
@@ -83,8 +122,14 @@ export function ProviderKeyForm({ onSuccess, submitLabel = "Continue" }: Provide
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Setup failed");
+        let message = "Setup failed";
+        try {
+          const data = await res.json();
+          if (data.error) message = data.error;
+        } catch {
+          // response body was not JSON; use default message
+        }
+        throw new Error(message);
       }
 
       onSuccess();
@@ -151,7 +196,7 @@ export function ProviderKeyForm({ onSuccess, submitLabel = "Continue" }: Provide
                 <ol className="space-y-1.5 list-decimal list-inside text-muted-foreground">
                   {PROVIDERS[provider].guide.steps.map((step) => (
                     <li key={step.label}>
-                      {step.label}
+                      {step.link ? renderStepWithLink(step.label, step.link) : step.label}
                       {step.optional && (
                         <span className="text-xs text-muted-foreground/60"> (optional)</span>
                       )}

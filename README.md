@@ -98,16 +98,32 @@ Follow our progress on [the blog](https://heypinchy.com/blog/building-pinchy-in-
 
 ## Development
 
-### Local development
+### Docker dev mode (recommended)
+
+Run the full stack with hot reload — code changes are reflected immediately in the browser:
 
 ```bash
-# Install dependencies
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+After the initial build, subsequent starts only need:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+What hot-reloads: React components, pages, styles. What doesn't: `server.ts` (restart container), dependencies (rebuild with `--build`).
+
+### Local development (without Docker for the app)
+
+```bash
 pnpm install
 
-# Start the database and OpenClaw
-docker compose up db openclaw -d
+# Start database and OpenClaw in Docker (dev override exposes port 5432)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up db openclaw -d
 
-# Run the dev server
+export DATABASE_URL=postgresql://pinchy:pinchy_dev@localhost:5432/pinchy
+pnpm db:migrate
 pnpm dev
 ```
 
@@ -121,6 +137,9 @@ pnpm build           # Production build
 pnpm test            # Run tests
 pnpm lint            # Run ESLint
 pnpm format          # Format code with Prettier
+pnpm db:generate     # Generate migration from schema changes
+pnpm db:migrate      # Apply pending migrations
+pnpm db:studio       # Open Drizzle Studio (database browser)
 ```
 
 ### Project structure
@@ -138,7 +157,8 @@ pinchy/
 │   └── drizzle/           # Generated migrations
 ├── config/                # OpenClaw config
 ├── docs/                  # Documentation (Astro Starlight)
-├── docker-compose.yml     # Full stack definition
+├── docker-compose.yml     # Full stack definition (production)
+├── docker-compose.dev.yml # Dev override (hot reload, exposed DB port)
 └── .github/workflows/     # CI + docs deployment
 ```
 

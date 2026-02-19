@@ -34,26 +34,47 @@ Docs PRs are always welcome — typo fixes, better examples, translations. No ch
 
 ## Development Setup
 
+### Docker dev mode (recommended)
+
+The easiest way to get started. Runs the full stack with hot reload:
+
 ```bash
-# Clone the repo
 git clone https://github.com/heypinchy/pinchy.git
 cd pinchy
-
-# Install dependencies
-npm install
-
-# Run in development mode
-npm run dev
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-> ⚠️ Detailed setup instructions will be added as the codebase matures.
+Open [http://localhost:7777](http://localhost:7777). Code changes in `packages/web/` are reflected immediately in the browser.
+
+### Local development (without Docker for the app)
+
+```bash
+git clone https://github.com/heypinchy/pinchy.git
+cd pinchy
+pnpm install
+
+# Start database and OpenClaw in Docker
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up db openclaw -d
+
+export DATABASE_URL=postgresql://pinchy:pinchy_dev@localhost:5432/pinchy
+pnpm db:migrate
+pnpm dev
+```
+
+### Running tests
+
+```bash
+pnpm test
+```
+
+All new features require tests. We practice TDD — write the failing test first, then the implementation.
 
 ## Code Style
 
-- TypeScript preferred
-- Prettier for formatting
-- ESLint for linting
-- Run `npm run lint` before submitting
+- TypeScript strict mode
+- Prettier for formatting, ESLint for linting
+- Run `pnpm lint` and `pnpm format` before submitting
+- Pre-commit hook runs linting automatically via Husky
 
 ## Code of Conduct
 

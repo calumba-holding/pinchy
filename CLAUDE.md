@@ -81,7 +81,10 @@ pinchy/
 │   └── drizzle/           # Generated migrations
 ├── config/                # OpenClaw config & startup script
 ├── docs/                  # Documentation (Astro Starlight, standalone)
-├── docker-compose.yml     # Full stack definition
+├── docker-compose.yml     # Full stack definition (production)
+├── docker-compose.dev.yml # Dev override (hot reload, exposed DB port)
+├── Dockerfile.pinchy      # Production image
+├── Dockerfile.pinchy.dev  # Dev image (no build step, runs pnpm dev)
 ├── .github/workflows/     # CI + docs deployment
 ├── CLAUDE.md              # ← You are here
 └── README.md              # Public-facing project description
@@ -151,13 +154,22 @@ Know these when making architectural decisions:
 ## Useful Commands
 
 ```bash
-# Full stack (Docker)
+# Production (Docker)
 docker compose up --build
 
-# Local development
+# Docker dev mode (hot reload)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+
+# Local development (without Docker for the app)
 pnpm install
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up db openclaw -d
+export DATABASE_URL=postgresql://pinchy:pinchy_dev@localhost:5432/pinchy
+pnpm db:migrate
 pnpm dev                 # Start dev server (port 7777)
+
+# Common commands
 pnpm test                # Run test suite
+pnpm build               # Production build
 pnpm lint                # Run ESLint
 pnpm format              # Format with Prettier
 pnpm db:generate         # Generate migration from schema changes
