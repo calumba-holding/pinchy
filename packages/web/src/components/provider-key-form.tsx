@@ -98,14 +98,27 @@ function renderStepWithLink(label: string, link: { text: string; url: string }) 
 interface ProviderKeyFormProps {
   onSuccess: () => void;
   submitLabel?: string;
+  configuredProviders?: Record<string, { configured: boolean; hint?: string }>;
+  defaultProvider?: string | null;
 }
 
-export function ProviderKeyForm({ onSuccess, submitLabel = "Continue" }: ProviderKeyFormProps) {
+export function ProviderKeyForm({
+  onSuccess,
+  submitLabel = "Continue",
+  configuredProviders,
+  defaultProvider,
+}: ProviderKeyFormProps) {
   const [provider, setProvider] = useState<ProviderName | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
+  const [replacing, setReplacing] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const isConfigured = provider ? configuredProviders?.[provider]?.configured === true : false;
+  const hint = provider ? configuredProviders?.[provider]?.hint : undefined;
+  const showInput = !isConfigured || replacing;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -132,6 +145,11 @@ export function ProviderKeyForm({ onSuccess, submitLabel = "Continue" }: Provide
         throw new Error(message);
       }
 
+      if (configuredProviders) {
+        setSaved(true);
+        setReplacing(false);
+        setApiKey("");
+      }
       onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Setup failed");
@@ -149,19 +167,28 @@ export function ProviderKeyForm({ onSuccess, submitLabel = "Continue" }: Provide
         <div className="grid grid-cols-3 gap-2">
           {(Object.entries(PROVIDERS) as [ProviderName, (typeof PROVIDERS)[ProviderName]][]).map(
             ([key, config]) => (
-              <Button
-                key={key}
-                type="button"
-                variant={provider === key ? "default" : "outline"}
-                onClick={() => {
-                  setProvider(key);
-                  setApiKey("");
-                  setError("");
-                  setGuideOpen(false);
-                }}
-              >
-                {config.name}
-              </Button>
+              <div key={key} className="flex flex-col items-center gap-1">
+                <Button
+                  type="button"
+                  variant={provider === key ? "default" : "outline"}
+                  className="w-full"
+                  onClick={() => {
+                    setProvider(key);
+                    setApiKey("");
+                    setError("");
+                    setGuideOpen(false);
+                    setReplacing(false);
+                    setSaved(false);
+                  }}
+                >
+                  {config.name}
+                </Button>
+                {configuredProviders?.[key]?.configured && (
+                  <span className="text-xs text-muted-foreground">
+                    {defaultProvider === key ? "Active" : "Configured"}
+                  </span>
+                )}
+              </div>
             )
           )}
         </div>
@@ -169,56 +196,82 @@ export function ProviderKeyForm({ onSuccess, submitLabel = "Continue" }: Provide
 
       {provider && (
         <>
-          <div className="space-y-2">
-            <Label htmlFor="apiKey">API Key</Label>
-            <Input
-              id="apiKey"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={PROVIDERS[provider].placeholder}
-            />
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Lock className="size-3" />
-              Your API key is encrypted at rest and never leaves your server.
-            </p>
-          </div>
-
-          <Collapsible open={guideOpen} onOpenChange={setGuideOpen}>
-            <CollapsibleTrigger className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-              <ChevronDown
-                className={`size-4 transition-transform ${guideOpen ? "rotate-180" : ""}`}
-              />
-              Need help getting a key?
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="mt-3 space-y-3 rounded-md border p-3 text-sm">
-                <ol className="space-y-1.5 list-decimal list-inside text-muted-foreground">
-                  {PROVIDERS[provider].guide.steps.map((step) => (
-                    <li key={step.label}>
-                      {step.link ? renderStepWithLink(step.label, step.link) : step.label}
-                      {step.optional && (
-                        <span className="text-xs text-muted-foreground/60"> (optional)</span>
-                      )}
-                    </li>
-                  ))}
-                </ol>
-                <a
-                  href={PROVIDERS[provider].guide.keyUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-                >
-                  Go to {PROVIDERS[provider].name}
-                  <ExternalLink className="size-3" />
-                </a>
+          {isConfigured && !replacing ? (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">····{hint}</p>
+              {saved && <p className="text-sm text-green-600">Saved!</p>}
+              <Button type="button" variant="outline" onClick={() => setReplacing(true)}>
+                Replace key
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="apiKey">API Key</Label>
+                <Input
+                  id="apiKey"
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={PROVIDERS[provider].placeholder}
+                />
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Lock className="size-3" />
+                  Your API key is encrypted at rest and never leaves your server.
+                </p>
               </div>
-            </CollapsibleContent>
-          </Collapsible>
 
-          <Button type="submit" disabled={!apiKey.trim() || loading} className="w-full">
-            {loading ? "Validating..." : submitLabel}
-          </Button>
+              <Collapsible open={guideOpen} onOpenChange={setGuideOpen}>
+                <CollapsibleTrigger className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                  <ChevronDown
+                    className={`size-4 transition-transform ${guideOpen ? "rotate-180" : ""}`}
+                  />
+                  Need help getting a key?
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-3 space-y-3 rounded-md border p-3 text-sm">
+                    <ol className="space-y-1.5 list-decimal list-inside text-muted-foreground">
+                      {PROVIDERS[provider].guide.steps.map((step) => (
+                        <li key={step.label}>
+                          {step.link ? renderStepWithLink(step.label, step.link) : step.label}
+                          {step.optional && (
+                            <span className="text-xs text-muted-foreground/60"> (optional)</span>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                    <a
+                      href={PROVIDERS[provider].guide.keyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                    >
+                      Go to {PROVIDERS[provider].name}
+                      <ExternalLink className="size-3" />
+                    </a>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+
+              <div className="flex gap-2">
+                <Button type="submit" disabled={!apiKey.trim() || loading} className="w-full">
+                  {loading ? "Validating..." : configuredProviders ? "Save" : submitLabel}
+                </Button>
+                {replacing && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setReplacing(false);
+                      setApiKey("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
     </form>

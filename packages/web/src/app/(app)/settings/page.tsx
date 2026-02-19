@@ -1,16 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProviderKeyForm } from "@/components/provider-key-form";
 
-export default function SettingsPage() {
-  const [saved, setSaved] = useState(false);
+interface ProviderStatus {
+  defaultProvider: string | null;
+  providers: Record<string, { configured: boolean }>;
+}
 
-  function handleSuccess() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  }
+export default function SettingsPage() {
+  const [status, setStatus] = useState<ProviderStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/settings/providers");
+      if (res.ok) {
+        const data = await res.json();
+        setStatus(data);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
 
   return (
     <div className="p-8 max-w-lg">
@@ -21,8 +38,16 @@ export default function SettingsPage() {
           <CardTitle>LLM Provider</CardTitle>
         </CardHeader>
         <CardContent>
-          <ProviderKeyForm onSuccess={handleSuccess} submitLabel="Save" />
-          {saved && <p className="text-green-600 mt-4">Settings saved!</p>}
+          {loading ? (
+            <p>Loading...</p>
+          ) : (
+            <ProviderKeyForm
+              onSuccess={fetchStatus}
+              submitLabel="Save"
+              configuredProviders={status?.providers}
+              defaultProvider={status?.defaultProvider}
+            />
+          )}
         </CardContent>
       </Card>
     </div>

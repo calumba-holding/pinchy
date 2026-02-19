@@ -1,5 +1,5 @@
 // packages/web/src/__tests__/components/provider-key-form.test.tsx
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { ProviderKeyForm } from "@/components/provider-key-form";
@@ -204,6 +204,105 @@ describe("ProviderKeyForm", () => {
       const signupLink = screen.getByRole("link", { name: /aistudio\.google\.com/i });
       expect(signupLink).toHaveAttribute("href", "https://aistudio.google.com");
       expect(signupLink).toHaveAttribute("target", "_blank");
+    });
+  });
+
+  describe("with configured providers", () => {
+    const configuredProviders = {
+      anthropic: { configured: true, hint: "xY9z" },
+      openai: { configured: false },
+      google: { configured: false },
+    };
+
+    it("should show 'Configured' indicator when configuredProviders marks a provider as configured", () => {
+      render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
+
+      expect(screen.getByText("Configured")).toBeInTheDocument();
+    });
+
+    it("should show 'Active' indicator for the defaultProvider", () => {
+      render(
+        <ProviderKeyForm
+          onSuccess={onSuccess}
+          configuredProviders={configuredProviders}
+          defaultProvider="anthropic"
+        />
+      );
+
+      expect(screen.getByText("Active")).toBeInTheDocument();
+    });
+
+    it("should show masked key with hint when clicking a configured provider", () => {
+      render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
+
+      expect(screen.getByText(/····xY9z/)).toBeInTheDocument();
+    });
+
+    it("should not show API key input when clicking a configured provider", () => {
+      render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
+
+      expect(screen.queryByLabelText(/api key/i)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /replace key/i })).toBeInTheDocument();
+    });
+
+    it("should show API key input after clicking Replace key", () => {
+      render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
+      fireEvent.click(screen.getByRole("button", { name: /replace key/i }));
+
+      expect(screen.getByLabelText(/api key/i)).toBeInTheDocument();
+    });
+
+    it("should hide input and show masked key again after clicking Cancel", () => {
+      render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
+      fireEvent.click(screen.getByRole("button", { name: /replace key/i }));
+      fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+
+      expect(screen.queryByLabelText(/api key/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/····xY9z/)).toBeInTheDocument();
+    });
+
+    it("should show API key input directly for unconfigured provider", () => {
+      render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /openai/i }));
+
+      expect(screen.getByLabelText(/api key/i)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /replace key/i })).not.toBeInTheDocument();
+    });
+
+    it("should not show status indicators without configuredProviders prop", () => {
+      render(<ProviderKeyForm onSuccess={onSuccess} />);
+
+      expect(screen.queryByText("Configured")).not.toBeInTheDocument();
+      expect(screen.queryByText("Active")).not.toBeInTheDocument();
+    });
+
+    it("should show success feedback after saving", async () => {
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      } as Response);
+
+      render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
+      fireEvent.click(screen.getByRole("button", { name: /replace key/i }));
+      fireEvent.change(screen.getByLabelText(/api key/i), {
+        target: { value: "sk-ant-new-key" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/saved/i)).toBeInTheDocument();
+      });
     });
   });
 });
