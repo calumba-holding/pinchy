@@ -1,11 +1,19 @@
-import { defineConfig } from 'astro/config';
+import { defineConfig, passthroughImageService } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
   site: 'https://docs.heypinchy.com',
+  image: {
+    service: passthroughImageService(),
+  },
   integrations: [
     starlight({
       title: 'Pinchy',
+      logo: {
+        src: './src/assets/pinchy-logo.png',
+      },
+      favicon: '/favicon.png',
+      customCss: ['./src/styles/custom.css'],
       social: [
         {
           icon: 'github',
