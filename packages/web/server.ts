@@ -27,7 +27,8 @@ app.prepare().then(() => {
       try {
         const trigger = await shouldTriggerGreeting();
         if (trigger) {
-          const greetingPrompt = "Greet the new admin. Briefly introduce yourself as Smithers and explain what you can help with in Pinchy. Keep it to 2-3 sentences.";
+          const greetingPrompt =
+            "Greet the new admin. Briefly introduce yourself as Smithers and explain what you can help with in Pinchy. Keep it to 2-3 sentences.";
           currentMessageId = crypto.randomUUID();
           openclawWs.send(JSON.stringify(createMessagePayload(greetingPrompt, "")));
           await markGreetingSent();
