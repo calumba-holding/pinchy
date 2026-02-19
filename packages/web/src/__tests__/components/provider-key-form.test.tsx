@@ -95,6 +95,25 @@ describe("ProviderKeyForm", () => {
     });
   });
 
+  it("should show error indicator next to input on failed validation", async () => {
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: "Invalid API key." }),
+    } as Response);
+
+    render(<ProviderKeyForm onSuccess={onSuccess} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
+    fireEvent.change(screen.getByLabelText(/api key/i), {
+      target: { value: "sk-ant-invalid" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("key-error-indicator")).toBeInTheDocument();
+    });
+  });
+
   it("should show loading state during submission", async () => {
     vi.mocked(global.fetch).mockImplementation(
       () =>
@@ -271,6 +290,26 @@ describe("ProviderKeyForm", () => {
 
       expect(screen.queryByText("Configured")).not.toBeInTheDocument();
       expect(screen.queryByText("Active")).not.toBeInTheDocument();
+    });
+
+    it("should show error indicator instead of configured indicator on failed save", async () => {
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: "Invalid API key." }),
+      } as Response);
+
+      render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
+      fireEvent.change(screen.getByLabelText(/api key/i), {
+        target: { value: "sk-ant-bad-key" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("key-error-indicator")).toBeInTheDocument();
+        expect(screen.queryByTestId("key-configured-indicator")).not.toBeInTheDocument();
+      });
     });
 
     it("should show configured indicator after successful save", async () => {

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Lock, ChevronDown, ExternalLink, CircleCheck } from "lucide-react";
+import { Lock, ChevronDown, ExternalLink, CircleCheck, CircleX } from "lucide-react";
 
 type ProviderName = "anthropic" | "openai" | "google";
 
@@ -166,8 +166,6 @@ export function ProviderKeyForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {error && <p className="text-destructive">{error}</p>}
-
       <div className="space-y-2">
         <Label>Provider</Label>
         <div className="grid grid-cols-3 gap-2">
@@ -212,13 +210,20 @@ export function ProviderKeyForm({
                 placeholder={maskedPlaceholder}
                 className="flex-1"
               />
-              {(isConfigured || saved) && !loading && (
+              {error && !loading && (
+                <CircleX
+                  className="size-5 text-destructive shrink-0"
+                  data-testid="key-error-indicator"
+                />
+              )}
+              {!error && (isConfigured || saved) && !loading && (
                 <CircleCheck
                   className="size-5 text-green-600 shrink-0"
                   data-testid="key-configured-indicator"
                 />
               )}
             </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Lock className="size-3" />
               Your API key is encrypted at rest and never leaves your server.
