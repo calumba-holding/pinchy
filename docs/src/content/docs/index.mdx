@@ -1,6 +1,6 @@
 ---
 title: Pinchy Documentation
-description: Enterprise AI agent platform built on OpenClaw.
+description: Enterprise AI agent platform built on OpenClaw. Self-hosted, offline-capable, open source.
 template: splash
 hero:
   title: Pinchy Documentation
@@ -14,3 +14,30 @@ hero:
       variant: minimal
       icon: external
 ---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What is Pinchy?
+
+Pinchy is an enterprise layer on top of [OpenClaw](https://github.com/openclaw/openclaw) — the open-source AI agent runtime. OpenClaw is powerful for individual users. Pinchy adds what teams need: permissions, audit trails, user management, and governance.
+
+We believe AI agents should run on **your** servers, with **your** data, under **your** control.
+
+## Current Status
+
+Pinchy is in early development. The core is working — setup, authentication, provider configuration, and agent chat via OpenClaw. We're building the enterprise features (RBAC, audit trail, plugins) next.
+
+<CardGrid>
+  <Card title="Quick Start" icon="rocket">
+    Get Pinchy running in 5 minutes with Docker Compose. [Read the guide →](/getting-started/)
+  </Card>
+  <Card title="Installation" icon="setting">
+    Environment variables, Docker volumes, and development setup. [Full details →](/installation/)
+  </Card>
+  <Card title="Architecture" icon="document">
+    How Pinchy wraps OpenClaw, the request flow, and the tech stack. [Learn more →](/architecture/)
+  </Card>
+  <Card title="GitHub" icon="github">
+    Source code, issues, and discussions. [View repository →](https://github.com/heypinchy/pinchy)
+  </Card>
+</CardGrid>

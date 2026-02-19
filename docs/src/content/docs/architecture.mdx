@@ -1,6 +1,100 @@
 ---
 title: Architecture
-description: How Pinchy is structured and how it integrates with OpenClaw.
+description: How Pinchy wraps OpenClaw, the request flow, and the tech stack.
 ---
 
-Coming soon.
+## Overview
+
+Pinchy is **not a fork** of OpenClaw. It's a governance layer on top of it. OpenClaw handles agent execution, tool use, and model communication. Pinchy adds authentication, provider management, and (soon) permissions, audit trails, and team management.
+
+```
+┌─────────────────────────────────────────────┐
+│                  Browser                     │
+│         (Next.js React Frontend)             │
+└──────────┬──────────────────┬───────────────┘
+           │ HTTPS            │ WebSocket
+           │ (pages, API)     │ (/api/ws)
+           ▼                  ▼
+┌─────────────────────────────────────────────┐
+│              Pinchy (Node.js)                │
+│                                             │
+│  ┌──────────┐  ┌──────────┐  ┌───────────┐ │
+│  │ Next.js  │  │    WS    │  │   Auth    │ │
+│  │  Pages   │  │  Bridge  │  │  (Auth.js)│ │
+│  └──────────┘  └────┬─────┘  └───────────┘ │
+│                     │                       │
+│  ┌──────────────────┴───────────────────┐   │
+│  │          Drizzle ORM                 │   │
+│  └──────────────────┬───────────────────┘   │
+│                     │                       │
+└─────────────────────┼───────────────────────┘
+                      │
+          ┌───────────┼───────────┐
+          ▼                       ▼
+┌──────────────────┐   ┌──────────────────┐
+│   PostgreSQL 16  │   │    OpenClaw      │
+│                  │   │    Gateway       │
+│  users, agents,  │   │   (port 18789)  │
+│  settings, keys  │   │                 │
+└──────────────────┘   └──────────────────┘
+```
+
+## Request flow
+
+When a user sends a message, it flows through three layers:
+
+1. **Browser** → connects via WebSocket to `/api/ws` on Pinchy
+2. **Pinchy** → receives the message, generates a message ID, and forwards it to OpenClaw Gateway via a second WebSocket connection
+3. **OpenClaw** → processes the message through the configured model and streams the response back
+4. **Pinchy** → attaches the message ID and forwards each chunk to the browser
+5. **Browser** → renders the streaming response in real time
+
+Each browser connection gets its own dedicated OpenClaw connection. Pinchy acts as a bridge — it never interprets or modifies the AI response content.
+
+## Authentication
+
+Pinchy uses [Auth.js v5](https://authjs.dev/) with a credentials provider:
+
+- Passwords are hashed with **bcrypt** before storage
+- Sessions use **JWT** strategy (stateless, no server-side session store)
+- The first user created via the setup wizard becomes the admin
+- All app routes require authentication — unauthenticated requests redirect to `/login`
+
+## Database
+
+PostgreSQL 16, accessed via [Drizzle ORM](https://orm.drizzle.team/). The schema includes:
+
+- **Auth tables** — `user`, `account`, `session`, `verificationToken` (managed by Auth.js adapter)
+- **`agents`** — Agent configuration (name, model, system prompt)
+- **`settings`** — Key-value store for app configuration (provider keys, onboarding state)
+
+Migrations are generated with `drizzle-kit generate` and applied automatically on container startup via `drizzle-kit migrate`.
+
+## Encryption
+
+Provider API keys are encrypted at rest using **AES-256-GCM**:
+
+- A 256-bit encryption key is either provided via the `ENCRYPTION_KEY` environment variable or auto-generated and persisted in the `pinchy-data` Docker volume
+- Each encrypted value stores the IV, auth tag, and ciphertext together
+- Decryption happens on-demand when Pinchy writes the OpenClaw configuration file
+
+## OpenClaw integration
+
+OpenClaw runs as a separate Docker container. Pinchy communicates with it exclusively via WebSocket on port 18789. The browser never connects to OpenClaw directly.
+
+When a provider API key is saved in Pinchy, it writes the decrypted key to a shared Docker volume (`openclaw-config`). An inotify-based wrapper script inside the OpenClaw container detects the config change and restarts the gateway automatically.
+
+## Tech stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 16, React 19, Tailwind CSS v4, shadcn/ui |
+| Chat UI | assistant-ui (React) |
+| Auth | Auth.js v5 (credentials provider, JWT sessions) |
+| Database | PostgreSQL 16, Drizzle ORM |
+| Agent runtime | OpenClaw Gateway (WebSocket) |
+| Encryption | AES-256-GCM (Node.js crypto) |
+| Testing | Vitest, React Testing Library |
+| CI/CD | GitHub Actions, ESLint, Prettier |
+| Deployment | Docker Compose |
+| License | AGPL-3.0 |

@@ -1,6 +1,61 @@
 ---
 title: Quick Start
-description: Get up and running with Pinchy in minutes.
+description: Get Pinchy running in 5 minutes with Docker Compose.
 ---
 
-Coming soon.
+This guide walks you through getting Pinchy up and running — from cloning the repo to chatting with your first AI agent.
+
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) (v2+)
+- An API key from an LLM provider (Anthropic, OpenAI, or Google)
+
+## 1. Clone the repository
+
+```bash
+git clone https://github.com/heypinchy/pinchy.git
+cd pinchy
+```
+
+## 2. Start the stack
+
+```bash
+docker compose up --build
+```
+
+This starts three services:
+
+- **Pinchy** — the web app on port 7777
+- **OpenClaw** — the AI agent runtime (internal, not exposed)
+- **PostgreSQL** — the database
+
+Wait until you see `Pinchy ready on http://localhost:7777` in the logs.
+
+## 3. Create your admin account
+
+Open [http://localhost:7777](http://localhost:7777) in your browser. The setup wizard appears automatically on first run.
+
+Enter your name, email, and password. This creates the first admin user.
+
+## 4. Configure your AI provider
+
+After creating your account, Pinchy redirects you to the provider setup page. Choose your LLM provider and enter your API key:
+
+| Provider | Where to get a key |
+|----------|-------------------|
+| Anthropic | [console.anthropic.com](https://console.anthropic.com/) |
+| OpenAI | [platform.openai.com](https://platform.openai.com/api-keys) |
+| Google | [aistudio.google.com](https://aistudio.google.com/apikey) |
+
+Your API key is encrypted at rest using AES-256-GCM before being stored in the database.
+
+## 5. Chat with Smithers
+
+Once your provider is configured, Pinchy redirects you to the chat interface. Your default agent — **Smithers** — greets you automatically.
+
+Type a message and hit Enter. Smithers responds in real time via WebSocket.
+
+## What's next?
+
+- **[Installation](/installation/)** — Learn about environment variables, Docker volumes, and development setup
+- **[Architecture](/architecture/)** — Understand how Pinchy wraps OpenClaw and the request flow
