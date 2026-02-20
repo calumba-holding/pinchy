@@ -208,14 +208,12 @@ describe("regenerateOpenClawConfig", () => {
         id: "uuid-agent-1",
         name: "Smithers",
         model: "anthropic/claude-opus-4-6",
-        systemPrompt: null,
         createdAt: new Date(),
       },
       {
         id: "uuid-agent-2",
         name: "Jeeves",
         model: "openai/gpt-4o",
-        systemPrompt: null,
         createdAt: new Date(),
       },
     ];

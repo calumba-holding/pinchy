@@ -15,7 +15,6 @@ describe("database schema", () => {
     expect(columns).toContain("id");
     expect(columns).toContain("name");
     expect(columns).toContain("model");
-    expect(columns).toContain("systemPrompt");
     expect(columns).toContain("createdAt");
   });
 

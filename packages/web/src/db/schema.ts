@@ -69,7 +69,6 @@ export const agents = pgTable("agents", {
     .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull().default("Smithers"),
   model: text("model").notNull(),
-  systemPrompt: text("system_prompt"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

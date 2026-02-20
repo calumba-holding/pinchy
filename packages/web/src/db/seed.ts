@@ -1,5 +1,6 @@
 import { db } from "@/db";
 import { agents } from "@/db/schema";
+import { ensureWorkspace } from "@/lib/workspace";
 
 export async function seedDefaultAgent() {
   const existing = await db.query.agents.findFirst();
@@ -10,10 +11,10 @@ export async function seedDefaultAgent() {
     .values({
       name: "Smithers",
       model: "anthropic/claude-sonnet-4-20250514",
-      systemPrompt:
-        "You are Smithers, a helpful and loyal AI assistant. You are professional, efficient, and always ready to help.",
     })
     .returning();
+
+  ensureWorkspace(agent.id);
 
   return agent;
 }

@@ -5,13 +5,12 @@ import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AgentSettingsPage() {
   const params = useParams();
   const router = useRouter();
-  const [agent, setAgent] = useState({ name: "", model: "", systemPrompt: "" });
+  const [agent, setAgent] = useState({ name: "", model: "" });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,7 +30,7 @@ export default function AgentSettingsPage() {
     router.push(`/chat/${params.agentId}`);
   }
 
-  if (loading) return <div className="p-8 text-muted-foreground">Laden...</div>;
+  if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
 
   return (
     <div className="p-8 max-w-lg">
@@ -57,16 +56,7 @@ export default function AgentSettingsPage() {
                 onChange={(e) => setAgent({ ...agent, model: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="prompt">System Prompt</Label>
-              <Textarea
-                id="prompt"
-                value={agent.systemPrompt || ""}
-                onChange={(e) => setAgent({ ...agent, systemPrompt: e.target.value })}
-                rows={5}
-              />
-            </div>
-            <Button type="submit">Speichern</Button>
+            <Button type="submit">Save</Button>
           </form>
         </CardContent>
       </Card>

@@ -18,8 +18,6 @@ vi.mock("@/db", () => {
                 id: "agent-1",
                 name: "Smithers",
                 model: "anthropic/claude-sonnet-4-20250514",
-                systemPrompt:
-                  "You are Smithers, a helpful and loyal AI assistant. You are professional, efficient, and always ready to help.",
                 createdAt: new Date(),
               },
             ]);
@@ -49,6 +47,12 @@ vi.mock("bcryptjs", () => ({
     hash: vi.fn().mockResolvedValue("hashed_password"),
   },
 }));
+
+vi.mock("@/lib/workspace", () => ({
+  ensureWorkspace: vi.fn(),
+}));
+
+import { ensureWorkspace } from "@/lib/workspace";
 
 import { db } from "@/db";
 
@@ -167,12 +171,18 @@ describe("seedDefaultAgent", () => {
     expect(agent.name).toBe("Smithers");
   });
 
+  it("should call ensureWorkspace when creating a new agent", async () => {
+    vi.mocked(db.query.agents.findFirst).mockResolvedValue(undefined);
+
+    await seedDefaultAgent();
+    expect(ensureWorkspace).toHaveBeenCalledWith("agent-1");
+  });
+
   it("should return existing agent if one exists", async () => {
     vi.mocked(db.query.agents.findFirst).mockResolvedValue({
       id: "existing-agent",
       name: "Smithers",
       model: "anthropic/claude-sonnet-4-20250514",
-      systemPrompt: "existing prompt",
       createdAt: new Date(),
     });
 
@@ -180,5 +190,6 @@ describe("seedDefaultAgent", () => {
     expect(agent.name).toBe("Smithers");
     expect(agent.id).toBe("existing-agent");
     expect(db.insert).not.toHaveBeenCalled();
+    expect(ensureWorkspace).not.toHaveBeenCalled();
   });
 });
