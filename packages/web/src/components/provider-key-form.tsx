@@ -6,6 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Lock, ChevronDown, ExternalLink, CircleCheck, CircleX } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type ProviderName = "anthropic" | "openai" | "google";
 
@@ -268,34 +279,56 @@ export function ProviderKeyForm({
           </Button>
 
           {configuredProviders && isConfigured && (
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full text-destructive hover:text-destructive"
-              disabled={removing}
-              onClick={async () => {
-                setRemoving(true);
-                setError("");
-                try {
-                  const res = await fetch("/api/settings/providers", {
-                    method: "DELETE",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ provider }),
-                  });
-                  if (!res.ok) {
-                    const data = await res.json();
-                    throw new Error(data.error || "Failed to remove key");
-                  }
-                  onSuccess();
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : "Failed to remove key");
-                } finally {
-                  setRemoving(false);
-                }
-              }}
-            >
-              {removing ? "Removing..." : "Remove key"}
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full text-destructive hover:text-destructive"
+                  disabled={removing}
+                >
+                  {removing ? "Removing..." : "Remove key"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove API key?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will remove your {provider ? PROVIDERS[provider].name : ""} API key. If
+                    this is the active provider, agents will be switched to another configured
+                    provider.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={async () => {
+                      setRemoving(true);
+                      setError("");
+                      try {
+                        const res = await fetch("/api/settings/providers", {
+                          method: "DELETE",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ provider }),
+                        });
+                        if (!res.ok) {
+                          const data = await res.json();
+                          throw new Error(data.error || "Failed to remove key");
+                        }
+                        onSuccess();
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Failed to remove key");
+                      } finally {
+                        setRemoving(false);
+                      }
+                    }}
+                  >
+                    Remove
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </>
       )}

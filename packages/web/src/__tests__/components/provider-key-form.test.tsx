@@ -355,7 +355,27 @@ describe("ProviderKeyForm", () => {
       expect(screen.queryByRole("button", { name: /remove key/i })).not.toBeInTheDocument();
     });
 
-    it("should call DELETE endpoint and onSuccess after successful removal", async () => {
+    it("should open confirmation dialog when Remove key is clicked", () => {
+      render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
+      fireEvent.click(screen.getByRole("button", { name: /remove key/i }));
+
+      expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+      expect(screen.getByText("Remove API key?")).toBeInTheDocument();
+    });
+
+    it("should not call DELETE when Cancel is clicked in confirmation dialog", () => {
+      render(<ProviderKeyForm onSuccess={onSuccess} configuredProviders={configuredProviders} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
+      fireEvent.click(screen.getByRole("button", { name: /remove key/i }));
+      fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("should call DELETE endpoint and onSuccess after confirming removal", async () => {
       vi.mocked(global.fetch).mockResolvedValueOnce({
         ok: true,
         json: async () => ({ success: true }),
@@ -365,6 +385,7 @@ describe("ProviderKeyForm", () => {
 
       fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
       fireEvent.click(screen.getByRole("button", { name: /remove key/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^remove$/i }));
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith("/api/settings/providers", {
@@ -388,6 +409,7 @@ describe("ProviderKeyForm", () => {
 
       fireEvent.click(screen.getByRole("button", { name: /anthropic/i }));
       fireEvent.click(screen.getByRole("button", { name: /remove key/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^remove$/i }));
 
       await waitFor(() => {
         expect(screen.getByText(/cannot remove the last configured provider/i)).toBeInTheDocument();

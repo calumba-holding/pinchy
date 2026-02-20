@@ -69,7 +69,17 @@ app.prepare().then(() => {
   });
 
   // TODO: Authenticate WebSocket connections (validate session token before accepting)
-  const wss = new WebSocketServer({ server, path: "/api/ws" });
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on("upgrade", (request, socket, head) => {
+    const { pathname } = parse(request.url!, true);
+    if (pathname === "/api/ws") {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit("connection", ws, request);
+      });
+    }
+    // Other upgrade requests (e.g. Next.js HMR) are left for Next.js to handle
+  });
 
   wss.on("connection", (clientWs) => {
     clientWs.on("message", (data) => {
