@@ -14,7 +14,7 @@ export async function isSetupComplete(): Promise<boolean> {
   return firstUser !== undefined;
 }
 
-export async function createAdmin(email: string, password: string) {
+export async function createAdmin(name: string, email: string, password: string) {
   const existing = await db.query.users.findFirst();
   if (existing) {
     throw new Error("Setup already complete");
@@ -25,6 +25,7 @@ export async function createAdmin(email: string, password: string) {
   const [user] = await db
     .insert(users)
     .values({
+      name,
       email,
       passwordHash,
       role: "admin",

@@ -3,7 +3,11 @@ import { createAdmin } from "@/lib/setup";
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const { name, email, password } = await request.json();
+
+    if (!name || typeof name !== "string" || !name.trim()) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email)) {
@@ -16,7 +20,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await createAdmin(email, password);
+    const user = await createAdmin(name.trim(), email, password);
     return NextResponse.json(user, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "Setup already complete") {

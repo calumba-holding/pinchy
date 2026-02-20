@@ -47,15 +47,58 @@ describe("Setup Page", () => {
     ).toBeInTheDocument();
   });
 
-  it("should render email and password fields", () => {
+  it("should render name, email, and password fields", () => {
     render(<SetupPage />);
+    expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+  });
+
+  it("should render name field before email field", () => {
+    render(<SetupPage />);
+    const nameInput = screen.getByLabelText(/name/i);
+    const emailInput = screen.getByLabelText(/email/i);
+    // Name should come before email in the DOM
+    expect(
+      nameInput.compareDocumentPosition(emailInput) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it("should have a 'Create account' button", () => {
     render(<SetupPage />);
     expect(screen.getByRole("button", { name: /create account/i })).toBeInTheDocument();
+  });
+
+  it("should submit name along with email and password", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({}),
+    });
+
+    render(<SetupPage />);
+
+    fireEvent.change(screen.getByLabelText(/name/i), {
+      target: { value: "Admin User" },
+    });
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: "admin@test.com" },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: "password123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith("/api/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Admin User",
+          email: "admin@test.com",
+          password: "password123",
+        }),
+      });
+    });
   });
 
   it("should show success state after successful setup", async () => {
@@ -66,6 +109,9 @@ describe("Setup Page", () => {
 
     render(<SetupPage />);
 
+    fireEvent.change(screen.getByLabelText(/name/i), {
+      target: { value: "Admin User" },
+    });
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "admin@test.com" },
     });
@@ -89,6 +135,9 @@ describe("Setup Page", () => {
 
     render(<SetupPage />);
 
+    fireEvent.change(screen.getByLabelText(/name/i), {
+      target: { value: "Admin User" },
+    });
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "admin@test.com" },
     });
@@ -113,6 +162,9 @@ describe("Setup Page", () => {
 
     render(<SetupPage />);
 
+    fireEvent.change(screen.getByLabelText(/name/i), {
+      target: { value: "Admin User" },
+    });
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: "admin@test.com" },
     });

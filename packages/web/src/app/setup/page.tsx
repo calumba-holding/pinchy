@@ -21,6 +21,7 @@ export default function SetupPage() {
     setError("");
 
     const formData = new FormData(e.currentTarget);
+    const name = formData.get("name") as string;
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
@@ -28,7 +29,7 @@ export default function SetupPage() {
       const res = await fetch("/api/setup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ name, email, password }),
       });
 
       if (!res.ok) {
@@ -76,6 +77,11 @@ export default function SetupPage() {
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {error && <p className="text-destructive">{error}</p>}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name</Label>
+                    <Input id="name" name="name" type="text" required />
+                  </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>

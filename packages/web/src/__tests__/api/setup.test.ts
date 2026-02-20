@@ -64,17 +64,26 @@ describe("createAdmin", () => {
   it("should create admin user with hashed password", async () => {
     vi.mocked(db.query.users.findFirst).mockResolvedValue(undefined);
 
-    const result = await createAdmin("admin@test.com", "password123");
+    const result = await createAdmin("Admin User", "admin@test.com", "password123");
 
     expect(result).toEqual({ id: "1", email: "admin@test.com" });
     expect(db.insert).toHaveBeenCalled();
+  });
+
+  it("should accept and store name", async () => {
+    vi.mocked(db.query.users.findFirst).mockResolvedValue(undefined);
+
+    await createAdmin("Admin User", "admin@test.com", "password123");
+
+    const insertCalls = vi.mocked(db.insert).mock.calls;
+    expect(insertCalls.length).toBeGreaterThan(0);
   });
 
   it("should pass user id to seedDefaultAgent", async () => {
     vi.mocked(db.query.users.findFirst).mockResolvedValue(undefined);
     vi.mocked(db.query.agents.findFirst).mockResolvedValue(undefined);
 
-    await createAdmin("admin@test.com", "password123");
+    await createAdmin("Admin User", "admin@test.com", "password123");
 
     // db.insert is called twice: once for user, once for agent
     // The agent insert receives the ownerId from the created user
@@ -92,7 +101,9 @@ describe("createAdmin", () => {
       role: "admin",
     });
 
-    await expect(createAdmin("new@test.com", "pass")).rejects.toThrow("Setup already complete");
+    await expect(createAdmin("New User", "new@test.com", "pass")).rejects.toThrow(
+      "Setup already complete"
+    );
   });
 });
 
@@ -113,6 +124,7 @@ describe("POST /api/setup", () => {
     vi.mocked(db.query.users.findFirst).mockResolvedValue(undefined);
 
     const request = makeRequest({
+      name: "Admin User",
       email: "admin@test.com",
       password: "password123",
     });
@@ -123,8 +135,34 @@ describe("POST /api/setup", () => {
     expect(data).toEqual({ id: "1", email: "admin@test.com" });
   });
 
+  it("should return 400 when name is missing", async () => {
+    const request = makeRequest({
+      email: "admin@test.com",
+      password: "password123",
+    });
+    const response = await POST(request as any);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Name is required");
+  });
+
+  it("should return 400 when name is empty whitespace", async () => {
+    const request = makeRequest({
+      name: "   ",
+      email: "admin@test.com",
+      password: "password123",
+    });
+    const response = await POST(request as any);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe("Name is required");
+  });
+
   it("should return 400 when email is invalid", async () => {
     const request = makeRequest({
+      name: "Admin User",
       email: "not-an-email",
       password: "password123",
     });
@@ -137,6 +175,7 @@ describe("POST /api/setup", () => {
 
   it("should return 400 when password is too short", async () => {
     const request = makeRequest({
+      name: "Admin User",
       email: "admin@test.com",
       password: "short",
     });
@@ -159,6 +198,7 @@ describe("POST /api/setup", () => {
     });
 
     const request = makeRequest({
+      name: "New User",
       email: "new@test.com",
       password: "password123",
     });
