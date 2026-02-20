@@ -26,7 +26,10 @@ export async function PATCH(
   { params }: { params: Promise<{ agentId: string }> }
 ) {
   const { agentId } = await params;
-  const data = await request.json();
+  const body = await request.json();
+  const data: { name?: string; model?: string } = {};
+  if (body.name !== undefined) data.name = body.name;
+  if (body.model !== undefined) data.model = body.model;
   const agent = await updateAgent(agentId, data);
   return NextResponse.json(agent);
 }
