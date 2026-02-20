@@ -1,65 +1,109 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AgentSettingsGeneral } from "@/components/agent-settings-general";
+import { AgentSettingsFile } from "@/components/agent-settings-file";
+
+interface Agent {
+  id: string;
+  name: string;
+  model: string;
+}
+
+interface Provider {
+  id: string;
+  name: string;
+  models: Array<{ id: string; name: string }>;
+}
 
 export default function AgentSettingsPage() {
   const params = useParams();
-  const router = useRouter();
-  const [agent, setAgent] = useState({ name: "", model: "" });
+  const agentId = params.agentId as string;
+
+  const [agent, setAgent] = useState<Agent | null>(null);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [soulContent, setSoulContent] = useState("");
+  const [userContent, setUserContent] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/agents/${params.agentId}`)
-      .then((r) => r.json())
-      .then(setAgent)
-      .finally(() => setLoading(false));
-  }, [params.agentId]);
+    async function fetchData() {
+      try {
+        const [agentRes, modelsRes, soulRes, userRes] = await Promise.all([
+          fetch(`/api/agents/${agentId}`),
+          fetch("/api/providers/models"),
+          fetch(`/api/agents/${agentId}/files/SOUL.md`),
+          fetch(`/api/agents/${agentId}/files/USER.md`),
+        ]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    await fetch(`/api/agents/${params.agentId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(agent),
-    });
-    router.push(`/chat/${params.agentId}`);
+        if (agentRes.ok) {
+          setAgent(await agentRes.json());
+        }
+
+        if (modelsRes.ok) {
+          const data = await modelsRes.json();
+          setProviders(data.providers || []);
+        }
+
+        if (soulRes.ok) {
+          const data = await soulRes.json();
+          setSoulContent(data.content || "");
+        }
+
+        if (userRes.ok) {
+          const data = await userRes.json();
+          setUserContent(data.content || "");
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [agentId]);
+
+  if (loading) {
+    return <div className="p-8 text-muted-foreground">Loading...</div>;
   }
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
+  if (!agent) {
+    return <div className="p-8 text-muted-foreground">Agent not found.</div>;
+  }
 
   return (
-    <div className="p-8 max-w-lg">
-      <Card>
-        <CardHeader>
-          <CardTitle>Agent Settings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={agent.name}
-                onChange={(e) => setAgent({ ...agent, name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="model">Model</Label>
-              <Input
-                id="model"
-                value={agent.model}
-                onChange={(e) => setAgent({ ...agent, model: e.target.value })}
-              />
-            </div>
-            <Button type="submit">Save</Button>
-          </form>
-        </CardContent>
-      </Card>
+    <div className="p-8 max-w-2xl">
+      <div className="flex items-center justify-between mb-6">
+        <Link
+          href={`/chat/${agentId}`}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          &larr; Back to Chat
+        </Link>
+        <h1 className="text-2xl font-bold">Agent Settings</h1>
+      </div>
+
+      <Tabs defaultValue="general">
+        <TabsList>
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="soul">SOUL.md</TabsTrigger>
+          <TabsTrigger value="user">USER.md</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general">
+          <AgentSettingsGeneral agent={agent} providers={providers} />
+        </TabsContent>
+
+        <TabsContent value="soul">
+          <AgentSettingsFile agentId={agentId} filename="SOUL.md" content={soulContent} />
+        </TabsContent>
+
+        <TabsContent value="user">
+          <AgentSettingsFile agentId={agentId} filename="USER.md" content={userContent} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
