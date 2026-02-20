@@ -2,7 +2,9 @@
 
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { Thread } from "@/components/assistant-ui/thread";
-import { useWsRuntime } from "@/hooks/use-ws-runtime";
+import { useWsRuntime, clearSession } from "@/hooks/use-ws-runtime";
+import Link from "next/link";
+import { Settings, MessageSquarePlus } from "lucide-react";
 
 interface ChatProps {
   agentId: string;
@@ -21,12 +23,33 @@ export function Chat({ agentId, agentName, configuring = false }: ChatProps) {
 
   const statusColor = isConnected ? "text-green-600" : "text-destructive";
 
+  function handleNewChat() {
+    clearSession(agentId);
+    window.location.reload();
+  }
+
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <div className="flex flex-col h-full">
         <header className="p-4 border-b flex items-center justify-between">
           <h1 className="font-bold">{agentName}</h1>
-          <span className={`text-xs ${statusColor}`}>{statusMessage}</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleNewChat}
+              aria-label="New Chat"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <MessageSquarePlus className="h-5 w-5" />
+            </button>
+            <Link
+              href={`/chat/${agentId}/settings`}
+              aria-label="Settings"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Settings className="h-5 w-5" />
+            </Link>
+            <span className={`text-xs ${statusColor}`}>{statusMessage}</span>
+          </div>
         </header>
         <div className="flex-1">
           <Thread />

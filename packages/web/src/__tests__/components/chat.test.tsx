@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { Chat } from "@/components/chat";
 
@@ -8,6 +8,7 @@ vi.mock("@/hooks/use-ws-runtime", () => ({
     runtime: {},
     isConnected: true,
   }),
+  clearSession: vi.fn(),
 }));
 
 vi.mock("@assistant-ui/react", () => ({
@@ -18,7 +19,23 @@ vi.mock("@/components/assistant-ui/thread", () => ({
   Thread: () => <div data-testid="thread">Thread</div>,
 }));
 
-import { useWsRuntime } from "@/hooks/use-ws-runtime";
+vi.mock("next/link", () => ({
+  default: ({
+    children,
+    href,
+    ...props
+  }: {
+    children: React.ReactNode;
+    href: string;
+    [key: string]: unknown;
+  }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
+import { useWsRuntime, clearSession } from "@/hooks/use-ws-runtime";
 
 describe("Chat", () => {
   beforeEach(() => {
@@ -62,5 +79,39 @@ describe("Chat", () => {
 
     render(<Chat agentId="agent-1" agentName="Smithers" configuring={true} />);
     expect(screen.getByText(/applying your changes/i)).toBeInTheDocument();
+  });
+
+  it("should render a settings link with correct href", () => {
+    render(<Chat agentId="agent-1" agentName="Smithers" />);
+    const settingsLink = screen.getByRole("link", { name: /settings/i });
+    expect(settingsLink).toBeInTheDocument();
+    expect(settingsLink).toHaveAttribute("href", "/chat/agent-1/settings");
+  });
+
+  it("should render a New Chat button", () => {
+    render(<Chat agentId="agent-1" agentName="Smithers" />);
+    const newChatButton = screen.getByRole("button", { name: /new chat/i });
+    expect(newChatButton).toBeInTheDocument();
+  });
+
+  it("should call clearSession and reload when New Chat is clicked", () => {
+    const reloadMock = vi.fn();
+    Object.defineProperty(window, "location", {
+      value: { reload: reloadMock },
+      writable: true,
+    });
+
+    render(<Chat agentId="agent-1" agentName="Smithers" />);
+    const newChatButton = screen.getByRole("button", { name: /new chat/i });
+    fireEvent.click(newChatButton);
+
+    expect(clearSession).toHaveBeenCalledWith("agent-1");
+    expect(reloadMock).toHaveBeenCalled();
+  });
+
+  it("should render the settings link with the correct agent-specific href", () => {
+    render(<Chat agentId="my-special-agent" agentName="Test Agent" />);
+    const settingsLink = screen.getByRole("link", { name: /settings/i });
+    expect(settingsLink).toHaveAttribute("href", "/chat/my-special-agent/settings");
   });
 });
