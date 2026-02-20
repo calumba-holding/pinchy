@@ -16,8 +16,10 @@ export class ClientRouter {
     const messageId = crypto.randomUUID();
 
     try {
+      // Use OpenClaw's "main" agent. Pinchy's internal agent IDs don't map to
+      // OpenClaw agent IDs. Future: configurable agent mapping.
       const stream = this.openclawClient.chat(message.content, {
-        agentId: message.agentId,
+        sessionKey: "agent:main:main",
       });
 
       for await (const chunk of stream) {

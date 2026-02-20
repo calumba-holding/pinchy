@@ -44,7 +44,7 @@ describe("ClientRouter", () => {
     });
 
     expect(mockChat).toHaveBeenCalledWith("Hi Smithers", {
-      agentId: "agent-1",
+      sessionKey: "agent:main:main",
     });
   });
 

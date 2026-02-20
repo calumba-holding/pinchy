@@ -16,7 +16,6 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "openclaw-node": "0.0.3",
     "@assistant-ui/react": "^0.12.10",
     "@assistant-ui/react-markdown": "^0.12.3",
     "@auth/drizzle-adapter": "^1.11.1",
@@ -29,6 +28,7 @@
     "next": "16.1.6",
     "next-auth": "5.0.0-beta.30",
     "next-themes": "^0.4.6",
+    "openclaw-node": "0.0.5",
     "postgres": "^3.4.8",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
