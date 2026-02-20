@@ -313,11 +313,18 @@ describe("useWsRuntime", () => {
       ws.onopen?.();
     });
 
+    // assistant-ui puts images in attachments, not content
     act(() => {
       result.current.runtime.onNew({
-        content: [
-          { type: "text", text: "What is this?" },
-          { type: "image", image: "data:image/png;base64,abc123" },
+        content: [{ type: "text", text: "What is this?" }],
+        attachments: [
+          {
+            id: "img-1",
+            type: "image",
+            name: "photo.png",
+            status: { type: "complete" },
+            content: [{ type: "image", image: "data:image/png;base64,abc123" }],
+          },
         ],
         parentId: "root",
       });
@@ -357,14 +364,19 @@ describe("useWsRuntime", () => {
       ws.onopen?.();
     });
 
-    // Create a data URL that exceeds 5MB
     const largeImage = "data:image/png;base64," + "A".repeat(5 * 1024 * 1024 + 1);
 
     act(() => {
       result.current.runtime.onNew({
-        content: [
-          { type: "text", text: "Big image" },
-          { type: "image", image: largeImage },
+        content: [{ type: "text", text: "Big image" }],
+        attachments: [
+          {
+            id: "img-1",
+            type: "image",
+            name: "big.png",
+            status: { type: "complete" },
+            content: [{ type: "image", image: largeImage }],
+          },
         ],
         parentId: "root",
       });
@@ -391,15 +403,20 @@ describe("useWsRuntime", () => {
 
     act(() => {
       result.current.runtime.onNew({
-        content: [
-          { type: "text", text: "Describe this" },
-          { type: "image", image: "data:image/png;base64,xyz789" },
+        content: [{ type: "text", text: "Describe this" }],
+        attachments: [
+          {
+            id: "img-1",
+            type: "image",
+            name: "photo.png",
+            status: { type: "complete" },
+            content: [{ type: "image", image: "data:image/png;base64,xyz789" }],
+          },
         ],
         parentId: "root",
       });
     });
 
-    // The converted messages should include image content for display
     const messages = result.current.runtime.messages;
     const userMsg = messages.find((m: any) => m.role === "user");
     expect(userMsg).toBeDefined();

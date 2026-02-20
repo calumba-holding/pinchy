@@ -145,15 +145,31 @@ export function useWsRuntime(agentId: string): {
     async (message: AppendMessage) => {
       const textParts = message.content.filter((part) => part.type === "text");
       const text = textParts.map((part) => ("text" in part ? part.text : "")).join("");
-      const imageParts = message.content.filter((part) => part.type === "image");
+
+      // Extract images from attachments (assistant-ui puts them there, not in content)
+      const attachments =
+        (
+          message as {
+            attachments?: Array<{
+              type: string;
+              content?: Array<{ type: string; image?: string }>;
+            }>;
+          }
+        ).attachments ?? [];
+      const images: string[] = [];
+      for (const att of attachments) {
+        if (att.type === "image" && att.content) {
+          for (const c of att.content) {
+            if (c.type === "image" && c.image) {
+              images.push(c.image);
+            }
+          }
+        }
+      }
 
       // Check image size limit
-      for (const part of imageParts) {
-        if (
-          "image" in part &&
-          typeof part.image === "string" &&
-          part.image.length > MAX_IMAGE_SIZE
-        ) {
+      for (const img of images) {
+        if (img.length > MAX_IMAGE_SIZE) {
           setMessages((prev) => [
             ...prev,
             {
@@ -166,11 +182,7 @@ export function useWsRuntime(agentId: string): {
         }
       }
 
-      if (!text.trim() && imageParts.length === 0) return;
-
-      const images = imageParts
-        .map((part) => ("image" in part ? (part.image as string) : ""))
-        .filter(Boolean);
+      if (!text.trim() && images.length === 0) return;
 
       const userMessage: WsMessage = {
         id: crypto.randomUUID(),
