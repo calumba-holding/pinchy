@@ -2,10 +2,20 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { TemplateSelector } from "@/components/template-selector";
 import { DirectoryPicker } from "@/components/directory-picker";
 import { ArrowLeft } from "lucide-react";
@@ -21,15 +31,25 @@ interface Directory {
   name: string;
 }
 
+const agentFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+});
+
+type AgentFormValues = z.infer<typeof agentFormSchema>;
+
 export default function NewAgentPage() {
   const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [directories, setDirectories] = useState<Directory[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [name, setName] = useState("");
   const [selectedDirs, setSelectedDirs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const form = useForm<AgentFormValues>({
+    resolver: zodResolver(agentFormSchema),
+    defaultValues: { name: "" },
+  });
 
   const fetchData = useCallback(async () => {
     const [templatesRes, dirsRes] = await Promise.all([
@@ -52,14 +72,8 @@ export default function NewAgentPage() {
 
   const needsDirectories = selectedTemplate === "knowledge-base";
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmit(values: AgentFormValues) {
     setError(null);
-
-    if (!name.trim()) {
-      setError("Name is required");
-      return;
-    }
 
     if (needsDirectories && selectedDirs.length === 0) {
       setError("Select at least one directory");
@@ -70,7 +84,7 @@ export default function NewAgentPage() {
 
     try {
       const body: Record<string, unknown> = {
-        name: name.trim(),
+        name: values.name.trim(),
         templateId: selectedTemplate,
       };
 
@@ -106,58 +120,66 @@ export default function NewAgentPage() {
       {!selectedTemplate ? (
         <TemplateSelector templates={templates} onSelect={setSelectedTemplate} />
       ) : (
-        <form onSubmit={handleSubmit}>
+        <>
           <button
             type="button"
             onClick={() => setSelectedTemplate(null)}
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"
           >
             <ArrowLeft className="h-4 w-4" /> Back to templates
           </button>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                New {templates.find((t) => t.id === selectedTemplate)?.name ?? "Agent"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="agent-name">Name</Label>
-                <Input
-                  id="agent-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. HR Knowledge Base"
-                />
-              </div>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    New {templates.find((t) => t.id === selectedTemplate)?.name ?? "Agent"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. HR Knowledge Base" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              {needsDirectories && (
-                <div>
-                  <Label>Directories the agent can read</Label>
-                  <div className="mt-2">
-                    <DirectoryPicker
-                      directories={directories}
-                      selected={selectedDirs}
-                      onChange={setSelectedDirs}
-                    />
+                  {needsDirectories && (
+                    <div>
+                      <p className="text-sm font-medium">Directories the agent can read</p>
+                      <div className="mt-2">
+                        <DirectoryPicker
+                          directories={directories}
+                          selected={selectedDirs}
+                          onChange={setSelectedDirs}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {error && <p className="text-sm text-destructive">{error}</p>}
+
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => router.back()}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={submitting}>
+                      {submitting ? "Creating..." : "Create"}
+                    </Button>
                   </div>
-                </div>
-              )}
-
-              {error && <p className="text-sm text-destructive">{error}</p>}
-
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => router.back()}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? "Creating..." : "Create"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </form>
+                </CardContent>
+              </Card>
+            </form>
+          </Form>
+        </>
       )}
     </div>
   );

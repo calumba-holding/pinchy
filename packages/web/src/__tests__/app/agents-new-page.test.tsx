@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 
 vi.mock("next/navigation", () => ({
-  useRouter: vi.fn().mockReturnValue({ push: vi.fn() }),
+  useRouter: vi.fn().mockReturnValue({ push: vi.fn(), back: vi.fn() }),
 }));
 
 vi.mock("@/components/template-selector", () => ({
@@ -90,20 +91,63 @@ describe("New Agent Page", () => {
   });
 
   it("should show configuration form after selecting knowledge-base template", async () => {
+    const user = userEvent.setup();
     render(<NewAgentPage />);
     await waitFor(() => {
       expect(screen.getByTestId("template-selector")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByText("Knowledge Base"));
+    await user.click(screen.getByText("Knowledge Base"));
     await waitFor(() => {
       expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
       expect(screen.getByTestId("directory-picker")).toBeInTheDocument();
     });
   });
 
+  it("should show validation error when submitting with empty name", async () => {
+    const user = userEvent.setup();
+    render(<NewAgentPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId("template-selector")).toBeInTheDocument();
+    });
+    await user.click(screen.getByText("Custom Agent"));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
+    });
+
+    // Submit without filling the name
+    await user.click(screen.getByRole("button", { name: /create/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Name is required")).toBeInTheDocument();
+    });
+
+    // Should not have called the agents API
+    expect(global.fetch).not.toHaveBeenCalledWith("/api/agents", expect.anything());
+  });
+
+  it("should render Back to templates link outside the form element", async () => {
+    const user = userEvent.setup();
+    render(<NewAgentPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId("template-selector")).toBeInTheDocument();
+    });
+    await user.click(screen.getByText("Knowledge Base"));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
+    });
+
+    const backButton = screen.getByText(/back to templates/i);
+    expect(backButton).toBeInTheDocument();
+
+    // The back button should not be inside the form element
+    const formElement = screen.getByLabelText(/name/i).closest("form");
+    expect(formElement).not.toContainElement(backButton);
+  });
+
   it("should submit agent creation and redirect", async () => {
+    const user = userEvent.setup();
     const push = vi.fn();
-    vi.mocked(useRouter).mockReturnValue({ push } as any);
+    vi.mocked(useRouter).mockReturnValue({ push, back: vi.fn() } as any);
 
     vi.mocked(global.fetch).mockImplementation(async (url, opts) => {
       if (String(url).includes("/api/agents") && opts?.method === "POST") {
@@ -142,20 +186,20 @@ describe("New Agent Page", () => {
     });
 
     // Select template
-    fireEvent.click(screen.getByText("Knowledge Base"));
+    await user.click(screen.getByText("Knowledge Base"));
 
     await waitFor(() => {
       expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
     });
 
     // Fill name
-    fireEvent.change(screen.getByLabelText(/name/i), { target: { value: "Test Agent" } });
+    await user.type(screen.getByLabelText(/name/i), "Test Agent");
 
     // Select directory
-    fireEvent.click(screen.getByText("documents"));
+    await user.click(screen.getByText("documents"));
 
     // Submit
-    fireEvent.click(screen.getByRole("button", { name: /create/i }));
+    await user.click(screen.getByRole("button", { name: /create/i }));
 
     await waitFor(() => {
       expect(push).toHaveBeenCalledWith("/chat/new-id");
