@@ -40,3 +40,7 @@ npm-debug.log*
 # Coverage
 coverage/
 .nyc_output/
+
+# Playwright
+packages/web/test-results/
+packages/web/playwright-report/
