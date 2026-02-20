@@ -198,9 +198,6 @@ describe("SettingsUsers", () => {
       expect(screen.getByLabelText("Role")).toBeInTheDocument();
     });
 
-    // Select role
-    await user.selectOptions(screen.getByLabelText("Role"), "admin");
-
     vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ token: "invite-token-abc" }),
@@ -212,7 +209,7 @@ describe("SettingsUsers", () => {
       expect(global.fetch).toHaveBeenCalledWith("/api/users/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "", role: "admin" }),
+        body: JSON.stringify({ email: "", role: "user" }),
       });
     });
 

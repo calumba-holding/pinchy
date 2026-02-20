@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +13,28 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const inviteSchema = z.object({
+  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  role: z.enum(["user", "admin"]),
+});
+
+type InviteFormValues = z.infer<typeof inviteSchema>;
 
 interface InviteDialogProps {
   open: boolean;
@@ -18,21 +42,36 @@ interface InviteDialogProps {
 }
 
 export function InviteDialog({ open, onOpenChange }: InviteDialogProps) {
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("user");
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  async function handleCreate() {
+  const form = useForm<InviteFormValues>({
+    resolver: zodResolver(inviteSchema),
+    defaultValues: {
+      email: "",
+      role: "user",
+    },
+  });
+
+  useEffect(() => {
+    if (!open) {
+      form.reset();
+      setInviteLink(null);
+      setError(null);
+      setCopied(false);
+    }
+  }, [open, form]);
+
+  async function onSubmit(values: InviteFormValues) {
     setError(null);
     setCreating(true);
     try {
       const res = await fetch("/api/users/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify({ email: values.email, role: values.role }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -57,14 +96,6 @@ export function InviteDialog({ open, onOpenChange }: InviteDialogProps) {
   }
 
   function handleOpenChange(nextOpen: boolean) {
-    if (!nextOpen) {
-      // Reset state when closing
-      setEmail("");
-      setRole("user");
-      setInviteLink(null);
-      setError(null);
-      setCopied(false);
-    }
     onOpenChange(nextOpen);
   }
 
@@ -83,34 +114,48 @@ export function InviteDialog({ open, onOpenChange }: InviteDialogProps) {
             <Button onClick={handleCopy}>{copied ? "Copied!" : "Copy"}</Button>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="invite-email">Email (optional)</Label>
-              <Input
-                id="invite-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@example.com"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email (optional)</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="user@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="invite-role">Role</Label>
-              <select
-                id="invite-role"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-            {error && <p className="text-destructive text-sm">{error}</p>}
-            <Button onClick={handleCreate} disabled={creating}>
-              Create Invite
-            </Button>
-          </div>
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="user">User</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {error && <p className="text-destructive text-sm">{error}</p>}
+              <Button type="submit" disabled={creating}>
+                Create Invite
+              </Button>
+            </form>
+          </Form>
         )}
       </DialogContent>
     </Dialog>
