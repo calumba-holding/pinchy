@@ -1,0 +1,223 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
+
+vi.mock("@/lib/auth", () => ({
+  auth: vi.fn().mockResolvedValue({ user: { id: "1", email: "admin@test.com" } }),
+}));
+
+vi.mock("@/db", () => ({
+  db: {
+    query: {
+      agents: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "agent-1",
+          name: "Smithers",
+          model: "anthropic/claude-sonnet-4-20250514",
+        }),
+      },
+    },
+  },
+}));
+
+vi.mock("@/lib/workspace", () => ({
+  readWorkspaceFile: vi.fn().mockReturnValue("# Soul content"),
+  writeWorkspaceFile: vi.fn(),
+}));
+
+import { auth } from "@/lib/auth";
+import { db } from "@/db";
+import { readWorkspaceFile, writeWorkspaceFile } from "@/lib/workspace";
+import { GET, PUT } from "@/app/api/agents/[agentId]/files/[filename]/route";
+
+function makeGetRequest(agentId: string, filename: string) {
+  return new NextRequest(`http://localhost/api/agents/${agentId}/files/${filename}`, {
+    method: "GET",
+  });
+}
+
+function makePutRequest(agentId: string, filename: string, body: Record<string, unknown>) {
+  return new NextRequest(`http://localhost/api/agents/${agentId}/files/${filename}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function makeParams(agentId: string, filename: string) {
+  return { params: Promise.resolve({ agentId, filename }) };
+}
+
+describe("GET /api/agents/[agentId]/files/[filename]", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Restore default mocks
+    vi.mocked(auth).mockResolvedValue({ user: { id: "1", email: "admin@test.com" } } as any);
+    vi.mocked(db.query.agents.findFirst).mockResolvedValue({
+      id: "agent-1",
+      name: "Smithers",
+      model: "anthropic/claude-sonnet-4-20250514",
+      systemPrompt: null,
+      createdAt: new Date(),
+    });
+    vi.mocked(readWorkspaceFile).mockReturnValue("# Soul content");
+  });
+
+  it("should return file content for an allowed file", async () => {
+    const request = makeGetRequest("agent-1", "SOUL.md");
+    const response = await GET(request, makeParams("agent-1", "SOUL.md"));
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.content).toBe("# Soul content");
+    expect(readWorkspaceFile).toHaveBeenCalledWith("agent-1", "SOUL.md");
+  });
+
+  it("should return 401 when not authenticated", async () => {
+    vi.mocked(auth).mockResolvedValueOnce(null);
+
+    const request = makeGetRequest("agent-1", "SOUL.md");
+    const response = await GET(request, makeParams("agent-1", "SOUL.md"));
+
+    expect(response.status).toBe(401);
+    const data = await response.json();
+    expect(data.error).toBe("Unauthorized");
+  });
+
+  it("should return 404 when agent does not exist", async () => {
+    vi.mocked(db.query.agents.findFirst).mockResolvedValueOnce(undefined);
+
+    const request = makeGetRequest("nonexistent", "SOUL.md");
+    const response = await GET(request, makeParams("nonexistent", "SOUL.md"));
+
+    expect(response.status).toBe(404);
+    const data = await response.json();
+    expect(data.error).toBe("Agent not found");
+  });
+
+  it("should return 400 when filename is not allowed", async () => {
+    vi.mocked(readWorkspaceFile).mockImplementationOnce(() => {
+      throw new Error("File not allowed: SECRET.md");
+    });
+
+    const request = makeGetRequest("agent-1", "SECRET.md");
+    const response = await GET(request, makeParams("agent-1", "SECRET.md"));
+
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toBe("File not allowed: SECRET.md");
+  });
+
+  it("should read USER.md file", async () => {
+    vi.mocked(readWorkspaceFile).mockReturnValueOnce("# User context");
+
+    const request = makeGetRequest("agent-1", "USER.md");
+    const response = await GET(request, makeParams("agent-1", "USER.md"));
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.content).toBe("# User context");
+    expect(readWorkspaceFile).toHaveBeenCalledWith("agent-1", "USER.md");
+  });
+
+  it("should return empty string when file does not exist yet", async () => {
+    vi.mocked(readWorkspaceFile).mockReturnValueOnce("");
+
+    const request = makeGetRequest("agent-1", "SOUL.md");
+    const response = await GET(request, makeParams("agent-1", "SOUL.md"));
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.content).toBe("");
+  });
+});
+
+describe("PUT /api/agents/[agentId]/files/[filename]", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(auth).mockResolvedValue({ user: { id: "1", email: "admin@test.com" } } as any);
+    vi.mocked(db.query.agents.findFirst).mockResolvedValue({
+      id: "agent-1",
+      name: "Smithers",
+      model: "anthropic/claude-sonnet-4-20250514",
+      systemPrompt: null,
+      createdAt: new Date(),
+    });
+  });
+
+  it("should write file content and return success", async () => {
+    const request = makePutRequest("agent-1", "SOUL.md", {
+      content: "# Updated soul",
+    });
+    const response = await PUT(request, makeParams("agent-1", "SOUL.md"));
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    expect(writeWorkspaceFile).toHaveBeenCalledWith("agent-1", "SOUL.md", "# Updated soul");
+  });
+
+  it("should return 401 when not authenticated", async () => {
+    vi.mocked(auth).mockResolvedValueOnce(null);
+
+    const request = makePutRequest("agent-1", "SOUL.md", {
+      content: "# Updated soul",
+    });
+    const response = await PUT(request, makeParams("agent-1", "SOUL.md"));
+
+    expect(response.status).toBe(401);
+    const data = await response.json();
+    expect(data.error).toBe("Unauthorized");
+  });
+
+  it("should return 404 when agent does not exist", async () => {
+    vi.mocked(db.query.agents.findFirst).mockResolvedValueOnce(undefined);
+
+    const request = makePutRequest("nonexistent", "SOUL.md", {
+      content: "# Updated soul",
+    });
+    const response = await PUT(request, makeParams("nonexistent", "SOUL.md"));
+
+    expect(response.status).toBe(404);
+    const data = await response.json();
+    expect(data.error).toBe("Agent not found");
+  });
+
+  it("should return 400 when filename is not allowed", async () => {
+    vi.mocked(writeWorkspaceFile).mockImplementationOnce(() => {
+      throw new Error("File not allowed: HACK.md");
+    });
+
+    const request = makePutRequest("agent-1", "HACK.md", {
+      content: "malicious content",
+    });
+    const response = await PUT(request, makeParams("agent-1", "HACK.md"));
+
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toBe("File not allowed: HACK.md");
+  });
+
+  it("should write USER.md file", async () => {
+    const request = makePutRequest("agent-1", "USER.md", {
+      content: "# Team info",
+    });
+    const response = await PUT(request, makeParams("agent-1", "USER.md"));
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    expect(writeWorkspaceFile).toHaveBeenCalledWith("agent-1", "USER.md", "# Team info");
+  });
+
+  it("should handle empty content", async () => {
+    const request = makePutRequest("agent-1", "SOUL.md", {
+      content: "",
+    });
+    const response = await PUT(request, makeParams("agent-1", "SOUL.md"));
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    expect(writeWorkspaceFile).toHaveBeenCalledWith("agent-1", "SOUL.md", "");
+  });
+});
