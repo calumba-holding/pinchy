@@ -1,7 +1,11 @@
 {
   "gateway": {
     "mode": "local",
-    "bind": "lan"
+    "bind": "lan",
+    "auth": {
+      "mode": "token",
+      "token": "20339cb1e8907e8ade63a1ce5064711933095b4bf63e0e6a"
+    }
   },
   "agents": {
     "defaults": {

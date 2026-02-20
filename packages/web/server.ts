@@ -32,8 +32,9 @@ app.prepare().then(() => {
   const openclawClient = new OpenClawClient({
     url: OPENCLAW_WS_URL,
     token: readGatewayToken(),
-    clientId: "pinchy",
+    clientId: "gateway-client",
     clientVersion: "0.1.0",
+    scopes: ["operator.admin"],
     autoReconnect: true,
     reconnectIntervalMs: 1000,
     maxReconnectAttempts: Infinity,

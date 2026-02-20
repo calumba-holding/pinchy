@@ -77,6 +77,20 @@ export function useWsRuntime(agentId: string): {
             setIsRunning(false);
           }, STREAM_DONE_DEBOUNCE_MS);
         }
+
+        if (data.type === "done") {
+          if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+          }
+          setIsRunning(false);
+        }
+
+        if (data.type === "error") {
+          if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+          }
+          setIsRunning(false);
+        }
       } catch {
         // Ignore unparseable messages
       }
