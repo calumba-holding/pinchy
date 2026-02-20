@@ -60,6 +60,18 @@ Pinchy uses [Auth.js v5](https://authjs.dev/) with a credentials provider:
 - The first user created via the setup wizard becomes the admin
 - All app routes require authentication — unauthenticated requests redirect to `/login`
 
+## Permission layer
+
+Pinchy enforces agent permissions through a defense-in-depth approach. When an agent is created from a template like **Knowledge Base**, Pinchy:
+
+1. **Denies native tools** — tells OpenClaw to block the agent's access to file system, runtime, and web tool groups using OpenClaw's `tools.deny` policy
+2. **Installs scoped alternatives** — the `pinchy-files` plugin provides `pinchy_ls` and `pinchy_read` tools that only access directories the admin explicitly allowed
+3. **Validates paths at runtime** — every file access request is checked against the agent's allowed directories, with symlink resolution to prevent escapes
+
+All agent-accessible files live under `/data/` in the container, mounted via Docker volumes. This means even if all software layers failed, the agent can only see files that were explicitly mounted.
+
+For the full details, see [Agent Permissions](/concepts/agent-permissions/).
+
 ## Database
 
 PostgreSQL 16, accessed via [Drizzle ORM](https://orm.drizzle.team/). The schema includes:

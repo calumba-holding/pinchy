@@ -1,0 +1,66 @@
+---
+title: Agent Permissions
+description: How Pinchy restricts what agents can see and do using scoped tools and path validation.
+---
+
+## Why agent permissions matter
+
+AI agents are powerful — but in an enterprise setting, they must be constrained. An agent that can read any file on the server or execute arbitrary commands is a liability. Pinchy enforces **scoped permissions** so each agent can only access what it explicitly needs.
+
+## The two-layer permission model
+
+Pinchy restricts agent capabilities at two levels:
+
+1. **OpenClaw tool deny** — blocks the agent from using native file system and shell tools entirely
+2. **Plugin path validation** — provides restricted alternatives that only access approved directories
+
+When you create a Knowledge Base agent, Pinchy tells OpenClaw to deny the agent access to tool groups like `group:fs` (file system), `group:runtime` (shell commands), and `group:web` (network access). The agent cannot use these tools at all.
+
+Instead, Pinchy installs its own **scoped tools** via the `pinchy-files` OpenClaw plugin. These tools — `pinchy_ls` and `pinchy_read` — replace the native file tools but enforce path restrictions at the plugin level.
+
+## Scoped tools
+
+The `pinchy-files` plugin provides two tools:
+
+| Tool | Purpose | Restriction |
+|------|---------|-------------|
+| `pinchy_ls` | List files in a directory | Only directories the admin selected during agent creation |
+| `pinchy_read` | Read a file's contents | Only files within the allowed directories |
+
+These tools validate every path before executing. If an agent tries to read a file outside its allowed directories, the tool returns an error — the agent never sees the file.
+
+## The `/data/` convention
+
+All agent-accessible files live under `/data/` inside the Pinchy container. This is mounted as a Docker volume, and you can bind-mount host directories into subdirectories of `/data/`.
+
+For example, if you mount your company's HR policies at `/data/hr-policies`, an agent configured to access that directory can read those documents — and nothing else.
+
+See the [Mount Data Directories](/guides/mount-data-directories/) guide for setup instructions.
+
+## Defense in depth
+
+Pinchy does not rely on any single layer for security. Four layers work together:
+
+1. **Docker volumes** — only directories explicitly mounted into the container are accessible at all
+2. **OpenClaw tool deny** — native file system, runtime, and web tools are blocked for scoped agents
+3. **Plugin path validation** — the `pinchy-files` plugin checks every requested path against the agent's allowed directories
+4. **Symlink resolution** — paths are resolved to their real location before validation, preventing symlink-based escapes
+
+If any one layer fails, the others still prevent unauthorized access.
+
+## Agent templates
+
+Pinchy uses templates to define what permissions an agent starts with:
+
+| Template | Tools denied | Plugin | Use case |
+|----------|-------------|--------|----------|
+| **Knowledge Base** | `group:runtime`, `group:fs`, `group:web` | `pinchy-files` | Answer questions from selected documents |
+| **Custom Agent** | None | None | Full OpenClaw capabilities (for trusted use cases) |
+
+When creating an agent from the **Knowledge Base** template, you select which directories under `/data/` the agent can access. The **Custom Agent** template has no restrictions — it uses OpenClaw's full tool set.
+
+## Directory selection during agent creation
+
+When you create a Knowledge Base agent, Pinchy scans `/data/` for subdirectories and presents them in the creation form. You select one or more directories, and these become the agent's `allowed_paths`. The agent can only read files within those directories.
+
+This configuration is stored in the agent's `pluginConfig` field in the database and passed to the `pinchy-files` plugin at runtime.

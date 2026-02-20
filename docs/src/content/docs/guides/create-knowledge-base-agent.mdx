@@ -1,0 +1,60 @@
+---
+title: Create a Knowledge Base Agent
+description: Step-by-step guide to creating an agent that can answer questions from your documents.
+---
+
+This guide walks you through creating a Knowledge Base agent — an agent that can read and answer questions from your documents, but cannot access anything else on the system.
+
+## Prerequisites
+
+- Pinchy is running (see [Quick Start](/getting-started/))
+- You have mounted at least one data directory (see [Mount Data Directories](/guides/mount-data-directories/))
+- You are logged in as an admin
+
+## 1. Mount your data directories
+
+Before creating a Knowledge Base agent, make sure the documents you want the agent to access are mounted under `/data/` in the Pinchy container. See the [Mount Data Directories](/guides/mount-data-directories/) guide for detailed instructions.
+
+## 2. Navigate to "New Agent"
+
+In the Pinchy sidebar, click the **+** button next to "Agents" to open the agent creation form.
+
+## 3. Select the "Knowledge Base" template
+
+Choose **Knowledge Base** from the template options. This template:
+
+- Blocks the agent from using shell commands, native file access, and web requests
+- Provides scoped `pinchy_ls` and `pinchy_read` tools that only work within approved directories
+
+## 4. Enter a name
+
+Give your agent a descriptive name, for example "HR Policy Assistant" or "Engineering Docs".
+
+## 5. Select directories
+
+The form displays all directories found under `/data/`. Select the directories that contain the documents this agent should be able to read.
+
+For example, if you mounted your HR policies at `/data/hr-policies` and your engineering handbook at `/data/engineering`, you could select one or both.
+
+## 6. Click Create
+
+Pinchy creates the agent, configures its OpenClaw workspace with the appropriate tool restrictions, and installs the `pinchy-files` plugin with the selected directories.
+
+## 7. Chat with the agent
+
+Select your new agent from the sidebar and start chatting. The agent can:
+
+- List files in the directories you selected
+- Read the contents of those files
+- Answer questions based on what it reads
+
+The agent **cannot**:
+
+- Access files outside the selected directories
+- Execute shell commands
+- Make network requests
+- Read system files
+
+## How it works
+
+Under the hood, Pinchy applies a defense-in-depth approach. See [Agent Permissions](/concepts/agent-permissions/) for the full explanation of how scoped tools, path validation, and tool deny policies work together.

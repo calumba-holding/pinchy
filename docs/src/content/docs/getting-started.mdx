@@ -55,7 +55,15 @@ Once your provider is configured, Pinchy redirects you to the chat interface. Yo
 
 Type a message and hit Enter. Smithers responds in real time via WebSocket.
 
+## 6. Create a Knowledge Base Agent (optional)
+
+You can create agents from templates that have scoped permissions. For example, a **Knowledge Base** agent can only read files in directories you select — it cannot access the shell, the network, or any other files.
+
+To try it out, mount a directory with documents into the Pinchy container and create an agent from the Knowledge Base template. See the [Create a Knowledge Base Agent](/guides/create-knowledge-base-agent/) guide for the full walkthrough.
+
 ## What's next?
 
 - **[Installation](/installation/)** — Learn about environment variables, Docker volumes, and development setup
 - **[Architecture](/architecture/)** — Understand how Pinchy wraps OpenClaw and the request flow
+- **[Agent Permissions](/concepts/agent-permissions/)** — Learn how Pinchy restricts what agents can access
+- **[API Reference](/reference/api/)** — REST API endpoints for managing agents and settings

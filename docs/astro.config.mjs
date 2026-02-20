@@ -31,9 +31,23 @@ export default defineConfig({
           ],
         },
         {
+          label: 'Guides',
+          items: [
+            { label: 'Create a Knowledge Base Agent', slug: 'guides/create-knowledge-base-agent' },
+            { label: 'Mount Data Directories', slug: 'guides/mount-data-directories' },
+          ],
+        },
+        {
           label: 'Concepts',
           items: [
             { label: 'Architecture', slug: 'architecture' },
+            { label: 'Agent Permissions', slug: 'concepts/agent-permissions' },
+          ],
+        },
+        {
+          label: 'Reference',
+          items: [
+            { label: 'API Reference', slug: 'reference/api' },
           ],
         },
       ],

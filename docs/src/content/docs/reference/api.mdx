@@ -1,0 +1,163 @@
+---
+title: API Reference
+description: REST API endpoints for managing agents, templates, and settings.
+---
+
+All API endpoints require authentication. Unauthenticated requests receive a `401 Unauthorized` response. Authenticate by including a valid session cookie (set during login via the web UI).
+
+## Agents
+
+### `GET /api/agents`
+
+List all agents.
+
+**Response:**
+
+```json
+[
+  {
+    "id": "uuid",
+    "name": "HR Policy Assistant",
+    "model": "anthropic/claude-haiku-4-5-20251001",
+    "templateId": "knowledge-base",
+    "pluginConfig": {
+      "allowed_paths": ["/data/hr-policies"]
+    },
+    "createdAt": "2025-01-15T10:00:00.000Z",
+    "updatedAt": "2025-01-15T10:00:00.000Z"
+  }
+]
+```
+
+### `POST /api/agents`
+
+Create a new agent.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Display name for the agent |
+| `templateId` | string | Yes | Template to use (`knowledge-base` or `custom`) |
+| `pluginConfig` | object | Conditional | Required for `knowledge-base` template |
+| `pluginConfig.allowed_paths` | string[] | Conditional | Directories the agent can access (must be under `/data/`) |
+
+**Example — Knowledge Base agent:**
+
+```json
+{
+  "name": "HR Policy Assistant",
+  "templateId": "knowledge-base",
+  "pluginConfig": {
+    "allowed_paths": ["/data/hr-policies", "/data/company-handbook"]
+  }
+}
+```
+
+**Example — Custom agent:**
+
+```json
+{
+  "name": "General Assistant",
+  "templateId": "custom"
+}
+```
+
+**Response:** `201 Created` with the created agent object.
+
+**Errors:**
+- `400` — missing or invalid `name`, `templateId`, or `pluginConfig`
+- `401` — not authenticated
+
+### `GET /api/agents/:id`
+
+Get a single agent by ID.
+
+**Response:** The agent object, or `404` if not found.
+
+### `PATCH /api/agents/:id`
+
+Update an agent's name or model.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | No | New display name |
+| `model` | string | No | New model identifier |
+
+**Response:** The updated agent object.
+
+## Templates
+
+### `GET /api/templates`
+
+List available agent templates.
+
+**Response:**
+
+```json
+{
+  "templates": [
+    {
+      "id": "knowledge-base",
+      "name": "Knowledge Base",
+      "description": "Answer questions from your docs"
+    },
+    {
+      "id": "custom",
+      "name": "Custom Agent",
+      "description": "Start from scratch"
+    }
+  ]
+}
+```
+
+## Data Directories
+
+### `GET /api/data-directories`
+
+List directories available under `/data/` for agent configuration.
+
+**Response:**
+
+```json
+{
+  "directories": [
+    { "path": "/data/hr-policies", "name": "hr-policies" },
+    { "path": "/data/engineering-docs", "name": "engineering-docs" }
+  ]
+}
+```
+
+Returns an empty array if `/data/` does not exist or contains no subdirectories. Hidden directories (starting with `.`) are excluded.
+
+## Settings
+
+### `GET /api/settings`
+
+Get all application settings. Encrypted values (such as API keys) are masked in the response.
+
+**Response:**
+
+```json
+[
+  { "key": "default_provider", "value": "anthropic", "encrypted": false },
+  { "key": "anthropic_api_key", "value": "--------", "encrypted": true }
+]
+```
+
+### `POST /api/settings`
+
+Update a setting.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | string | Yes | Setting key |
+| `value` | string | Yes | Setting value |
+
+Settings with `api_key` in the key name are automatically encrypted at rest.
+
+**Response:** `{ "success": true }`
