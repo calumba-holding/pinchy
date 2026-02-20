@@ -99,6 +99,7 @@ pinchy/
 - **Test-Driven Development (TDD)**: Write the failing test first, then the implementation. No exceptions.
 - Tests for all new features
 - Update docs when behavior changes
+- Update `packages/web/src/lib/smithers-soul.ts` when user-facing features change (Smithers must know the current platform)
 
 ### Architecture Principles
 - **OpenClaw is the runtime** — don't reinvent what OpenClaw already does. Wrap it, extend it, govern it.
