@@ -5,10 +5,9 @@ import { agents } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { readWorkspaceFile, writeWorkspaceFile } from "@/lib/workspace";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ agentId: string; filename: string }> }
-) {
+type Params = { params: Promise<{ agentId: string; filename: string }> };
+
+export async function GET(request: NextRequest, { params }: Params) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,10 +31,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ agentId: string; filename: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: Params) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -51,6 +47,10 @@ export async function PUT(
   }
 
   const { content } = await request.json();
+
+  if (typeof content !== "string") {
+    return NextResponse.json({ error: "content must be a string" }, { status: 400 });
+  }
 
   try {
     writeWorkspaceFile(agentId, filename, content);

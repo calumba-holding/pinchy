@@ -56,7 +56,7 @@ describe("GET /api/agents/[agentId]/files/[filename]", () => {
       id: "agent-1",
       name: "Smithers",
       model: "anthropic/claude-sonnet-4-20250514",
-      systemPrompt: null,
+
       createdAt: new Date(),
     });
     vi.mocked(readWorkspaceFile).mockReturnValue("# Soul content");
@@ -139,7 +139,7 @@ describe("PUT /api/agents/[agentId]/files/[filename]", () => {
       id: "agent-1",
       name: "Smithers",
       model: "anthropic/claude-sonnet-4-20250514",
-      systemPrompt: null,
+
       createdAt: new Date(),
     });
   });
@@ -219,5 +219,15 @@ describe("PUT /api/agents/[agentId]/files/[filename]", () => {
     const data = await response.json();
     expect(data.success).toBe(true);
     expect(writeWorkspaceFile).toHaveBeenCalledWith("agent-1", "SOUL.md", "");
+  });
+
+  it("should return 400 when content field is missing", async () => {
+    const request = makePutRequest("agent-1", "SOUL.md", {});
+    const response = await PUT(request, makeParams("agent-1", "SOUL.md"));
+
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toBe("content must be a string");
+    expect(writeWorkspaceFile).not.toHaveBeenCalled();
   });
 });
