@@ -12,7 +12,7 @@ const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
-const OPENCLAW_WS_URL = process.env.OPENCLAW_WS_URL || "ws://localhost:18789";
+const OPENCLAW_WS_URL = process.env.OPENCLAW_WS_URL;
 const OPENCLAW_CONFIG_PATH = process.env.OPENCLAW_CONFIG_PATH || "/openclaw-config/openclaw.json";
 
 function readGatewayToken(): string {
@@ -29,46 +29,53 @@ app.prepare().then(() => {
     handle(req, res, parse(req.url!, true));
   });
 
-  const openclawClient = new OpenClawClient({
-    url: OPENCLAW_WS_URL,
-    token: readGatewayToken(),
-    clientId: "gateway-client",
-    clientVersion: "0.1.0",
-    scopes: ["operator.admin"],
-    deviceIdentityPath: process.env.DEVICE_IDENTITY_PATH || "/openclaw-config/device-identity.json",
-    autoReconnect: true,
-    reconnectIntervalMs: 1000,
-    maxReconnectAttempts: Infinity,
-  });
+  let router: ClientRouter | null = null;
 
-  const router = new ClientRouter(openclawClient);
+  if (OPENCLAW_WS_URL) {
+    const openclawClient = new OpenClawClient({
+      url: OPENCLAW_WS_URL,
+      token: readGatewayToken(),
+      clientId: "gateway-client",
+      clientVersion: "0.1.0",
+      scopes: ["operator.admin"],
+      deviceIdentityPath:
+        process.env.DEVICE_IDENTITY_PATH || "/openclaw-config/device-identity.json",
+      autoReconnect: true,
+      reconnectIntervalMs: 1000,
+      maxReconnectAttempts: Infinity,
+    });
 
-  openclawClient.connect().catch((err) => {
-    console.error("OpenClaw initial connection failed, will retry:", err.message);
-  });
+    router = new ClientRouter(openclawClient);
 
-  openclawClient.on("connected", async () => {
-    console.log("Connected to OpenClaw Gateway");
-    try {
-      const trigger = await shouldTriggerGreeting();
-      if (trigger) {
-        const greetingPrompt =
-          "Greet the new admin. Briefly introduce yourself as Smithers and explain what you can help with in Pinchy. Keep it to 2-3 sentences.";
-        openclawClient.chatSync(greetingPrompt).catch(() => {});
-        await markGreetingSent();
+    openclawClient.connect().catch((err) => {
+      console.error("OpenClaw initial connection failed, will retry:", err.message);
+    });
+
+    openclawClient.on("connected", async () => {
+      console.log("Connected to OpenClaw Gateway");
+      try {
+        const trigger = await shouldTriggerGreeting();
+        if (trigger) {
+          const greetingPrompt =
+            "Greet the new admin. Briefly introduce yourself as Smithers and explain what you can help with in Pinchy. Keep it to 2-3 sentences.";
+          openclawClient.chatSync(greetingPrompt).catch(() => {});
+          await markGreetingSent();
+        }
+      } catch {
+        // Greeting is best-effort
       }
-    } catch {
-      // Greeting is best-effort
-    }
-  });
+    });
 
-  openclawClient.on("disconnected", () => {
-    console.log("Disconnected from OpenClaw Gateway, reconnecting...");
-  });
+    openclawClient.on("disconnected", () => {
+      console.log("Disconnected from OpenClaw Gateway, reconnecting...");
+    });
 
-  openclawClient.on("error", (err) => {
-    console.error("OpenClaw client error:", err.message);
-  });
+    openclawClient.on("error", (err) => {
+      console.error("OpenClaw client error:", err.message);
+    });
+  } else {
+    console.log("OPENCLAW_WS_URL not set — skipping OpenClaw connection");
+  }
 
   const wss = new WebSocketServer({ noServer: true });
 
@@ -92,6 +99,10 @@ app.prepare().then(() => {
     clientWs.on("message", (data) => {
       try {
         const parsed = JSON.parse(data.toString());
+        if (!router) {
+          clientWs.send(JSON.stringify({ type: "error", message: "OpenClaw not configured" }));
+          return;
+        }
         router.handleMessage(clientWs, parsed).catch((err) => {
           console.error("Unhandled router error:", err instanceof Error ? err.message : err);
         });

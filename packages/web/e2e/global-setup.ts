@@ -1,11 +1,12 @@
-import postgres from "postgres";
 import { execSync } from "child_process";
+import path from "path";
 
-const ADMIN_URL = "postgresql://pinchy:pinchy_dev@localhost:5432/postgres";
+const ADMIN_URL = "postgresql://pinchy:pinchy_dev@localhost:5433/postgres";
 const TEST_DB = "pinchy_test";
-const TEST_DB_URL = `postgresql://pinchy:pinchy_dev@localhost:5432/${TEST_DB}`;
+const TEST_DB_URL = `postgresql://pinchy:pinchy_dev@localhost:5433/${TEST_DB}`;
 
 export default async function globalSetup() {
+  const postgres = (await import("postgres")).default;
   const sql = postgres(ADMIN_URL);
 
   // Drop if leftover from previous failed run
@@ -14,8 +15,9 @@ export default async function globalSetup() {
   await sql.end();
 
   // Run Drizzle migrations against test DB
+  const packageRoot = path.resolve(__dirname, "..");
   execSync("pnpm db:migrate", {
-    cwd: new URL("..", import.meta.url).pathname,
+    cwd: packageRoot,
     env: { ...process.env, DATABASE_URL: TEST_DB_URL },
     stdio: "inherit",
   });

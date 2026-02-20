@@ -163,7 +163,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 # Local development (without Docker for the app)
 pnpm install
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up db openclaw -d
-export DATABASE_URL=postgresql://pinchy:pinchy_dev@localhost:5432/pinchy
+export DATABASE_URL=postgresql://pinchy:pinchy_dev@localhost:5433/pinchy
 pnpm db:migrate
 pnpm dev                 # Start dev server (port 7777)
 

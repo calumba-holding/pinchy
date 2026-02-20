@@ -119,10 +119,10 @@ What hot-reloads: React components, pages, styles. What doesn't: `server.ts` (re
 ```bash
 pnpm install
 
-# Start database and OpenClaw in Docker (dev override exposes port 5432)
+# Start database and OpenClaw in Docker (dev override exposes port 5433)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up db openclaw -d
 
-export DATABASE_URL=postgresql://pinchy:pinchy_dev@localhost:5432/pinchy
+export DATABASE_URL=postgresql://pinchy:pinchy_dev@localhost:5433/pinchy
 pnpm db:migrate
 pnpm dev
 ```
