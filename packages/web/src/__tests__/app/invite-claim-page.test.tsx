@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import InviteClaimPage from "@/app/invite/[token]/page";
 
@@ -47,7 +48,37 @@ describe("Invite Claim Page", () => {
     expect(screen.getByRole("button", { name: /create account/i })).toBeInTheDocument();
   });
 
+  it("should show validation error when name is empty", async () => {
+    const user = userEvent.setup();
+    render(<InviteClaimPage />);
+
+    await user.type(screen.getByLabelText(/password/i), "password123");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Name is required")).toBeInTheDocument();
+    });
+
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("should show validation error when password is too short", async () => {
+    const user = userEvent.setup();
+    render(<InviteClaimPage />);
+
+    await user.type(screen.getByLabelText(/name/i), "Test User");
+    await user.type(screen.getByLabelText(/password/i), "short");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Password must be at least 8 characters")).toBeInTheDocument();
+    });
+
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it("should show error when API returns error", async () => {
+    const user = userEvent.setup();
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: false,
       json: async () => ({ error: "Invalid or expired invite link" }),
@@ -55,13 +86,9 @@ describe("Invite Claim Page", () => {
 
     render(<InviteClaimPage />);
 
-    fireEvent.change(screen.getByLabelText(/name/i), {
-      target: { value: "Test User" },
-    });
-    fireEvent.change(screen.getByLabelText(/password/i), {
-      target: { value: "password123" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+    await user.type(screen.getByLabelText(/name/i), "Test User");
+    await user.type(screen.getByLabelText(/password/i), "password123");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
 
     await waitFor(() => {
       expect(screen.getByText("Invalid or expired invite link")).toBeInTheDocument();
@@ -69,6 +96,7 @@ describe("Invite Claim Page", () => {
   });
 
   it("should submit to /api/invite/claim with token, name, and password", async () => {
+    const user = userEvent.setup();
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ success: true }),
@@ -76,13 +104,9 @@ describe("Invite Claim Page", () => {
 
     render(<InviteClaimPage />);
 
-    fireEvent.change(screen.getByLabelText(/name/i), {
-      target: { value: "Test User" },
-    });
-    fireEvent.change(screen.getByLabelText(/password/i), {
-      target: { value: "password123" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+    await user.type(screen.getByLabelText(/name/i), "Test User");
+    await user.type(screen.getByLabelText(/password/i), "password123");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith("/api/invite/claim", {
@@ -98,6 +122,7 @@ describe("Invite Claim Page", () => {
   });
 
   it("should redirect to /login on success via 'Continue to sign in' button", async () => {
+    const user = userEvent.setup();
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ success: true }),
@@ -105,19 +130,15 @@ describe("Invite Claim Page", () => {
 
     render(<InviteClaimPage />);
 
-    fireEvent.change(screen.getByLabelText(/name/i), {
-      target: { value: "Test User" },
-    });
-    fireEvent.change(screen.getByLabelText(/password/i), {
-      target: { value: "password123" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+    await user.type(screen.getByLabelText(/name/i), "Test User");
+    await user.type(screen.getByLabelText(/password/i), "password123");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /continue to sign in/i })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /continue to sign in/i }));
+    await user.click(screen.getByRole("button", { name: /continue to sign in/i }));
     expect(pushMock).toHaveBeenCalledWith("/login");
   });
 });
