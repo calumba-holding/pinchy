@@ -29,7 +29,7 @@ export const authConfig: NextAuthConfig = {
 
         if (!isValid) return null;
 
-        return { id: user.id, email: user.email, name: user.name };
+        return { id: user.id, email: user.email, name: user.name, role: user.role };
       },
     }),
   ],
@@ -38,6 +38,21 @@ export const authConfig: NextAuthConfig = {
   },
   pages: {
     signIn: "/login",
+  },
+  callbacks: {
+    jwt({ token, user }) {
+      if (user) {
+        token.role = user.role;
+      }
+      return token;
+    },
+    session({ session, token }) {
+      if (session.user) {
+        session.user.role = (token.role as string) ?? "user";
+        session.user.id = token.sub!;
+      }
+      return session;
+    },
   },
 };
 
