@@ -71,17 +71,26 @@ export const agents = pgTable("agents", {
   model: text("model").notNull(),
   templateId: text("template_id"),
   pluginConfig: jsonb("plugin_config"),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "cascade" }),
+  isPersonal: boolean("is_personal").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const agentRoles = pgTable("agent_roles", {
+export const invites = pgTable("invites", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  agentId: text("agent_id")
+  tokenHash: text("token_hash").notNull().unique(),
+  email: text("email"),
+  role: text("role").notNull().default("user"),
+  type: text("type").notNull().default("invite"),
+  createdBy: text("created_by")
     .notNull()
-    .references(() => agents.id, { onDelete: "cascade" }),
-  role: text("role").notNull(),
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  claimedAt: timestamp("claimed_at"),
+  claimedByUserId: text("claimed_by_user_id").references(() => users.id),
 });
 
 export const settings = pgTable("settings", {

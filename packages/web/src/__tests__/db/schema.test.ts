@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { agents, settings, agentRoles } from "@/db/schema";
+import * as schema from "@/db/schema";
+
+const { agents, settings, invites } = schema;
 
 describe("database schema", () => {
   it("should export agents table", () => {
@@ -36,13 +38,38 @@ describe("agents schema — template and plugin columns", () => {
   });
 });
 
-describe("agentRoles schema", () => {
-  it("should be exported", () => {
-    expect(agentRoles).toBeDefined();
+describe("agents schema — ownership columns", () => {
+  it("should have ownerId column", () => {
+    expect(agents.ownerId).toBeDefined();
   });
 
-  it("should have agentId and role columns", () => {
-    expect(agentRoles.agentId).toBeDefined();
-    expect(agentRoles.role).toBeDefined();
+  it("should have isPersonal column", () => {
+    expect(agents.isPersonal).toBeDefined();
+  });
+});
+
+describe("invites schema", () => {
+  it("should be exported", () => {
+    expect(invites).toBeDefined();
+  });
+
+  it("should have all expected columns", () => {
+    const columns = Object.keys(invites);
+    expect(columns).toContain("id");
+    expect(columns).toContain("tokenHash");
+    expect(columns).toContain("email");
+    expect(columns).toContain("role");
+    expect(columns).toContain("type");
+    expect(columns).toContain("createdBy");
+    expect(columns).toContain("createdAt");
+    expect(columns).toContain("expiresAt");
+    expect(columns).toContain("claimedAt");
+    expect(columns).toContain("claimedByUserId");
+  });
+});
+
+describe("agentRoles removal", () => {
+  it("should NOT export agentRoles", () => {
+    expect("agentRoles" in schema).toBe(false);
   });
 });
