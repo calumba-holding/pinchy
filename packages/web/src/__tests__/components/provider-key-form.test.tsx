@@ -3,6 +3,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { ProviderKeyForm } from "@/components/provider-key-form";
+import { toast } from "sonner";
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 describe("ProviderKeyForm", () => {
   const onSuccess = vi.fn();
@@ -57,7 +60,7 @@ describe("ProviderKeyForm", () => {
     expect(screen.getByText(/encrypted at rest/i)).toBeInTheDocument();
   });
 
-  it("should call onSuccess after successful submission", async () => {
+  it("should call onSuccess and show success toast after successful submission", async () => {
     vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ success: true }),
@@ -73,10 +76,11 @@ describe("ProviderKeyForm", () => {
 
     await waitFor(() => {
       expect(onSuccess).toHaveBeenCalled();
+      expect(toast.success).toHaveBeenCalledWith("API key saved");
     });
   });
 
-  it("should show error on failed validation", async () => {
+  it("should show error toast on failed validation", async () => {
     vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: false,
       json: async () => ({ error: "Invalid API key. Please check and try again." }),
@@ -91,7 +95,7 @@ describe("ProviderKeyForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/invalid api key/i)).toBeInTheDocument();
+      expect(toast.error).toHaveBeenCalledWith("Invalid API key. Please check and try again.");
     });
   });
 
@@ -137,7 +141,9 @@ describe("ProviderKeyForm", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
-    expect(screen.getByText(/validating/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/validating/i)).toBeInTheDocument();
+    });
   });
 
   it("should use custom submitLabel", () => {
@@ -309,10 +315,11 @@ describe("ProviderKeyForm", () => {
       await waitFor(() => {
         expect(screen.getByTestId("key-error-indicator")).toBeInTheDocument();
         expect(screen.queryByTestId("key-configured-indicator")).not.toBeInTheDocument();
+        expect(toast.error).toHaveBeenCalledWith("Invalid API key.");
       });
     });
 
-    it("should show configured indicator after successful save", async () => {
+    it("should show configured indicator and success toast after successful save", async () => {
       vi.mocked(global.fetch).mockResolvedValueOnce({
         ok: true,
         json: async () => ({ success: true }),
@@ -328,6 +335,7 @@ describe("ProviderKeyForm", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("key-configured-indicator")).toBeInTheDocument();
+        expect(toast.success).toHaveBeenCalledWith("API key saved");
       });
     });
 
@@ -397,7 +405,7 @@ describe("ProviderKeyForm", () => {
       });
     });
 
-    it("should show error when trying to remove the last configured provider", async () => {
+    it("should show error toast when trying to remove the last configured provider", async () => {
       vi.mocked(global.fetch).mockResolvedValueOnce({
         ok: false,
         json: async () => ({
@@ -412,7 +420,9 @@ describe("ProviderKeyForm", () => {
       fireEvent.click(screen.getByRole("button", { name: /^remove$/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/cannot remove the last configured provider/i)).toBeInTheDocument();
+        expect(toast.error).toHaveBeenCalledWith(
+          "Cannot remove the last configured provider. Add another provider first."
+        );
       });
     });
   });
