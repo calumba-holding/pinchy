@@ -2,6 +2,7 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 
 export const ALLOWED_FILES = ["SOUL.md", "USER.md"] as const;
+export type WorkspaceFile = (typeof ALLOWED_FILES)[number];
 
 const DEFAULT_WORKSPACE_BASE_PATH = "/openclaw-config/workspaces";
 
@@ -9,22 +10,30 @@ function getWorkspaceBasePath(): string {
   return process.env.WORKSPACE_BASE_PATH || DEFAULT_WORKSPACE_BASE_PATH;
 }
 
-const PLACEHOLDER_CONTENT: Record<string, string> = {
+const PLACEHOLDER_CONTENT: Record<WorkspaceFile, string> = {
   "SOUL.md": `<!-- Describe your agent's personality here. For example:\nYou are a helpful project manager. You are structured, concise,\nand always keep track of deadlines and action items. -->`,
   "USER.md": `<!-- Add context about your team or organization here. For example:\nWe are a 12-person software team based in Vienna, Austria.\nOur main product is an e-commerce platform built with React and Node.js. -->`,
 };
 
-function assertAllowedFile(filename: string): void {
+function assertAllowedFile(filename: string): asserts filename is WorkspaceFile {
   if (!(ALLOWED_FILES as readonly string[]).includes(filename)) {
     throw new Error(`File not allowed: ${filename}`);
   }
 }
 
+function assertValidAgentId(agentId: string): void {
+  if (!agentId || agentId.includes("/") || agentId.includes("\\") || agentId.includes("..")) {
+    throw new Error(`Invalid agentId: ${agentId}`);
+  }
+}
+
 export function getWorkspacePath(agentId: string): string {
+  assertValidAgentId(agentId);
   return join(getWorkspaceBasePath(), agentId);
 }
 
 export function ensureWorkspace(agentId: string): void {
+  assertValidAgentId(agentId);
   const workspacePath = getWorkspacePath(agentId);
 
   mkdirSync(workspacePath, { recursive: true });
@@ -38,6 +47,7 @@ export function ensureWorkspace(agentId: string): void {
 }
 
 export function readWorkspaceFile(agentId: string, filename: string): string {
+  assertValidAgentId(agentId);
   assertAllowedFile(filename);
 
   const filePath = join(getWorkspacePath(agentId), filename);
@@ -50,6 +60,7 @@ export function readWorkspaceFile(agentId: string, filename: string): string {
 }
 
 export function writeWorkspaceFile(agentId: string, filename: string, content: string): void {
+  assertValidAgentId(agentId);
   assertAllowedFile(filename);
 
   const workspacePath = getWorkspacePath(agentId);

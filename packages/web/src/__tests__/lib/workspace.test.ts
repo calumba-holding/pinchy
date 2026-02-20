@@ -23,6 +23,7 @@ vi.mock("fs", async (importOriginal) => {
 });
 
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
+import type { WorkspaceFile } from "@/lib/workspace";
 import {
   ALLOWED_FILES,
   getWorkspacePath,
@@ -43,6 +44,55 @@ describe("ALLOWED_FILES", () => {
 
   it("should be a readonly array", () => {
     expect(Array.isArray(ALLOWED_FILES)).toBe(true);
+  });
+});
+
+describe("WorkspaceFile type", () => {
+  it("should be assignable from ALLOWED_FILES entries", () => {
+    const file: WorkspaceFile = ALLOWED_FILES[0];
+    expect(file).toBe("SOUL.md");
+  });
+});
+
+describe("agentId validation", () => {
+  it("should reject agentId containing forward slash", () => {
+    expect(() => getWorkspacePath("../../etc/cron.d")).toThrow("Invalid agentId: ../../etc/cron.d");
+  });
+
+  it("should reject agentId containing backslash", () => {
+    expect(() => getWorkspacePath("..\\etc\\passwd")).toThrow("Invalid agentId: ..\\etc\\passwd");
+  });
+
+  it("should reject agentId containing ..", () => {
+    expect(() => getWorkspacePath("..")).toThrow("Invalid agentId: ..");
+  });
+
+  it("should reject empty agentId", () => {
+    expect(() => getWorkspacePath("")).toThrow("Invalid agentId: ");
+  });
+
+  it("should reject path traversal in ensureWorkspace", () => {
+    expect(() => ensureWorkspace("../evil")).toThrow("Invalid agentId: ../evil");
+  });
+
+  it("should reject path traversal in readWorkspaceFile", () => {
+    expect(() => readWorkspaceFile("../../etc", "SOUL.md")).toThrow("Invalid agentId: ../../etc");
+  });
+
+  it("should reject path traversal in writeWorkspaceFile", () => {
+    expect(() => writeWorkspaceFile("../hack", "SOUL.md", "content")).toThrow(
+      "Invalid agentId: ../hack"
+    );
+  });
+
+  it("should accept valid agentId", () => {
+    const path = getWorkspacePath("agent-123");
+    expect(path).toBe("/openclaw-config/workspaces/agent-123");
+  });
+
+  it("should accept agentId with UUID format", () => {
+    const path = getWorkspacePath("550e8400-e29b-41d4-a716-446655440000");
+    expect(path).toBe("/openclaw-config/workspaces/550e8400-e29b-41d4-a716-446655440000");
   });
 });
 
