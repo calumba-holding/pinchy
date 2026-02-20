@@ -50,6 +50,11 @@ vi.mock("bcryptjs", () => ({
 
 vi.mock("@/lib/workspace", () => ({
   ensureWorkspace: vi.fn(),
+  writeWorkspaceFile: vi.fn(),
+}));
+
+vi.mock("@/lib/smithers-soul", () => ({
+  SMITHERS_SOUL_MD: "# Smithers\n\nTest soul content",
 }));
 
 import { ensureWorkspace } from "@/lib/workspace";

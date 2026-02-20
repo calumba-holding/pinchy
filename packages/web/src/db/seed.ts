@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { agents } from "@/db/schema";
-import { ensureWorkspace } from "@/lib/workspace";
+import { ensureWorkspace, writeWorkspaceFile } from "@/lib/workspace";
+import { SMITHERS_SOUL_MD } from "@/lib/smithers-soul";
 
 export async function seedDefaultAgent(ownerId?: string) {
   const existing = await db.query.agents.findFirst();
@@ -17,6 +18,7 @@ export async function seedDefaultAgent(ownerId?: string) {
     .returning();
 
   ensureWorkspace(agent.id);
+  writeWorkspaceFile(agent.id, "SOUL.md", SMITHERS_SOUL_MD);
 
   return agent;
 }
