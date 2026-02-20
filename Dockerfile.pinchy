@@ -20,4 +20,7 @@ ENV NODE_ENV=production
 
 WORKDIR /app/packages/web
 
+# Copy Pinchy plugins to OpenClaw extensions directory
+COPY packages/plugins/pinchy-files /openclaw-extensions/pinchy-files
+
 CMD ["sh", "-c", "pnpm db:migrate && pnpm start"]

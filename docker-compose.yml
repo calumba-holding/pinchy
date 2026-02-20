@@ -15,6 +15,7 @@ services:
     volumes:
       - openclaw-config:/openclaw-config
       - pinchy-data:/data
+      - openclaw-extensions:/openclaw-extensions
     depends_on:
       db:
         condition: service_healthy
@@ -29,6 +30,7 @@ services:
       - "18789"
     volumes:
       - openclaw-config:/root/.openclaw
+      - openclaw-extensions:/root/.openclaw/extensions
     restart: unless-stopped
 
   db:
@@ -49,3 +51,4 @@ volumes:
   pgdata:
   openclaw-config:
   pinchy-data:
+  openclaw-extensions:
