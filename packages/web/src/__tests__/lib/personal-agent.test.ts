@@ -1,0 +1,186 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// ── Mock @/db ────────────────────────────────────────────────────────────────
+const returningMock = vi.fn();
+const valuesMock = vi.fn().mockReturnValue({ returning: returningMock });
+const insertMock = vi.fn().mockReturnValue({ values: valuesMock });
+
+vi.mock("@/db", () => ({
+  db: {
+    insert: (...args: unknown[]) => insertMock(...args),
+  },
+}));
+
+// ── Mock @/lib/workspace ─────────────────────────────────────────────────────
+vi.mock("@/lib/workspace", () => ({
+  ensureWorkspace: vi.fn(),
+}));
+
+// ── Mock @/lib/settings ──────────────────────────────────────────────────────
+const getSettingMock = vi.fn();
+vi.mock("@/lib/settings", () => ({
+  getSetting: (...args: unknown[]) => getSettingMock(...args),
+}));
+
+// ── Mock @/lib/providers ─────────────────────────────────────────────────────
+vi.mock("@/lib/providers", () => ({
+  PROVIDERS: {
+    anthropic: {
+      name: "Anthropic",
+      settingsKey: "anthropic_api_key",
+      envVar: "ANTHROPIC_API_KEY",
+      defaultModel: "anthropic/claude-haiku-4-5-20251001",
+      placeholder: "sk-ant-...",
+    },
+    openai: {
+      name: "OpenAI",
+      settingsKey: "openai_api_key",
+      envVar: "OPENAI_API_KEY",
+      defaultModel: "openai/gpt-4o-mini",
+      placeholder: "sk-...",
+    },
+    google: {
+      name: "Google",
+      settingsKey: "google_api_key",
+      envVar: "GOOGLE_API_KEY",
+      defaultModel: "google/gemini-2.0-flash",
+      placeholder: "AIza...",
+    },
+  },
+}));
+
+import { ensureWorkspace } from "@/lib/workspace";
+
+describe("seedPersonalAgent", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("creates agent with ownerId and isPersonal = true", async () => {
+    getSettingMock.mockResolvedValue(null);
+    const fakeAgent = {
+      id: "agent-1",
+      name: "Smithers",
+      model: "anthropic/claude-sonnet-4-20250514",
+      ownerId: "user-1",
+      isPersonal: true,
+      createdAt: new Date(),
+    };
+    returningMock.mockResolvedValue([fakeAgent]);
+
+    const { seedPersonalAgent } = await import("@/lib/personal-agent");
+    const agent = await seedPersonalAgent("user-1");
+
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerId: "user-1",
+        isPersonal: true,
+      })
+    );
+    expect(agent.ownerId).toBe("user-1");
+    expect(agent.isPersonal).toBe(true);
+  });
+
+  it("names the agent Smithers", async () => {
+    getSettingMock.mockResolvedValue(null);
+    const fakeAgent = {
+      id: "agent-2",
+      name: "Smithers",
+      model: "anthropic/claude-sonnet-4-20250514",
+      ownerId: "user-1",
+      isPersonal: true,
+      createdAt: new Date(),
+    };
+    returningMock.mockResolvedValue([fakeAgent]);
+
+    const { seedPersonalAgent } = await import("@/lib/personal-agent");
+    const agent = await seedPersonalAgent("user-1");
+
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Smithers",
+      })
+    );
+    expect(agent.name).toBe("Smithers");
+  });
+
+  it("calls ensureWorkspace with the new agent ID", async () => {
+    getSettingMock.mockResolvedValue(null);
+    const fakeAgent = {
+      id: "agent-workspace-test",
+      name: "Smithers",
+      model: "anthropic/claude-sonnet-4-20250514",
+      ownerId: "user-1",
+      isPersonal: true,
+      createdAt: new Date(),
+    };
+    returningMock.mockResolvedValue([fakeAgent]);
+
+    const { seedPersonalAgent } = await import("@/lib/personal-agent");
+    await seedPersonalAgent("user-1");
+
+    expect(ensureWorkspace).toHaveBeenCalledWith("agent-workspace-test");
+  });
+
+  it("uses the default model from provider settings when available", async () => {
+    getSettingMock.mockResolvedValue("openai");
+    const fakeAgent = {
+      id: "agent-3",
+      name: "Smithers",
+      model: "openai/gpt-4o-mini",
+      ownerId: "user-1",
+      isPersonal: true,
+      createdAt: new Date(),
+    };
+    returningMock.mockResolvedValue([fakeAgent]);
+
+    const { seedPersonalAgent } = await import("@/lib/personal-agent");
+    await seedPersonalAgent("user-1");
+
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "openai/gpt-4o-mini",
+      })
+    );
+  });
+
+  it("uses fallback model when no provider is configured", async () => {
+    getSettingMock.mockResolvedValue(null);
+    const fakeAgent = {
+      id: "agent-4",
+      name: "Smithers",
+      model: "anthropic/claude-sonnet-4-20250514",
+      ownerId: "user-1",
+      isPersonal: true,
+      createdAt: new Date(),
+    };
+    returningMock.mockResolvedValue([fakeAgent]);
+
+    const { seedPersonalAgent } = await import("@/lib/personal-agent");
+    await seedPersonalAgent("user-1");
+
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "anthropic/claude-sonnet-4-20250514",
+      })
+    );
+  });
+
+  it("returns the created agent", async () => {
+    getSettingMock.mockResolvedValue(null);
+    const fakeAgent = {
+      id: "agent-5",
+      name: "Smithers",
+      model: "anthropic/claude-sonnet-4-20250514",
+      ownerId: "user-1",
+      isPersonal: true,
+      createdAt: new Date(),
+    };
+    returningMock.mockResolvedValue([fakeAgent]);
+
+    const { seedPersonalAgent } = await import("@/lib/personal-agent");
+    const agent = await seedPersonalAgent("user-1");
+
+    expect(agent).toEqual(fakeAgent);
+  });
+});

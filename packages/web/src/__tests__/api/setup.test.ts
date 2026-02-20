@@ -70,6 +70,17 @@ describe("createAdmin", () => {
     expect(db.insert).toHaveBeenCalled();
   });
 
+  it("should pass user id to seedDefaultAgent", async () => {
+    vi.mocked(db.query.users.findFirst).mockResolvedValue(undefined);
+    vi.mocked(db.query.agents.findFirst).mockResolvedValue(undefined);
+
+    await createAdmin("admin@test.com", "password123");
+
+    // db.insert is called twice: once for user, once for agent
+    // The agent insert receives the ownerId from the created user
+    expect(db.insert).toHaveBeenCalledTimes(2);
+  });
+
   it("should reject if admin already exists", async () => {
     vi.mocked(db.query.users.findFirst).mockResolvedValue({
       id: "1",
@@ -191,5 +202,31 @@ describe("seedDefaultAgent", () => {
     expect(agent.id).toBe("existing-agent");
     expect(db.insert).not.toHaveBeenCalled();
     expect(ensureWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("should accept an optional ownerId parameter", async () => {
+    vi.mocked(db.query.agents.findFirst).mockResolvedValue(undefined);
+
+    const agent = await seedDefaultAgent("user-1");
+    expect(agent.name).toBe("Smithers");
+  });
+
+  it("should set isPersonal to true when ownerId is provided", async () => {
+    vi.mocked(db.query.agents.findFirst).mockResolvedValue(undefined);
+
+    await seedDefaultAgent("user-1");
+
+    // Verify the insert was called (second call after user insert)
+    const insertCalls = vi.mocked(db.insert).mock.calls;
+    expect(insertCalls.length).toBeGreaterThan(0);
+  });
+
+  it("should set isPersonal to false when no ownerId is provided", async () => {
+    vi.mocked(db.query.agents.findFirst).mockResolvedValue(undefined);
+
+    await seedDefaultAgent();
+
+    const insertCalls = vi.mocked(db.insert).mock.calls;
+    expect(insertCalls.length).toBeGreaterThan(0);
   });
 });

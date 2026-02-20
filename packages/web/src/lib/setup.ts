@@ -31,8 +31,7 @@ export async function createAdmin(email: string, password: string) {
     })
     .returning();
 
-  // Seed default agent
-  await seedDefaultAgent();
+  await seedDefaultAgent(user.id);
 
   return { id: user.id, email: user.email };
 }
