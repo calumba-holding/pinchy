@@ -1,8 +1,9 @@
 import { db } from "@/db";
 import { agents } from "@/db/schema";
-import { ensureWorkspace } from "@/lib/workspace";
+import { ensureWorkspace, writeWorkspaceFile } from "@/lib/workspace";
 import { getSetting } from "@/lib/settings";
 import { PROVIDERS, type ProviderName } from "@/lib/providers";
+import { SMITHERS_SOUL_MD } from "@/lib/smithers-soul";
 
 export async function seedPersonalAgent(userId: string) {
   const defaultProvider = (await getSetting("default_provider")) as ProviderName | null;
@@ -21,6 +22,7 @@ export async function seedPersonalAgent(userId: string) {
     .returning();
 
   ensureWorkspace(agent.id);
+  writeWorkspaceFile(agent.id, "SOUL.md", SMITHERS_SOUL_MD);
 
   return agent;
 }

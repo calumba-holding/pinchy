@@ -14,12 +14,18 @@ vi.mock("@/db", () => ({
 // ── Mock @/lib/workspace ─────────────────────────────────────────────────────
 vi.mock("@/lib/workspace", () => ({
   ensureWorkspace: vi.fn(),
+  writeWorkspaceFile: vi.fn(),
 }));
 
 // ── Mock @/lib/settings ──────────────────────────────────────────────────────
 const getSettingMock = vi.fn();
 vi.mock("@/lib/settings", () => ({
   getSetting: (...args: unknown[]) => getSettingMock(...args),
+}));
+
+// ── Mock @/lib/smithers-soul ────────────────────────────────────────────────
+vi.mock("@/lib/smithers-soul", () => ({
+  SMITHERS_SOUL_MD: "# Smithers\n\nTest soul content",
 }));
 
 // ── Mock @/lib/providers ─────────────────────────────────────────────────────
@@ -49,7 +55,7 @@ vi.mock("@/lib/providers", () => ({
   },
 }));
 
-import { ensureWorkspace } from "@/lib/workspace";
+import { ensureWorkspace, writeWorkspaceFile } from "@/lib/workspace";
 
 describe("seedPersonalAgent", () => {
   beforeEach(() => {
@@ -120,6 +126,28 @@ describe("seedPersonalAgent", () => {
     await seedPersonalAgent("user-1");
 
     expect(ensureWorkspace).toHaveBeenCalledWith("agent-workspace-test");
+  });
+
+  it("writes Smithers SOUL.md to the workspace", async () => {
+    getSettingMock.mockResolvedValue(null);
+    const fakeAgent = {
+      id: "agent-soul-test",
+      name: "Smithers",
+      model: "anthropic/claude-sonnet-4-20250514",
+      ownerId: "user-1",
+      isPersonal: true,
+      createdAt: new Date(),
+    };
+    returningMock.mockResolvedValue([fakeAgent]);
+
+    const { seedPersonalAgent } = await import("@/lib/personal-agent");
+    await seedPersonalAgent("user-1");
+
+    expect(writeWorkspaceFile).toHaveBeenCalledWith(
+      "agent-soul-test",
+      "SOUL.md",
+      "# Smithers\n\nTest soul content"
+    );
   });
 
   it("uses the default model from provider settings when available", async () => {
