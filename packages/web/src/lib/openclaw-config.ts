@@ -5,10 +5,9 @@ import { db } from "@/db";
 import { agents } from "@/db/schema";
 import { getSetting } from "@/lib/settings";
 import { computeDeniedGroups } from "@/lib/tool-registry";
+import { getOpenClawWorkspacePath } from "@/lib/workspace";
 
 const CONFIG_PATH = process.env.OPENCLAW_CONFIG_PATH || "/openclaw-config/openclaw.json";
-const OPENCLAW_WORKSPACE_PREFIX =
-  process.env.OPENCLAW_WORKSPACE_PREFIX || "/root/.openclaw/workspaces";
 
 interface OpenClawConfigParams {
   provider: ProviderName;
@@ -104,7 +103,7 @@ export async function regenerateOpenClawConfig() {
       id: agent.id,
       name: agent.name,
       model: agent.model,
-      workspace: `${OPENCLAW_WORKSPACE_PREFIX}/${agent.id}`,
+      workspace: getOpenClawWorkspacePath(agent.id),
     };
 
     // Compute denied tool groups from allowed tools

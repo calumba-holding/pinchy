@@ -5,6 +5,7 @@ export const ALLOWED_FILES = ["SOUL.md", "USER.md"] as const;
 export type WorkspaceFile = (typeof ALLOWED_FILES)[number];
 
 const DEFAULT_WORKSPACE_BASE_PATH = "/openclaw-config/workspaces";
+const DEFAULT_OPENCLAW_WORKSPACE_PREFIX = "/root/.openclaw/workspaces";
 
 function getWorkspaceBasePath(): string {
   return process.env.WORKSPACE_BASE_PATH || DEFAULT_WORKSPACE_BASE_PATH;
@@ -30,6 +31,12 @@ function assertValidAgentId(agentId: string): void {
 export function getWorkspacePath(agentId: string): string {
   assertValidAgentId(agentId);
   return join(getWorkspaceBasePath(), agentId);
+}
+
+export function getOpenClawWorkspacePath(agentId: string): string {
+  assertValidAgentId(agentId);
+  const prefix = process.env.OPENCLAW_WORKSPACE_PREFIX || DEFAULT_OPENCLAW_WORKSPACE_PREFIX;
+  return `${prefix}/${agentId}`;
 }
 
 export function ensureWorkspace(agentId: string): void {

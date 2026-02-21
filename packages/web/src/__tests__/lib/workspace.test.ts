@@ -27,6 +27,7 @@ import type { WorkspaceFile } from "@/lib/workspace";
 import {
   ALLOWED_FILES,
   getWorkspacePath,
+  getOpenClawWorkspacePath,
   ensureWorkspace,
   readWorkspaceFile,
   writeWorkspaceFile,
@@ -114,6 +115,31 @@ describe("getWorkspacePath", () => {
     } else {
       process.env.WORKSPACE_BASE_PATH = originalEnv;
     }
+  });
+});
+
+describe("getOpenClawWorkspacePath", () => {
+  it("should return OpenClaw workspace path for agent", () => {
+    const path = getOpenClawWorkspacePath("550e8400-e29b-41d4-a716-446655440000");
+    expect(path).toBe("/root/.openclaw/workspaces/550e8400-e29b-41d4-a716-446655440000");
+  });
+
+  it("should use OPENCLAW_WORKSPACE_PREFIX env var when set", () => {
+    const originalEnv = process.env.OPENCLAW_WORKSPACE_PREFIX;
+    process.env.OPENCLAW_WORKSPACE_PREFIX = "/custom/openclaw/workspaces";
+
+    const path = getOpenClawWorkspacePath("agent-456");
+    expect(path).toBe("/custom/openclaw/workspaces/agent-456");
+
+    if (originalEnv === undefined) {
+      delete process.env.OPENCLAW_WORKSPACE_PREFIX;
+    } else {
+      process.env.OPENCLAW_WORKSPACE_PREFIX = originalEnv;
+    }
+  });
+
+  it("should reject invalid agentId", () => {
+    expect(() => getOpenClawWorkspacePath("../evil")).toThrow("Invalid agentId: ../evil");
   });
 });
 
