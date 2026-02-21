@@ -1,4 +1,14 @@
-import { pgTable, text, timestamp, boolean, integer, primaryKey, jsonb } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  integer,
+  primaryKey,
+  jsonb,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
 // ── Auth.js tables ─────────────────────────────────────────────────────
@@ -63,33 +73,41 @@ export const verificationTokens = pgTable(
 
 // ── Application tables ─────────────────────────────────────────────────
 
-export const agents = pgTable("agents", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull().default("Smithers"),
-  model: text("model").notNull(),
-  templateId: text("template_id"),
-  pluginConfig: jsonb("plugin_config"),
-  allowedTools: jsonb("allowed_tools").$type<string[]>().notNull().default([]),
-  ownerId: text("owner_id").references(() => users.id, { onDelete: "cascade" }),
-  isPersonal: boolean("is_personal").notNull().default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+export const agents = pgTable(
+  "agents",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull().default("Smithers"),
+    model: text("model").notNull(),
+    templateId: text("template_id"),
+    pluginConfig: jsonb("plugin_config"),
+    allowedTools: jsonb("allowed_tools").$type<string[]>().notNull().default([]),
+    ownerId: text("owner_id").references(() => users.id, { onDelete: "cascade" }),
+    isPersonal: boolean("is_personal").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [index("agents_owner_id_idx").on(table.ownerId)]
+);
 
-export const chatSessions = pgTable("chat_sessions", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  sessionKey: text("session_key").notNull().unique(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  agentId: text("agent_id")
-    .notNull()
-    .references(() => agents.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+export const chatSessions = pgTable(
+  "chat_sessions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    sessionKey: text("session_key").notNull().unique(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    agentId: text("agent_id")
+      .notNull()
+      .references(() => agents.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [uniqueIndex("chat_sessions_user_agent_idx").on(table.userId, table.agentId)]
+);
 
 export const invites = pgTable("invites", {
   id: text("id")

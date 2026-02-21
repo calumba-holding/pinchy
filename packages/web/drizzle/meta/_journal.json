@@ -43,6 +43,13 @@
       "when": 1771654919731,
       "tag": "0005_strange_echo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771666023315,
+      "tag": "0006_unknown_scourge",
+      "breakpoints": true
     }
   ]
 }
