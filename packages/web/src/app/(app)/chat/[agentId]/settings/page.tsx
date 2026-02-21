@@ -7,12 +7,20 @@ import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AgentSettingsGeneral } from "@/components/agent-settings-general";
 import { AgentSettingsFile } from "@/components/agent-settings-file";
+import { AgentSettingsPermissions } from "@/components/agent-settings-permissions";
 
 interface Agent {
   id: string;
   name: string;
   model: string;
   isPersonal: boolean;
+  allowedTools: string[];
+  pluginConfig: { allowed_paths?: string[] } | null;
+}
+
+interface Directory {
+  path: string;
+  name: string;
 }
 
 interface Provider {
@@ -30,16 +38,18 @@ export default function AgentSettingsPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [soulContent, setSoulContent] = useState("");
   const [userContent, setUserContent] = useState("");
+  const [directories, setDirectories] = useState<Directory[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [agentRes, modelsRes, soulRes, userRes] = await Promise.all([
+        const [agentRes, modelsRes, soulRes, userRes, dirRes] = await Promise.all([
           fetch(`/api/agents/${agentId}`),
           fetch("/api/providers/models"),
           fetch(`/api/agents/${agentId}/files/SOUL.md`),
           fetch(`/api/agents/${agentId}/files/USER.md`),
+          fetch("/api/data-directories"),
         ]);
 
         if (agentRes.ok) {
@@ -60,6 +70,11 @@ export default function AgentSettingsPage() {
           const data = await userRes.json();
           setUserContent(data.content || "");
         }
+
+        if (dirRes.ok) {
+          const data = await dirRes.json();
+          setDirectories(data.directories || []);
+        }
       } finally {
         setLoading(false);
       }
@@ -76,7 +91,9 @@ export default function AgentSettingsPage() {
     return <div className="p-8 text-muted-foreground">Agent not found.</div>;
   }
 
-  const canDelete = session?.user?.role === "admin" && !agent.isPersonal;
+  const isAdmin = session?.user?.role === "admin";
+  const canDelete = isAdmin && !agent.isPersonal;
+  const showPermissions = isAdmin && !agent.isPersonal;
 
   return (
     <div className="p-8 max-w-2xl">
@@ -95,6 +112,7 @@ export default function AgentSettingsPage() {
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="soul">SOUL.md</TabsTrigger>
           <TabsTrigger value="user">USER.md</TabsTrigger>
+          {showPermissions && <TabsTrigger value="permissions">Permissions</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="general">
@@ -108,6 +126,12 @@ export default function AgentSettingsPage() {
         <TabsContent value="user">
           <AgentSettingsFile agentId={agentId} filename="USER.md" content={userContent} />
         </TabsContent>
+
+        {showPermissions && (
+          <TabsContent value="permissions">
+            <AgentSettingsPermissions agent={agent} directories={directories} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
