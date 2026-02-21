@@ -393,6 +393,233 @@ describe("useWsRuntime", () => {
     expect(errorMessage).toBeDefined();
   });
 
+  it("should send history request on connect when sessionKey exists", () => {
+    localStorageStore["pinchy:session:agent-1"] = "existing-session";
+
+    renderHook(() => useWsRuntime("agent-1"));
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onopen?.();
+    });
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "history", sessionKey: "existing-session" })
+    );
+  });
+
+  it("should not send history request on connect when no sessionKey exists", () => {
+    renderHook(() => useWsRuntime("agent-1"));
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onopen?.();
+    });
+
+    expect(ws.send).not.toHaveBeenCalled();
+  });
+
+  it("should populate messages from history response", () => {
+    localStorageStore["pinchy:session:agent-1"] = "existing-session";
+
+    const { result } = renderHook(() => useWsRuntime("agent-1"));
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onopen?.();
+    });
+
+    act(() => {
+      ws.onmessage?.({
+        data: JSON.stringify({
+          type: "history",
+          messages: [
+            { role: "user", content: "Hello", timestamp: "2026-01-01T00:00:00Z" },
+            { role: "assistant", content: "Hi!", timestamp: "2026-01-01T00:00:01Z" },
+          ],
+        }),
+      });
+    });
+
+    const messages = result.current.runtime.messages;
+    expect(messages).toHaveLength(2);
+    expect(messages[0].role).toBe("user");
+    expect(messages[0].content[0].text).toBe("Hello");
+    expect(messages[1].role).toBe("assistant");
+    expect(messages[1].content[0].text).toBe("Hi!");
+  });
+
+  it("should map system role to assistant in history messages", () => {
+    localStorageStore["pinchy:session:agent-1"] = "existing-session";
+
+    const { result } = renderHook(() => useWsRuntime("agent-1"));
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onopen?.();
+    });
+
+    act(() => {
+      ws.onmessage?.({
+        data: JSON.stringify({
+          type: "history",
+          messages: [
+            { role: "system", content: "System prompt", timestamp: "2026-01-01T00:00:00Z" },
+          ],
+        }),
+      });
+    });
+
+    const messages = result.current.runtime.messages;
+    expect(messages).toHaveLength(1);
+    expect(messages[0].role).toBe("assistant");
+  });
+
+  it("should not overwrite existing messages when history arrives late", () => {
+    localStorageStore["pinchy:session:agent-1"] = "existing-session";
+
+    const { result } = renderHook(() => useWsRuntime("agent-1"));
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onopen?.();
+    });
+
+    // User sends a message first (creating a non-empty messages array)
+    act(() => {
+      result.current.runtime.onNew({
+        content: [{ type: "text", text: "New message" }],
+        parentId: "root",
+      });
+    });
+
+    // History arrives after user already started chatting
+    act(() => {
+      ws.onmessage?.({
+        data: JSON.stringify({
+          type: "history",
+          messages: [
+            { role: "user", content: "Old message" },
+            { role: "assistant", content: "Old response" },
+          ],
+        }),
+      });
+    });
+
+    const messages = result.current.runtime.messages;
+    // Should still have the user's new message, not the history
+    expect(messages[0].content[0].text).toBe("New message");
+  });
+
+  it("should pass timestamps from history messages into metadata", () => {
+    localStorageStore["pinchy:session:agent-1"] = "existing-session";
+
+    const { result } = renderHook(() => useWsRuntime("agent-1"));
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onopen?.();
+    });
+
+    act(() => {
+      ws.onmessage?.({
+        data: JSON.stringify({
+          type: "history",
+          messages: [
+            { role: "user", content: "Hello", timestamp: "2026-02-20T21:30:00Z" },
+            { role: "assistant", content: "Hi!", timestamp: "2026-02-20T21:30:05Z" },
+          ],
+        }),
+      });
+    });
+
+    const messages = result.current.runtime.messages;
+    expect(messages[0].metadata).toEqual({ custom: { timestamp: "2026-02-20T21:30:00Z" } });
+    expect(messages[1].metadata).toEqual({ custom: { timestamp: "2026-02-20T21:30:05Z" } });
+  });
+
+  it("should not include metadata when history message has no timestamp", () => {
+    localStorageStore["pinchy:session:agent-1"] = "existing-session";
+
+    const { result } = renderHook(() => useWsRuntime("agent-1"));
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onopen?.();
+    });
+
+    act(() => {
+      ws.onmessage?.({
+        data: JSON.stringify({
+          type: "history",
+          messages: [{ role: "user", content: "Hello" }],
+        }),
+      });
+    });
+
+    const messages = result.current.runtime.messages;
+    expect(messages[0].metadata).toBeUndefined();
+  });
+
+  it("should set timestamp on new user messages", () => {
+    vi.setSystemTime(new Date("2026-03-15T10:30:00Z"));
+
+    const { result } = renderHook(() => useWsRuntime("agent-1"));
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onopen?.();
+    });
+
+    act(() => {
+      result.current.runtime.onNew({
+        content: [{ type: "text", text: "Hello" }],
+        parentId: "root",
+      });
+    });
+
+    const messages = result.current.runtime.messages;
+    expect(messages[0].metadata).toEqual({
+      custom: { timestamp: "2026-03-15T10:30:00.000Z" },
+    });
+  });
+
+  it("should set timestamp on new assistant messages from chunks", () => {
+    vi.setSystemTime(new Date("2026-03-15T10:30:05Z"));
+
+    const { result } = renderHook(() => useWsRuntime("agent-1"));
+    const ws = wsInstances[0];
+
+    act(() => {
+      ws.onopen?.();
+    });
+
+    act(() => {
+      result.current.runtime.onNew({
+        content: [{ type: "text", text: "Hello" }],
+        parentId: "root",
+      });
+    });
+
+    vi.setSystemTime(new Date("2026-03-15T10:30:10Z"));
+
+    act(() => {
+      ws.onmessage?.({
+        data: JSON.stringify({
+          type: "chunk",
+          content: "Hi there!",
+          messageId: "msg-1",
+        }),
+      });
+    });
+
+    const messages = result.current.runtime.messages;
+    const assistantMsg = messages.find((m: any) => m.role === "assistant");
+    expect(assistantMsg.metadata).toEqual({
+      custom: { timestamp: "2026-03-15T10:30:10.000Z" },
+    });
+  });
+
   it("should store image data on user message for display", () => {
     const { result } = renderHook(() => useWsRuntime("agent-1"));
     const ws = wsInstances[0];

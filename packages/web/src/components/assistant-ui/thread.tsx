@@ -3,35 +3,57 @@ import {
   ComposerAttachments,
   UserMessageAttachments,
 } from "@/components/assistant-ui/attachment";
+import { ChatImage } from "@/components/assistant-ui/chat-image";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import {
   ActionBarMorePrimitive,
   ActionBarPrimitive,
   AuiIf,
-  BranchPickerPrimitive,
   ComposerPrimitive,
   ErrorPrimitive,
   MessagePrimitive,
   SuggestionPrimitive,
   ThreadPrimitive,
+  useMessage,
 } from "@assistant-ui/react";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
   CheckIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   CopyIcon,
   DownloadIcon,
   MoreHorizontalIcon,
-  PencilIcon,
   SquareIcon,
 } from "lucide-react";
 import type { FC } from "react";
+
+function formatTimestamp(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (isToday) {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+const MessageTimestamp: FC = () => {
+  const timestamp = useMessage((s) => s.metadata?.custom?.timestamp as string | undefined);
+  if (!timestamp) return null;
+  return <span className="text-xs text-muted-foreground/60">{formatTimestamp(timestamp)}</span>;
+};
 
 export const Thread: FC = () => {
   return (
@@ -49,7 +71,6 @@ export const Thread: FC = () => {
         <ThreadPrimitive.Messages
           components={{
             UserMessage,
-            EditComposer,
             AssistantMessage,
           }}
         />
@@ -207,8 +228,8 @@ const AssistantMessage: FC = () => {
         <MessageError />
       </div>
 
-      <div className="aui-assistant-message-footer mt-1 ml-2 flex">
-        <BranchPicker />
+      <div className="aui-assistant-message-footer mt-1 ml-2 flex items-center gap-2">
+        <MessageTimestamp />
         <AssistantActionBar />
       </div>
     </MessagePrimitive.Root>
@@ -259,87 +280,24 @@ const AssistantActionBar: FC = () => {
 const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root
-      className="aui-user-message-root fade-in slide-in-from-bottom-1 mx-auto grid w-full max-w-(--thread-max-width) animate-in auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] content-start gap-y-2 px-2 py-3 duration-150 [&:where(>*)]:col-start-2"
+      className="aui-user-message-root fade-in slide-in-from-bottom-1 mx-auto flex w-full max-w-(--thread-max-width) animate-in flex-col items-end gap-1 px-2 py-3 duration-150"
       data-role="user"
     >
       <UserMessageAttachments />
 
-      <div className="aui-user-message-content-wrapper relative col-start-2 min-w-0">
+      <div className="aui-user-message-content-wrapper min-w-0 max-w-[85%]">
         <div className="aui-user-message-content wrap-break-word rounded-2xl bg-muted px-4 py-2.5 text-foreground">
-          <MessagePrimitive.Parts />
-        </div>
-        <div className="aui-user-action-bar-wrapper absolute top-1/2 left-0 -translate-x-full -translate-y-1/2 pr-2">
-          <UserActionBar />
+          <MessagePrimitive.Parts
+            components={{
+              Image: ChatImage,
+            }}
+          />
         </div>
       </div>
 
-      <BranchPicker className="aui-user-branch-picker col-span-full col-start-1 row-start-3 -mr-1 justify-end" />
+      <div className="flex mr-1">
+        <MessageTimestamp />
+      </div>
     </MessagePrimitive.Root>
-  );
-};
-
-const UserActionBar: FC = () => {
-  return (
-    <ActionBarPrimitive.Root
-      hideWhenRunning
-      autohide="not-last"
-      className="aui-user-action-bar-root flex flex-col items-end"
-    >
-      <ActionBarPrimitive.Edit asChild>
-        <TooltipIconButton tooltip="Edit" className="aui-user-action-edit p-4">
-          <PencilIcon />
-        </TooltipIconButton>
-      </ActionBarPrimitive.Edit>
-    </ActionBarPrimitive.Root>
-  );
-};
-
-const EditComposer: FC = () => {
-  return (
-    <MessagePrimitive.Root className="aui-edit-composer-wrapper mx-auto flex w-full max-w-(--thread-max-width) flex-col px-2 py-3">
-      <ComposerPrimitive.Root className="aui-edit-composer-root ml-auto flex w-full max-w-[85%] flex-col rounded-2xl bg-muted">
-        <ComposerPrimitive.Input
-          className="aui-edit-composer-input min-h-14 w-full resize-none bg-transparent p-4 text-foreground text-sm outline-none"
-          autoFocus
-        />
-        <div className="aui-edit-composer-footer mx-3 mb-3 flex items-center gap-2 self-end">
-          <ComposerPrimitive.Cancel asChild>
-            <Button variant="ghost" size="sm">
-              Cancel
-            </Button>
-          </ComposerPrimitive.Cancel>
-          <ComposerPrimitive.Send asChild>
-            <Button size="sm">Update</Button>
-          </ComposerPrimitive.Send>
-        </div>
-      </ComposerPrimitive.Root>
-    </MessagePrimitive.Root>
-  );
-};
-
-const BranchPicker: FC<BranchPickerPrimitive.Root.Props> = ({ className, ...rest }) => {
-  return (
-    <BranchPickerPrimitive.Root
-      hideWhenSingleBranch
-      className={cn(
-        "aui-branch-picker-root mr-2 -ml-2 inline-flex items-center text-muted-foreground text-xs",
-        className
-      )}
-      {...rest}
-    >
-      <BranchPickerPrimitive.Previous asChild>
-        <TooltipIconButton tooltip="Previous">
-          <ChevronLeftIcon />
-        </TooltipIconButton>
-      </BranchPickerPrimitive.Previous>
-      <span className="aui-branch-picker-state font-medium">
-        <BranchPickerPrimitive.Number /> / <BranchPickerPrimitive.Count />
-      </span>
-      <BranchPickerPrimitive.Next asChild>
-        <TooltipIconButton tooltip="Next">
-          <ChevronRightIcon />
-        </TooltipIconButton>
-      </BranchPickerPrimitive.Next>
-    </BranchPickerPrimitive.Root>
   );
 };

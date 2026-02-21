@@ -1,11 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockChat = vi.fn();
+const { mockChat, mockReadSessionHistory } = vi.hoisted(() => ({
+  mockChat: vi.fn(),
+  mockReadSessionHistory: vi.fn(),
+}));
+
 vi.mock("openclaw-node", () => ({
   OpenClawClient: vi.fn().mockImplementation(() => ({
     chat: mockChat,
     isConnected: true,
   })),
+}));
+
+vi.mock("@/lib/session-history", () => ({
+  readSessionHistory: mockReadSessionHistory,
 }));
 
 import { ClientRouter } from "@/server/client-router";
@@ -22,11 +30,17 @@ function createMockClientWs() {
 
 describe("ClientRouter", () => {
   let router: ClientRouter;
-  let mockOpenClawClient: { chat: typeof mockChat; isConnected: boolean };
+  let mockOpenClawClient: {
+    chat: typeof mockChat;
+    isConnected: boolean;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockOpenClawClient = { chat: mockChat, isConnected: true };
+    mockOpenClawClient = {
+      chat: mockChat,
+      isConnected: true,
+    };
     router = new ClientRouter(mockOpenClawClient as any);
   });
 
@@ -163,6 +177,82 @@ describe("ClientRouter", () => {
     });
 
     expect(clientWs.send).not.toHaveBeenCalled();
+  });
+
+  it("should return session history from JSONL file", async () => {
+    const clientWs = createMockClientWs();
+    const historyMessages = [
+      { role: "user", content: "Hello" },
+      { role: "assistant", content: "Hi there!" },
+    ];
+    mockReadSessionHistory.mockReturnValue(historyMessages);
+
+    await router.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+      sessionKey: "session-123",
+    });
+
+    expect(mockReadSessionHistory).toHaveBeenCalledWith("session-123");
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent).toHaveLength(1);
+    expect(sent[0].type).toBe("history");
+    expect(sent[0].messages).toEqual(historyMessages);
+  });
+
+  it("should return empty messages when no sessionKey provided for history", async () => {
+    const clientWs = createMockClientWs();
+
+    await router.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+    });
+
+    expect(mockReadSessionHistory).not.toHaveBeenCalled();
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent).toHaveLength(1);
+    expect(sent[0].type).toBe("history");
+    expect(sent[0].messages).toEqual([]);
+  });
+
+  it("should return empty messages when session file not found", async () => {
+    const clientWs = createMockClientWs();
+    mockReadSessionHistory.mockReturnValue([]);
+
+    await router.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+      sessionKey: "nonexistent-session",
+    });
+
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent).toHaveLength(1);
+    expect(sent[0].type).toBe("history");
+    expect(sent[0].messages).toEqual([]);
+  });
+
+  it("should still handle regular message type after adding history support", async () => {
+    async function* fakeStream() {
+      yield { type: "text" as const, text: "Hello!" };
+      yield { type: "done" as const, text: "" };
+    }
+    mockChat.mockReturnValue(fakeStream());
+
+    const clientWs = createMockClientWs();
+    await router.handleMessage(clientWs as any, {
+      type: "message",
+      content: "Hi",
+      agentId: "agent-1",
+      sessionKey: "session-1",
+    });
+
+    expect(mockChat).toHaveBeenCalledWith("Hi", { sessionKey: "session-1" });
+    expect(mockReadSessionHistory).not.toHaveBeenCalled();
+    const messages = clientWs.sent.map((s) => JSON.parse(s));
+    expect(messages.some((m: any) => m.type === "chunk")).toBe(true);
   });
 
   it("should forward structured content array to openclaw", async () => {

@@ -1,5 +1,6 @@
 import type { OpenClawClient, ContentPart } from "openclaw-node";
 import type { WebSocket } from "ws";
+import { readSessionHistory } from "@/lib/session-history";
 
 const WS_OPEN = 1;
 
@@ -14,6 +15,10 @@ export class ClientRouter {
   constructor(private openclawClient: OpenClawClient) {}
 
   async handleMessage(clientWs: WebSocket, message: BrowserMessage): Promise<void> {
+    if (message.type === "history") {
+      return this.handleHistory(clientWs, message.sessionKey);
+    }
+
     const messageId = crypto.randomUUID();
 
     try {
@@ -23,6 +28,7 @@ export class ClientRouter {
       if (message.sessionKey) {
         chatOptions.sessionKey = message.sessionKey;
       }
+
       const stream = this.openclawClient.chat(message.content, chatOptions);
 
       for await (const chunk of stream) {
@@ -48,6 +54,15 @@ export class ClientRouter {
         messageId,
       });
     }
+  }
+
+  private handleHistory(clientWs: WebSocket, sessionKey?: string): void {
+    if (!sessionKey) {
+      this.sendToClient(clientWs, { type: "history", messages: [] });
+      return;
+    }
+    const messages = readSessionHistory(sessionKey);
+    this.sendToClient(clientWs, { type: "history", messages });
   }
 
   private sendToClient(ws: WebSocket, data: Record<string, unknown>): void {

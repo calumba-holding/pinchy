@@ -18,6 +18,7 @@ interface WsMessage {
   role: "user" | "assistant";
   content: string;
   images?: string[];
+  timestamp?: string;
 }
 
 const STREAM_DONE_DEBOUNCE_MS = 1500;
@@ -46,6 +47,7 @@ function convertMessage(msg: WsMessage): ThreadMessageLike {
     role: msg.role,
     content: parts,
     id: msg.id,
+    metadata: msg.timestamp ? { custom: { timestamp: msg.timestamp } } : undefined,
   };
 }
 
@@ -73,7 +75,13 @@ export function useWsRuntime(agentId: string): {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws?agentId=${agentId}`);
 
-    ws.onopen = () => setIsConnected(true);
+    ws.onopen = () => {
+      setIsConnected(true);
+      const sessionKey = getSessionKey(agentId);
+      if (sessionKey) {
+        ws.send(JSON.stringify({ type: "history", sessionKey }));
+      }
+    };
 
     ws.onclose = () => {
       setIsConnected(false);
@@ -88,6 +96,22 @@ export function useWsRuntime(agentId: string): {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        if (data.type === "history") {
+          setMessages((prev) => {
+            if (prev.length > 0) return prev;
+            return (data.messages ?? []).map(
+              (msg: { role: string; content: string; timestamp?: string }) => ({
+                id: crypto.randomUUID(),
+                role: msg.role === "system" ? "assistant" : msg.role,
+                content: msg.content,
+                timestamp: msg.timestamp,
+              })
+            );
+          });
+          return;
+        }
+
         if (data.type === "chunk") {
           setMessages((prev) => {
             const last = prev[prev.length - 1];
@@ -100,6 +124,7 @@ export function useWsRuntime(agentId: string): {
                 id: data.messageId,
                 role: "assistant",
                 content: data.content,
+                timestamp: new Date().toISOString(),
               },
             ];
           });
@@ -188,6 +213,7 @@ export function useWsRuntime(agentId: string): {
         id: crypto.randomUUID(),
         role: "user",
         content: text,
+        timestamp: new Date().toISOString(),
         ...(images.length > 0 && { images }),
       };
 
