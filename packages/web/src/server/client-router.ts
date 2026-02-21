@@ -7,6 +7,7 @@ import { agents } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 const WS_OPEN = 1;
+const CONNECTION_TIMEOUT_MS = 10_000;
 
 interface ContentPart {
   type: string;
@@ -61,6 +62,8 @@ export class ClientRouter {
     const messageId = crypto.randomUUID();
 
     try {
+      await this.waitForConnection();
+
       // Extract text and images from structured content
       let text: string;
       const attachments: ChatAttachment[] = [];
@@ -122,6 +125,7 @@ export class ClientRouter {
     const session = await getOrCreateSession(this.userId, agentId);
 
     try {
+      await this.waitForConnection();
       const result = (await this.openclawClient.sessions.history(session.sessionKey)) as {
         messages?: HistoryMessage[];
       };
@@ -162,7 +166,34 @@ export class ClientRouter {
     }
   }
 
-  private sanitizeError(_err: unknown): string {
+  private waitForConnection(): Promise<void> {
+    if (this.openclawClient.isConnected) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.openclawClient.removeListener("connected", onConnected);
+        reject(
+          new Error("Agent runtime is not available right now. Please try again in a moment.")
+        );
+      }, CONNECTION_TIMEOUT_MS);
+
+      const onConnected = () => {
+        clearTimeout(timeout);
+        resolve();
+      };
+      this.openclawClient.once("connected", onConnected);
+    });
+  }
+
+  private sanitizeError(err: unknown): string {
+    const message = err instanceof Error ? err.message : String(err);
+    // Pass through user-facing messages from waitForConnection
+    if (message.includes("not available")) {
+      return message;
+    }
+    console.error("ClientRouter error:", message);
+    if (err instanceof Error && err.stack) {
+      console.error(err.stack);
+    }
     return "Something went wrong. Please try again.";
   }
 

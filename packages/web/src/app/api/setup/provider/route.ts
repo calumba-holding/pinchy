@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { validateProviderKey, PROVIDERS, type ProviderName } from "@/lib/providers";
 import { setSetting } from "@/lib/settings";
-import { writeOpenClawConfig } from "@/lib/openclaw-config";
+import { regenerateOpenClawConfig } from "@/lib/openclaw-config";
 import { db } from "@/db";
 import { agents } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -45,12 +45,8 @@ export async function POST(request: NextRequest) {
     await db.update(agents).set({ model: config.defaultModel }).where(eq(agents.id, smithers.id));
   }
 
-  // Write OpenClaw config
-  writeOpenClawConfig({
-    provider: provider as ProviderName,
-    apiKey,
-    model: config.defaultModel,
-  });
+  // Regenerate full OpenClaw config (includes agent list, provider env, model defaults)
+  await regenerateOpenClawConfig();
 
   return NextResponse.json({ success: true });
 }

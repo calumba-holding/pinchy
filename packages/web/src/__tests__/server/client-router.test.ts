@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { EventEmitter } from "events";
 
 const { mockChat, mockSessionsHistory, mockGetOrCreateSession, mockFindFirst } = vi.hoisted(() => ({
   mockChat: vi.fn(),
@@ -57,21 +58,23 @@ const defaultAgent = {
   isPersonal: false,
 };
 
+function createMockOpenClawClient(connected = true) {
+  const emitter = new EventEmitter();
+  const client = Object.assign(emitter, {
+    chat: mockChat,
+    sessions: { history: mockSessionsHistory },
+    isConnected: connected,
+  });
+  return client;
+}
+
 describe("ClientRouter", () => {
   let router: ClientRouter;
-  let mockOpenClawClient: {
-    chat: typeof mockChat;
-    sessions: { history: typeof mockSessionsHistory };
-    isConnected: boolean;
-  };
+  let mockOpenClawClient: ReturnType<typeof createMockOpenClawClient>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockOpenClawClient = {
-      chat: mockChat,
-      sessions: { history: mockSessionsHistory },
-      isConnected: true,
-    };
+    mockOpenClawClient = createMockOpenClawClient(true);
     router = new ClientRouter(mockOpenClawClient as any, "user-1", "user");
 
     // Default: agent exists and is accessible
@@ -500,6 +503,58 @@ describe("ClientRouter", () => {
     expect(sent[0].type).toBe("error");
     expect(sent[0].message).not.toContain("/root/");
     expect(sent[0].message).toBe("Something went wrong. Please try again.");
+  });
+
+  it("should wait for reconnect and succeed when OpenClaw reconnects in time", async () => {
+    // Start disconnected — sessions.history throws like real client
+    const disconnectedClient = createMockOpenClawClient(false);
+    const disconnectedRouter = new ClientRouter(disconnectedClient as any, "user-1", "user");
+
+    mockSessionsHistory.mockResolvedValue({ messages: [] });
+
+    // Simulate reconnect after 50ms
+    setTimeout(() => {
+      disconnectedClient.isConnected = true;
+      disconnectedClient.emit("connected");
+    }, 50);
+
+    const clientWs = createMockClientWs();
+    await disconnectedRouter.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+    });
+
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent).toHaveLength(1);
+    expect(sent[0].type).toBe("history");
+  });
+
+  it("should return error after timeout when OpenClaw does not reconnect", async () => {
+    vi.useFakeTimers();
+
+    const disconnectedClient = createMockOpenClawClient(false);
+    const disconnectedRouter = new ClientRouter(disconnectedClient as any, "user-1", "user");
+
+    mockSessionsHistory.mockRejectedValue(new Error("Not connected to OpenClaw Gateway"));
+
+    const clientWs = createMockClientWs();
+    const messagePromise = disconnectedRouter.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+    });
+
+    // Advance past the connection timeout
+    await vi.advanceTimersByTimeAsync(11_000);
+    await messagePromise;
+
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent).toHaveLength(1);
+    expect(sent[0].type).toBe("error");
+    expect(sent[0].message).toContain("not available");
+
+    vi.useRealTimers();
   });
 
   it("should allow admin to access personal agents of other users", async () => {

@@ -41,6 +41,7 @@ vi.mock("@/lib/settings", () => ({
 
 vi.mock("@/lib/openclaw-config", () => ({
   writeOpenClawConfig: vi.fn(),
+  regenerateOpenClawConfig: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/db", () => ({
@@ -64,7 +65,7 @@ vi.mock("@/db", () => ({
 
 import { validateProviderKey } from "@/lib/providers";
 import { setSetting } from "@/lib/settings";
-import { writeOpenClawConfig } from "@/lib/openclaw-config";
+import { writeOpenClawConfig, regenerateOpenClawConfig } from "@/lib/openclaw-config";
 import { db } from "@/db";
 import { requireAdmin } from "@/lib/api-auth";
 
@@ -128,7 +129,7 @@ describe("POST /api/setup/provider", () => {
     expect(db.update).toHaveBeenCalled();
   });
 
-  it("should write OpenClaw config", async () => {
+  it("should regenerate full OpenClaw config including agent list", async () => {
     await POST(
       makeRequest({
         provider: "anthropic",
@@ -136,11 +137,7 @@ describe("POST /api/setup/provider", () => {
       }) as any
     );
 
-    expect(writeOpenClawConfig).toHaveBeenCalledWith({
-      provider: "anthropic",
-      apiKey: "sk-ant-key",
-      model: "anthropic/claude-haiku-4-5-20251001",
-    });
+    expect(regenerateOpenClawConfig).toHaveBeenCalled();
   });
 
   it("should set onboarding_greeting_pending", async () => {
