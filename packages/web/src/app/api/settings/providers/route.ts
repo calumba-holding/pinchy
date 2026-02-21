@@ -31,8 +31,8 @@ export async function GET() {
 }
 
 export async function DELETE(request: Request) {
-  const adminResult = await requireAdmin();
-  if (adminResult instanceof NextResponse) return adminResult;
+  const sessionOrError = await requireAdmin();
+  if (sessionOrError instanceof NextResponse) return sessionOrError;
 
   const body = await request.json();
   const provider = body.provider as ProviderName;
