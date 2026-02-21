@@ -7,6 +7,7 @@ interface ChatSession {
   sessionKey: string;
   userId: string;
   agentId: string;
+  runtimeActivated: boolean;
 }
 
 /**
@@ -31,4 +32,15 @@ export async function getOrCreateSession(userId: string, agentId: string): Promi
     .returning();
 
   return session;
+}
+
+/**
+ * Mark a session as activated in the runtime. Called after the first successful
+ * chat() call, so subsequent history requests know it's safe to query OpenClaw.
+ */
+export async function markSessionActivated(sessionId: string): Promise<void> {
+  await db
+    .update(chatSessions)
+    .set({ runtimeActivated: true })
+    .where(eq(chatSessions.id, sessionId));
 }

@@ -1,10 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventEmitter } from "events";
 
-const { mockChat, mockSessionsHistory, mockGetOrCreateSession, mockFindFirst } = vi.hoisted(() => ({
+const {
+  mockChat,
+  mockSessionsHistory,
+  mockGetOrCreateSession,
+  mockMarkSessionActivated,
+  mockFindFirst,
+} = vi.hoisted(() => ({
   mockChat: vi.fn(),
   mockSessionsHistory: vi.fn(),
   mockGetOrCreateSession: vi.fn(),
+  mockMarkSessionActivated: vi.fn(),
   mockFindFirst: vi.fn(),
 }));
 
@@ -19,6 +26,7 @@ vi.mock("@/lib/agent-access", () => ({
 
 vi.mock("@/lib/chat-sessions", () => ({
   getOrCreateSession: mockGetOrCreateSession,
+  markSessionActivated: mockMarkSessionActivated,
 }));
 
 vi.mock("@/db", () => ({
@@ -80,13 +88,15 @@ describe("ClientRouter", () => {
     // Default: agent exists and is accessible
     mockFindFirst.mockResolvedValue(defaultAgent);
 
-    // Default: session exists
+    // Default: session exists and has been activated in the runtime
     mockGetOrCreateSession.mockResolvedValue({
       id: "session-id",
       sessionKey: "server-session-key",
       userId: "user-1",
       agentId: "agent-1",
+      runtimeActivated: true,
     });
+    mockMarkSessionActivated.mockResolvedValue(undefined);
   });
 
   it("should return error when agent not found", async () => {
@@ -126,7 +136,7 @@ describe("ClientRouter", () => {
     expect(messages[0].message).toBe("Access denied");
   });
 
-  it("should use server-side session key for OpenClaw chat", async () => {
+  it("should pass only agentId (no sessionKey) to OpenClaw chat", async () => {
     async function* fakeStream() {
       yield { type: "text" as const, text: "Hello!" };
       yield { type: "done" as const, text: "" };
@@ -139,9 +149,7 @@ describe("ClientRouter", () => {
       agentId: "agent-1",
     });
 
-    expect(mockGetOrCreateSession).toHaveBeenCalledWith("user-1", "agent-1");
     expect(mockChat).toHaveBeenCalledWith("Hi Smithers", {
-      sessionKey: "server-session-key",
       agentId: "agent-1",
     });
   });
@@ -307,7 +315,6 @@ describe("ClientRouter", () => {
     });
 
     expect(mockChat).toHaveBeenCalledWith("Hi", {
-      sessionKey: "server-session-key",
       agentId: "agent-1",
     });
     expect(mockSessionsHistory).not.toHaveBeenCalled();
@@ -334,7 +341,6 @@ describe("ClientRouter", () => {
     });
 
     expect(mockChat).toHaveBeenCalledWith("What is this?", {
-      sessionKey: "server-session-key",
       agentId: "agent-1",
       attachments: [{ mimeType: "image/png", content: "abc123" }],
     });
@@ -359,7 +365,6 @@ describe("ClientRouter", () => {
     });
 
     expect(mockChat).toHaveBeenCalledWith("First part. Second part.", {
-      sessionKey: "server-session-key",
       agentId: "agent-1",
     });
   });
@@ -378,7 +383,6 @@ describe("ClientRouter", () => {
     });
 
     expect(mockChat).toHaveBeenCalledWith("Hi", {
-      sessionKey: "server-session-key",
       agentId: "agent-1",
     });
   });
@@ -452,6 +456,68 @@ describe("ClientRouter", () => {
     expect(sent[0].messages).toHaveLength(2);
     expect(sent[0].messages[0].role).toBe("user");
     expect(sent[0].messages[1].role).toBe("assistant");
+  });
+
+  it("should return empty history without calling OpenClaw for unactivated sessions", async () => {
+    const clientWs = createMockClientWs();
+    mockGetOrCreateSession.mockResolvedValue({
+      id: "new-session-id",
+      sessionKey: "brand-new-key",
+      userId: "user-1",
+      agentId: "agent-1",
+      runtimeActivated: false,
+    });
+
+    await router.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+    });
+
+    expect(mockSessionsHistory).not.toHaveBeenCalled();
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent).toHaveLength(1);
+    expect(sent[0].type).toBe("history");
+    expect(sent[0].messages).toEqual([]);
+  });
+
+  it("should mark session as activated after successful chat", async () => {
+    mockGetOrCreateSession.mockResolvedValue({
+      id: "new-session-id",
+      sessionKey: "brand-new-key",
+      userId: "user-1",
+      agentId: "agent-1",
+      runtimeActivated: false,
+    });
+    async function* fakeStream() {
+      yield { type: "text" as const, text: "Hello!" };
+      yield { type: "done" as const, text: "" };
+    }
+    mockChat.mockReturnValue(fakeStream());
+
+    await router.handleMessage(createMockClientWs() as any, {
+      type: "message",
+      content: "Hi",
+      agentId: "agent-1",
+    });
+
+    expect(mockMarkSessionActivated).toHaveBeenCalledWith("new-session-id");
+  });
+
+  it("should not re-activate an already activated session", async () => {
+    async function* fakeStream() {
+      yield { type: "text" as const, text: "Hello!" };
+      yield { type: "done" as const, text: "" };
+    }
+    mockChat.mockReturnValue(fakeStream());
+
+    await router.handleMessage(createMockClientWs() as any, {
+      type: "message",
+      content: "Hi",
+      agentId: "agent-1",
+    });
+
+    expect(mockMarkSessionActivated).not.toHaveBeenCalled();
   });
 
   it("should send error when history fetch fails", async () => {

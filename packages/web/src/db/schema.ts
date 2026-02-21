@@ -104,6 +104,7 @@ export const chatSessions = pgTable(
     agentId: text("agent_id")
       .notNull()
       .references(() => agents.id, { onDelete: "cascade" }),
+    runtimeActivated: boolean("runtime_activated").notNull().default(false),
     createdAt: timestamp("created_at").defaultNow(),
   },
   (table) => [uniqueIndex("chat_sessions_user_agent_idx").on(table.userId, table.agentId)]

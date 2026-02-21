@@ -5,6 +5,8 @@ const findFirstMock = vi.fn();
 const returningMock = vi.fn();
 const valuesMock = vi.fn().mockReturnValue({ returning: returningMock });
 const insertMock = vi.fn().mockReturnValue({ values: valuesMock });
+const setMock = vi.fn().mockReturnValue({ where: vi.fn() });
+const updateMock = vi.fn().mockReturnValue({ set: setMock });
 
 vi.mock("@/db", () => ({
   db: {
@@ -14,14 +16,17 @@ vi.mock("@/db", () => ({
       },
     },
     insert: (...args: unknown[]) => insertMock(...args),
+    update: (...args: unknown[]) => updateMock(...args),
   },
 }));
 
 vi.mock("@/db/schema", () => ({
   chatSessions: {
+    id: "id",
     userId: "user_id",
     agentId: "agent_id",
     createdAt: "created_at",
+    runtimeActivated: "runtime_activated",
   },
 }));
 
@@ -31,7 +36,7 @@ vi.mock("drizzle-orm", () => ({
   desc: vi.fn((col) => ({ col, type: "desc" })),
 }));
 
-import { getOrCreateSession } from "@/lib/chat-sessions";
+import { getOrCreateSession, markSessionActivated } from "@/lib/chat-sessions";
 
 describe("getOrCreateSession", () => {
   beforeEach(() => {
@@ -44,6 +49,7 @@ describe("getOrCreateSession", () => {
       sessionKey: "key-123",
       userId: "u1",
       agentId: "a1",
+      runtimeActivated: false,
     };
     findFirstMock.mockResolvedValue(existing);
 
@@ -60,6 +66,7 @@ describe("getOrCreateSession", () => {
       sessionKey: "key-456",
       userId: "u1",
       agentId: "a1",
+      runtimeActivated: false,
     };
     findFirstMock.mockResolvedValue(existing);
 
@@ -75,6 +82,7 @@ describe("getOrCreateSession", () => {
       sessionKey: "new-key",
       userId: "u1",
       agentId: "a1",
+      runtimeActivated: false,
     };
     returningMock.mockResolvedValue([newSession]);
 
@@ -92,6 +100,7 @@ describe("getOrCreateSession", () => {
       sessionKey: "key-789",
       userId: "user-42",
       agentId: "agent-7",
+      runtimeActivated: false,
     };
     returningMock.mockResolvedValue([newSession]);
 
@@ -112,6 +121,7 @@ describe("getOrCreateSession", () => {
       sessionKey: "generated-uuid",
       userId: "u1",
       agentId: "a1",
+      runtimeActivated: false,
     };
     returningMock.mockResolvedValue([newSession]);
 
@@ -124,9 +134,42 @@ describe("getOrCreateSession", () => {
     );
   });
 
+  it("returns runtimeActivated from existing session", async () => {
+    const existing = {
+      id: "s1",
+      sessionKey: "key-123",
+      userId: "u1",
+      agentId: "a1",
+      runtimeActivated: true,
+    };
+    findFirstMock.mockResolvedValue(existing);
+
+    const result = await getOrCreateSession("u1", "a1");
+
+    expect(result.runtimeActivated).toBe(true);
+  });
+
+  it("returns runtimeActivated=false for new sessions", async () => {
+    findFirstMock.mockResolvedValue(undefined);
+    const newSession = {
+      id: "s6",
+      sessionKey: "new-key",
+      userId: "u1",
+      agentId: "a1",
+      runtimeActivated: false,
+    };
+    returningMock.mockResolvedValue([newSession]);
+
+    const result = await getOrCreateSession("u1", "a1");
+
+    expect(result.runtimeActivated).toBe(false);
+  });
+
   it("queries with correct user and agent filters", async () => {
     findFirstMock.mockResolvedValue(undefined);
-    returningMock.mockResolvedValue([{ id: "s5", sessionKey: "k", userId: "u1", agentId: "a1" }]);
+    returningMock.mockResolvedValue([
+      { id: "s5", sessionKey: "k", userId: "u1", agentId: "a1", runtimeActivated: false },
+    ]);
 
     await getOrCreateSession("u1", "a1");
 
@@ -136,5 +179,22 @@ describe("getOrCreateSession", () => {
         orderBy: expect.any(Object),
       })
     );
+  });
+});
+
+describe("markSessionActivated", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("updates runtimeActivated to true for the given session", async () => {
+    const whereMock = vi.fn();
+    setMock.mockReturnValue({ where: whereMock });
+
+    await markSessionActivated("session-123");
+
+    expect(updateMock).toHaveBeenCalled();
+    expect(setMock).toHaveBeenCalledWith({ runtimeActivated: true });
+    expect(whereMock).toHaveBeenCalled();
   });
 });

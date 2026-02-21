@@ -1,7 +1,7 @@
 import type { OpenClawClient, ChatAttachment } from "openclaw-node";
 import type { WebSocket } from "ws";
 import { assertAgentAccess } from "@/lib/agent-access";
-import { getOrCreateSession } from "@/lib/chat-sessions";
+import { getOrCreateSession, markSessionActivated } from "@/lib/chat-sessions";
 import { db } from "@/db";
 import { agents } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -87,7 +87,6 @@ export class ClientRouter {
       }
 
       const chatOptions: Record<string, unknown> = {
-        sessionKey: session.sessionKey,
         agentId: message.agentId,
       };
       if (attachments.length > 0) {
@@ -106,6 +105,9 @@ export class ClientRouter {
         }
 
         if (chunk.type === "done") {
+          if (!session.runtimeActivated) {
+            markSessionActivated(session.id).catch(() => {});
+          }
           this.sendToClient(clientWs, {
             type: "done",
             messageId,
@@ -123,6 +125,14 @@ export class ClientRouter {
 
   private async handleHistory(clientWs: WebSocket, agentId: string): Promise<void> {
     const session = await getOrCreateSession(this.userId, agentId);
+
+    // Sessions that haven't had a successful chat() yet don't exist in OpenClaw.
+    // Calling sessions.history() would create the session with the default agent
+    // "main", which then conflicts when chat() passes the real agentId.
+    if (!session.runtimeActivated) {
+      this.sendToClient(clientWs, { type: "history", messages: [] });
+      return;
+    }
 
     try {
       await this.waitForConnection();
