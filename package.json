@@ -20,10 +20,10 @@
   "lint-staged": {
     "packages/web/src/**/*.{ts,tsx}": [
       "pnpm -C packages/web exec eslint --no-warn-ignored",
-      "pnpm -C packages/web exec prettier --check"
+      "pnpm -C packages/web exec prettier --write"
     ],
-    "packages/web/src/**/*.{json,css,md}": [
-      "pnpm -C packages/web exec prettier --check"
+    "packages/web/**/*.{json,css,md}": [
+      "pnpm -C packages/web exec prettier --write"
     ]
   }
 }
