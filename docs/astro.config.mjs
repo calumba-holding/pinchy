@@ -11,16 +11,39 @@ export default defineConfig({
     starlight({
       title: 'Pinchy',
       plugins: [starlightClientMermaid()],
-      head: process.env.UMAMI_WEBSITE_ID ? [
+      head: [
+        ...(process.env.UMAMI_WEBSITE_ID ? [
+          {
+            tag: 'script',
+            attrs: {
+              defer: true,
+              src: 'https://cloud.umami.is/script.js',
+              'data-website-id': process.env.UMAMI_WEBSITE_ID,
+            },
+          },
+        ] : []),
         {
           tag: 'script',
-          attrs: {
-            defer: true,
-            src: 'https://cloud.umami.is/script.js',
-            'data-website-id': process.env.UMAMI_WEBSITE_ID,
-          },
+          attrs: { type: 'application/ld+json' },
+          content: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: 'Pinchy Documentation',
+            url: 'https://docs.heypinchy.com',
+            publisher: {
+              '@type': 'Organization',
+              name: 'Helmcraft GmbH',
+              url: 'https://heypinchy.com',
+            },
+            about: {
+              '@type': 'SoftwareApplication',
+              name: 'Pinchy',
+              applicationCategory: 'DeveloperApplication',
+              operatingSystem: 'Linux, Docker',
+            },
+          }),
         },
-      ] : [],
+      ],
       logo: {
         src: './src/assets/pinchy-logo.png',
       },
