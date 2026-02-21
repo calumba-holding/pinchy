@@ -40,6 +40,8 @@ jobs:
       - name: Build
         working-directory: docs
         run: pnpm build
+        env:
+          UMAMI_WEBSITE_ID: ${{ vars.UMAMI_DOCS_WEBSITE_ID }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

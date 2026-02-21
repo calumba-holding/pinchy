@@ -9,6 +9,16 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Pinchy',
+      head: process.env.UMAMI_WEBSITE_ID ? [
+        {
+          tag: 'script',
+          attrs: {
+            defer: true,
+            src: 'https://cloud.umami.is/script.js',
+            'data-website-id': process.env.UMAMI_WEBSITE_ID,
+          },
+        },
+      ] : [],
       logo: {
         src: './src/assets/pinchy-logo.png',
       },
