@@ -83,7 +83,10 @@ export class ClientRouter {
         text = message.content;
       }
 
-      const chatOptions: Record<string, unknown> = { sessionKey: session.sessionKey };
+      const chatOptions: Record<string, unknown> = {
+        sessionKey: session.sessionKey,
+        agentId: message.agentId,
+      };
       if (attachments.length > 0) {
         chatOptions.attachments = attachments;
       }

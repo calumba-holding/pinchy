@@ -139,6 +139,7 @@ describe("ClientRouter", () => {
     expect(mockGetOrCreateSession).toHaveBeenCalledWith("user-1", "agent-1");
     expect(mockChat).toHaveBeenCalledWith("Hi Smithers", {
       sessionKey: "server-session-key",
+      agentId: "agent-1",
     });
   });
 
@@ -302,7 +303,10 @@ describe("ClientRouter", () => {
       agentId: "agent-1",
     });
 
-    expect(mockChat).toHaveBeenCalledWith("Hi", { sessionKey: "server-session-key" });
+    expect(mockChat).toHaveBeenCalledWith("Hi", {
+      sessionKey: "server-session-key",
+      agentId: "agent-1",
+    });
     expect(mockSessionsHistory).not.toHaveBeenCalled();
     const messages = clientWs.sent.map((s) => JSON.parse(s));
     expect(messages.some((m: any) => m.type === "chunk")).toBe(true);
@@ -328,6 +332,7 @@ describe("ClientRouter", () => {
 
     expect(mockChat).toHaveBeenCalledWith("What is this?", {
       sessionKey: "server-session-key",
+      agentId: "agent-1",
       attachments: [{ mimeType: "image/png", content: "abc123" }],
     });
   });
@@ -352,6 +357,7 @@ describe("ClientRouter", () => {
 
     expect(mockChat).toHaveBeenCalledWith("First part. Second part.", {
       sessionKey: "server-session-key",
+      agentId: "agent-1",
     });
   });
 
@@ -370,6 +376,7 @@ describe("ClientRouter", () => {
 
     expect(mockChat).toHaveBeenCalledWith("Hi", {
       sessionKey: "server-session-key",
+      agentId: "agent-1",
     });
   });
 
