@@ -282,6 +282,95 @@ describe("readSessionHistory", () => {
     expect(result).toEqual([]);
   });
 
+  it("should merge consecutive assistant messages into one", () => {
+    const jsonl = [
+      JSON.stringify({
+        type: "message",
+        id: "msg-1",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Tell me about content types" }],
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "msg-2",
+        timestamp: "2026-02-20T18:22:00Z",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Here are the types:" }],
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "msg-3",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "**1. Audio**" }],
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "msg-4",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "**2. Images**" }],
+        },
+      }),
+    ].join("\n");
+
+    mockDirectJsonl(jsonl);
+
+    const result = readSessionHistory(SESSION_KEY);
+
+    expect(result).toEqual([
+      { role: "user", content: "Tell me about content types", timestamp: undefined },
+      {
+        role: "assistant",
+        content: "Here are the types:\n\n**1. Audio**\n\n**2. Images**",
+        timestamp: "2026-02-20T18:22:00Z",
+      },
+    ]);
+  });
+
+  it("should not merge assistant messages separated by a user message", () => {
+    const jsonl = [
+      JSON.stringify({
+        type: "message",
+        id: "msg-1",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "First response" }],
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "msg-2",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Follow-up question" }],
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "msg-3",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Second response" }],
+        },
+      }),
+    ].join("\n");
+
+    mockDirectJsonl(jsonl);
+
+    const result = readSessionHistory(SESSION_KEY);
+
+    expect(result).toHaveLength(3);
+    expect(result[0].content).toBe("First response");
+    expect(result[1].content).toBe("Follow-up question");
+    expect(result[2].content).toBe("Second response");
+  });
+
   it("should strip timestamp prefix from user messages", () => {
     const jsonl = JSON.stringify({
       type: "message",

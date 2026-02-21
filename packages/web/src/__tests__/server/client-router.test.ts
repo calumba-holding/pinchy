@@ -255,9 +255,9 @@ describe("ClientRouter", () => {
     expect(messages.some((m: any) => m.type === "chunk")).toBe(true);
   });
 
-  it("should forward structured content array to openclaw", async () => {
+  it("should extract text from structured content array before sending to openclaw", async () => {
     async function* fakeStream() {
-      yield { type: "text" as const, text: "I see an image" };
+      yield { type: "text" as const, text: "I see the image" };
       yield { type: "done" as const, text: "" };
     }
     mockChat.mockReturnValue(fakeStream());
@@ -274,8 +274,29 @@ describe("ClientRouter", () => {
       sessionKey: "session-1",
     });
 
-    expect(mockChat).toHaveBeenCalledWith(structuredContent, {
+    expect(mockChat).toHaveBeenCalledWith("What is this?", {
       sessionKey: "session-1",
     });
+  });
+
+  it("should join multiple text parts from structured content with spaces", async () => {
+    async function* fakeStream() {
+      yield { type: "text" as const, text: "OK" };
+      yield { type: "done" as const, text: "" };
+    }
+    mockChat.mockReturnValue(fakeStream());
+
+    const structuredContent = [
+      { type: "text", text: "First part." },
+      { type: "text", text: "Second part." },
+    ];
+
+    await router.handleMessage(createMockClientWs() as any, {
+      type: "message",
+      content: structuredContent,
+      agentId: "agent-1",
+    });
+
+    expect(mockChat).toHaveBeenCalledWith("First part. Second part.", {});
   });
 });

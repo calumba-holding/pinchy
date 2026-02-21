@@ -94,11 +94,17 @@ export function readSessionHistory(sessionKey: string): SessionMessage[] {
       text = text.replace(/^\[.*?\]\s*/, "");
     }
 
-    messages.push({
-      role: role as "user" | "assistant",
-      content: text,
-      timestamp: entry.timestamp,
-    });
+    // Merge consecutive assistant messages into one (OpenClaw splits turns into multiple entries)
+    const last = messages[messages.length - 1];
+    if (role === "assistant" && last?.role === "assistant") {
+      last.content += "\n\n" + text;
+    } else {
+      messages.push({
+        role: role as "user" | "assistant",
+        content: text,
+        timestamp: entry.timestamp,
+      });
+    }
   }
 
   return messages;

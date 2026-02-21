@@ -139,6 +139,13 @@ describe("useWsRuntime", () => {
     });
 
     expect(result.current.runtime.isRunning).toBe(false);
+
+    // Should show the error as an assistant message
+    const messages = result.current.runtime.messages;
+    const errorMsg = messages.find(
+      (m: any) => m.role === "assistant" && m.content[0]?.text?.includes("Something went wrong")
+    );
+    expect(errorMsg).toBeDefined();
   });
 
   it("should clear debounce timer when done message arrives", () => {

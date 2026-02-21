@@ -149,6 +149,14 @@ export function useWsRuntime(agentId: string): {
           if (debounceTimerRef.current) {
             clearTimeout(debounceTimerRef.current);
           }
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: data.message || "An unknown error occurred.",
+            },
+          ]);
           setIsRunning(false);
         }
       } catch {

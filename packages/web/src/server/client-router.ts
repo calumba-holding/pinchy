@@ -29,7 +29,15 @@ export class ClientRouter {
         chatOptions.sessionKey = message.sessionKey;
       }
 
-      const stream = this.openclawClient.chat(message.content, chatOptions);
+      // Gateway only accepts string messages — extract text from ContentPart[]
+      const text = Array.isArray(message.content)
+        ? message.content
+            .filter((part) => part.type === "text" && "text" in part)
+            .map((part) => (part as { text: string }).text)
+            .join(" ")
+        : message.content;
+
+      const stream = this.openclawClient.chat(text, chatOptions);
 
       for await (const chunk of stream) {
         if (chunk.type === "text") {
