@@ -47,23 +47,23 @@ interface AuditResponse {
 
 interface VerifyResult {
   valid: boolean;
-  checked: number;
-  tampered: number[];
+  totalChecked: number;
+  invalidIds: number[];
 }
 
 const EVENT_TYPES = [
   "auth.login",
-  "auth.logout",
-  "auth.denied",
   "auth.failed",
+  "auth.logout",
   "agent.created",
   "agent.updated",
   "agent.deleted",
-  "user.created",
-  "user.deleted",
+  "user.invited",
   "user.updated",
-  "config.updated",
-  "tool.called",
+  "user.deleted",
+  "config.changed",
+  "tool.execute",
+  "tool.denied",
 ];
 
 function isNegativeEvent(eventType: string): boolean {
@@ -240,11 +240,11 @@ export function AuditLogTable() {
           }`}
         >
           {verifyResult.valid ? (
-            <span>All {verifyResult.checked} entries verified. Integrity intact.</span>
+            <span>All {verifyResult.totalChecked} entries verified. Integrity intact.</span>
           ) : (
             <span>
-              {verifyResult.tampered.length} tampered entries detected out of {verifyResult.checked}{" "}
-              checked. IDs: {verifyResult.tampered.join(", ")}
+              {verifyResult.invalidIds.length} tampered entries detected out of{" "}
+              {verifyResult.totalChecked} checked. IDs: {verifyResult.invalidIds.join(", ")}
             </span>
           )}
         </div>

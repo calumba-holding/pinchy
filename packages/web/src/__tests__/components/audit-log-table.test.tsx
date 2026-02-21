@@ -33,7 +33,7 @@ describe("AuditLogTable", () => {
       timestamp: "2026-02-21T12:00:00.000Z",
       actorType: "user",
       actorId: "user-3",
-      eventType: "auth.denied",
+      eventType: "auth.failed",
       resource: null,
       detail: { reason: "Invalid credentials" },
       rowHmac: "ghi789",
@@ -81,7 +81,7 @@ describe("AuditLogTable", () => {
     });
 
     expect(screen.getByText("agent.created")).toBeInTheDocument();
-    expect(screen.getByText("auth.denied")).toBeInTheDocument();
+    expect(screen.getByText("auth.failed")).toBeInTheDocument();
     expect(screen.getByText("user-1")).toBeInTheDocument();
     expect(screen.getByText("user-2")).toBeInTheDocument();
   });
@@ -142,7 +142,7 @@ describe("AuditLogTable", () => {
 
     vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ valid: true, checked: 3, tampered: [] }),
+      json: async () => ({ valid: true, totalChecked: 3, invalidIds: [] }),
     } as Response);
 
     const user = userEvent.setup();
@@ -166,7 +166,7 @@ describe("AuditLogTable", () => {
 
     vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ valid: false, checked: 3, tampered: [3, 17] }),
+      json: async () => ({ valid: false, totalChecked: 3, invalidIds: [3, 17] }),
     } as Response);
 
     const user = userEvent.setup();
@@ -181,11 +181,11 @@ describe("AuditLogTable", () => {
     renderWithEntriesLoaded();
 
     await waitFor(() => {
-      expect(screen.getByText("auth.denied")).toBeInTheDocument();
+      expect(screen.getByText("auth.failed")).toBeInTheDocument();
     });
 
-    const deniedBadge = screen.getByText("auth.denied");
-    expect(deniedBadge).toHaveAttribute("data-variant", "destructive");
+    const failedBadge = screen.getByText("auth.failed");
+    expect(failedBadge).toHaveAttribute("data-variant", "destructive");
   });
 
   it("should show secondary badge for normal events", async () => {
