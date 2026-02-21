@@ -74,6 +74,16 @@ jobs:
         env:
           CI: true
 
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -f Dockerfile.pinchy -t pinchy:ci .
+
   audit:
     name: Security audit
     runs-on: ubuntu-latest
@@ -90,5 +100,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Audit dependencies
+      - name: Audit production dependencies
         run: pnpm audit --prod
+
+      - name: Check for secrets in codebase
+        run: |
+          # Check for common secret patterns in tracked files
+          PATTERNS='(AKIA[A-Z0-9]{16}|sk-[a-zA-Z0-9]{20,}|-----BEGIN (RSA |EC )?PRIVATE KEY-----|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36})'
+          if git grep -lEI "$PATTERNS" -- ':!*.lock' ':!.github/' ':!*.test.*' ':!*.md' 2>/dev/null; then
+            echo "::error::Potential secrets found in codebase"
+            exit 1
+          fi
+          echo "No secrets detected"
