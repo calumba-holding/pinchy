@@ -29,99 +29,87 @@ const FALLBACK_MODELS: Record<ProviderName, ModelInfo[]> = {
   ],
 };
 
-async function fetchAnthropicModels(apiKey: string): Promise<ModelInfo[]> {
-  const response = await fetch("https://api.anthropic.com/v1/models", {
-    headers: {
+interface ProviderFetchConfig {
+  url: (apiKey: string) => string;
+  headers: (apiKey: string) => Record<string, string>;
+  transform: (data: Record<string, unknown>) => ModelInfo[];
+}
+
+const PROVIDER_FETCH_CONFIG: Record<ProviderName, ProviderFetchConfig> = {
+  anthropic: {
+    url: () => "https://api.anthropic.com/v1/models",
+    headers: (apiKey) => ({
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
-    },
+    }),
+    transform: (data) =>
+      (data.data as { id: string; display_name: string }[]).map((m) => ({
+        id: `anthropic/${m.id}`,
+        name: m.display_name,
+      })),
+  },
+  openai: {
+    url: () => "https://api.openai.com/v1/models",
+    headers: (apiKey) => ({ Authorization: `Bearer ${apiKey}` }),
+    transform: (data) =>
+      (data.data as { id: string }[])
+        .filter((m) => m.id.startsWith("gpt-") || m.id.startsWith("o"))
+        .map((m) => ({
+          id: `openai/${m.id}`,
+          name: m.id,
+        })),
+  },
+  google: {
+    url: (apiKey) => `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`,
+    headers: () => ({}),
+    transform: (data) =>
+      (data.models as { name: string; displayName: string; supportedGenerationMethods: string[] }[])
+        .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+        .map((m) => ({
+          id: `google/${m.name.replace("models/", "")}`,
+          name: m.displayName,
+        })),
+  },
+};
+
+async function fetchModelsForProvider(
+  provider: ProviderName,
+  apiKey: string
+): Promise<ModelInfo[]> {
+  const config = PROVIDER_FETCH_CONFIG[provider];
+  const response = await fetch(config.url(apiKey), {
+    headers: config.headers(apiKey),
   });
 
   if (!response.ok) {
-    return FALLBACK_MODELS.anthropic;
+    return FALLBACK_MODELS[provider];
   }
 
   const data = await response.json();
-  return data.data.map((model: { id: string; display_name: string }) => ({
-    id: `anthropic/${model.id}`,
-    name: model.display_name,
-  }));
-}
-
-async function fetchOpenAIModels(apiKey: string): Promise<ModelInfo[]> {
-  const response = await fetch("https://api.openai.com/v1/models", {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-    },
-  });
-
-  if (!response.ok) {
-    return FALLBACK_MODELS.openai;
-  }
-
-  const data = await response.json();
-  return data.data
-    .filter((model: { id: string }) => {
-      return model.id.startsWith("gpt-") || model.id.startsWith("o");
-    })
-    .map((model: { id: string }) => ({
-      id: `openai/${model.id}`,
-      name: model.id,
-    }));
-}
-
-async function fetchGoogleModels(apiKey: string): Promise<ModelInfo[]> {
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`);
-
-  if (!response.ok) {
-    return FALLBACK_MODELS.google;
-  }
-
-  const data = await response.json();
-  return data.models
-    .filter((model: { supportedGenerationMethods: string[] }) =>
-      model.supportedGenerationMethods?.includes("generateContent")
-    )
-    .map((model: { name: string; displayName: string }) => ({
-      id: `google/${model.name.replace("models/", "")}`,
-      name: model.displayName,
-    }));
+  return config.transform(data);
 }
 
 export async function fetchProviderModels(): Promise<ProviderModels[]> {
   const results: ProviderModels[] = [];
 
-  for (const [providerName, config] of Object.entries(PROVIDERS)) {
+  for (const [providerName, providerConfig] of Object.entries(PROVIDERS)) {
     const provider = providerName as ProviderName;
-    const apiKey = await getSetting(config.settingsKey);
+    const apiKey = await getSetting(providerConfig.settingsKey);
 
     if (!apiKey) {
       continue;
     }
 
-    let models: ModelInfo[];
-
     try {
-      switch (provider) {
-        case "anthropic":
-          models = await fetchAnthropicModels(apiKey);
-          break;
-        case "openai":
-          models = await fetchOpenAIModels(apiKey);
-          break;
-        case "google":
-          models = await fetchGoogleModels(apiKey);
-          break;
-      }
+      const models = await fetchModelsForProvider(provider, apiKey);
+      results.push({ id: provider, name: providerConfig.name, models });
     } catch {
-      models = FALLBACK_MODELS[provider];
+      results.push({
+        id: provider,
+        name: providerConfig.name,
+        models: FALLBACK_MODELS[provider],
+      });
     }
-
-    results.push({
-      id: provider,
-      name: config.name,
-      models,
-    });
   }
 
   return results;
