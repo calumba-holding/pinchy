@@ -7,12 +7,14 @@ const {
   mockGetOrCreateSession,
   mockMarkSessionActivated,
   mockFindFirst,
+  mockAppendAuditLog,
 } = vi.hoisted(() => ({
   mockChat: vi.fn(),
   mockSessionsHistory: vi.fn(),
   mockGetOrCreateSession: vi.fn(),
   mockMarkSessionActivated: vi.fn(),
   mockFindFirst: vi.fn(),
+  mockAppendAuditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/lib/agent-access", () => ({
@@ -45,6 +47,10 @@ vi.mock("@/db/schema", () => ({
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((col, val) => ({ col, val })),
+}));
+
+vi.mock("@/lib/audit", () => ({
+  appendAuditLog: mockAppendAuditLog,
 }));
 
 import { ClientRouter } from "@/server/client-router";
@@ -621,6 +627,63 @@ describe("ClientRouter", () => {
     expect(sent[0].message).toContain("not available");
 
     vi.useRealTimers();
+  });
+
+  it("should log audit event when agent access is denied", async () => {
+    const clientWs = createMockClientWs();
+    mockFindFirst.mockResolvedValue({
+      id: "agent-1",
+      name: "Personal Agent",
+      ownerId: "other-user",
+      isPersonal: true,
+    });
+
+    await router.handleMessage(clientWs as any, {
+      type: "message",
+      content: "Hi",
+      agentId: "agent-1",
+    });
+
+    expect(mockAppendAuditLog).toHaveBeenCalledWith({
+      actorType: "user",
+      actorId: "user-1",
+      eventType: "tool.denied",
+      resource: "agent:agent-1",
+      detail: { reason: "access_denied" },
+    });
+  });
+
+  it("should log audit event when agent uses a tool", async () => {
+    const clientWs = createMockClientWs();
+    async function* fakeStream() {
+      yield { type: "tool_use" as const, text: "search_web" };
+      yield { type: "tool_result" as const, text: "result data" };
+      yield { type: "text" as const, text: "Here are the results." };
+      yield { type: "done" as const, text: "" };
+    }
+    mockChat.mockReturnValue(fakeStream());
+
+    await router.handleMessage(clientWs as any, {
+      type: "message",
+      content: "Search for something",
+      agentId: "agent-1",
+    });
+
+    expect(mockAppendAuditLog).toHaveBeenCalledTimes(2);
+    expect(mockAppendAuditLog).toHaveBeenCalledWith({
+      actorType: "agent",
+      actorId: "agent-1",
+      eventType: "tool.execute",
+      resource: "agent:agent-1",
+      detail: { chunkType: "tool_use", text: "search_web" },
+    });
+    expect(mockAppendAuditLog).toHaveBeenCalledWith({
+      actorType: "agent",
+      actorId: "agent-1",
+      eventType: "tool.execute",
+      resource: "agent:agent-1",
+      detail: { chunkType: "tool_result", text: "result data" },
+    });
   });
 
   it("should allow admin to access personal agents of other users", async () => {

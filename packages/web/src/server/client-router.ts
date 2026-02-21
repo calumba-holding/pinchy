@@ -1,6 +1,7 @@
 import type { OpenClawClient, ChatAttachment } from "openclaw-node";
 import type { WebSocket } from "ws";
 import { assertAgentAccess } from "@/lib/agent-access";
+import { appendAuditLog } from "@/lib/audit";
 import { getOrCreateSession, markSessionActivated } from "@/lib/chat-sessions";
 import { db } from "@/db";
 import { agents } from "@/db/schema";
@@ -48,6 +49,13 @@ export class ClientRouter {
     try {
       assertAgentAccess(agent, this.userId, this.userRole);
     } catch {
+      appendAuditLog({
+        actorType: "user",
+        actorId: this.userId,
+        eventType: "tool.denied",
+        resource: `agent:${message.agentId}`,
+        detail: { reason: "access_denied" },
+      }).catch(() => {});
       this.sendToClient(clientWs, { type: "error", message: "Access denied" });
       return;
     }
@@ -102,6 +110,16 @@ export class ClientRouter {
             content: chunk.text,
             messageId,
           });
+        }
+
+        if (chunk.type === "tool_use" || chunk.type === "tool_result") {
+          appendAuditLog({
+            actorType: "agent",
+            actorId: message.agentId,
+            eventType: "tool.execute",
+            resource: `agent:${message.agentId}`,
+            detail: { chunkType: chunk.type, text: chunk.text },
+          }).catch(() => {});
         }
 
         if (chunk.type === "done") {
