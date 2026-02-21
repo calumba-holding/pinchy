@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Bot, Plus, Settings, User } from "lucide-react";
+import { Bot, ClipboardList, Plus, Settings, User } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -74,6 +74,16 @@ export function AppSidebar({ agents, isAdmin }: AppSidebarProps) {
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          {isAdmin && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild>
+                <Link href="/audit">
+                  <ClipboardList className="size-4" />
+                  <span>Audit Trail</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
