@@ -1,4 +1,5 @@
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
+import { randomBytes } from "crypto";
 import { dirname } from "path";
 import { PROVIDERS, type ProviderName } from "@/lib/providers";
 import { db } from "@/db";
@@ -51,8 +52,17 @@ function deepMerge(
 export function writeOpenClawConfig({ provider, apiKey, model }: OpenClawConfigParams) {
   const existing = readExistingConfig();
 
+  // Generate auth token if none exists in the existing config
+  const existingGateway = (existing.gateway as Record<string, unknown>) || {};
+  const existingAuth = (existingGateway.auth as Record<string, unknown>) || {};
+  const token = (existingAuth.token as string) || randomBytes(24).toString("hex");
+
   const pinchyFields = {
-    gateway: { mode: "local", bind: "lan" },
+    gateway: {
+      mode: "local",
+      bind: "lan",
+      auth: { mode: "token", token },
+    },
     env: {
       [PROVIDERS[provider].envVar]: apiKey,
     },

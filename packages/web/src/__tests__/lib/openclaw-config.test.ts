@@ -123,6 +123,22 @@ describe("writeOpenClawConfig", () => {
     expect(config.agents.defaults.model.primary).toBe("google/gemini-2.0-flash");
   });
 
+  it("should generate auth token when no existing config", () => {
+    writeOpenClawConfig({
+      provider: "anthropic",
+      apiKey: "sk-ant-key",
+      model: "anthropic/claude-haiku-4-5-20251001",
+    });
+
+    const written = mockedWriteFileSync.mock.calls[0][1] as string;
+    const config = JSON.parse(written);
+
+    expect(config.gateway.auth).toBeDefined();
+    expect(config.gateway.auth.mode).toBe("token");
+    expect(config.gateway.auth.token).toBeTruthy();
+    expect(config.gateway.auth.token).toHaveLength(48); // 24 bytes hex
+  });
+
   it("should merge with existing config preserving gateway.auth", () => {
     const existingConfig = {
       gateway: {
