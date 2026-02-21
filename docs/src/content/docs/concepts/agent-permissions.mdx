@@ -106,6 +106,10 @@ Not every user can see every agent. Pinchy enforces access rules:
 
 Only admins can view and modify the Permissions tab. Regular users can chat with agents they have access to, but cannot change what tools those agents use.
 
+:::note
+All permission changes are logged in the [audit trail](/concepts/audit-trail/). When an admin enables or disables tools for an agent, the change is recorded with the admin's identity, the affected agent, and the old and new permissions.
+:::
+
 ## The `/data/` convention
 
 All agent-accessible files live under `/data/` inside the Pinchy container. This is mounted as a Docker volume, and you can bind-mount host directories into subdirectories of `/data/`.

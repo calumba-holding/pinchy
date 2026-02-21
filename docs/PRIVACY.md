@@ -49,6 +49,18 @@ Pinchy does **not** collect telemetry, does **not** phone home, and does **not**
 | Configured mount points | File plugin configuration | PostgreSQL |
 | File paths accessed | Agent file reading | Processed in memory; not persisted beyond session |
 
+### 2.5 Audit Log Data
+
+| Data Field | Purpose | Storage |
+|---|---|---|
+| Event type | Categorization of the logged action | PostgreSQL (append-only, HMAC-signed) |
+| Actor ID and email | Identifying who performed the action | PostgreSQL (append-only, HMAC-signed) |
+| Timestamp | When the action occurred | PostgreSQL (append-only, HMAC-signed) |
+| Metadata (action details) | Context about the action (e.g., agent ID, changed settings) | PostgreSQL (append-only, HMAC-signed) |
+| HMAC signature | Cryptographic integrity verification | PostgreSQL |
+
+Audit log entries are **immutable** — PostgreSQL triggers prevent modification or deletion. Chat message content is **not** stored in the audit log. The audit log records actions and events only (logins, agent changes, tool executions, etc.).
+
 ---
 
 ## 3. Data Storage & Location
@@ -89,6 +101,7 @@ Since Pinchy is self-hosted, data retention is **entirely under the customer's c
 - **Chat messages** remain in the database until the customer deletes them.
 - **User accounts** remain until deleted by an administrator.
 - **Agent configurations** remain until deleted by an administrator.
+- **Audit log entries** are immutable and cannot be deleted through the application. They remain in the database permanently. Customers requiring audit log retention limits should implement database-level policies.
 - **Database backups** are the customer's responsibility and follow the customer's backup policies.
 
 **Recommendation:** Customers should establish their own data retention policy consistent with applicable data protection laws and their organizational requirements.
@@ -101,7 +114,7 @@ As the data controller, the customer is responsible for fulfilling data subject 
 
 | Right | How to Fulfill |
 |---|---|
-| **Access** (Art. 15) | Export user data from the PostgreSQL database |
+| **Access** (Art. 15) | Export user data from the PostgreSQL database. Audit log entries referencing the user can be exported via CSV. |
 | **Rectification** (Art. 16) | Update user profile via admin interface |
 | **Erasure** (Art. 17) | Delete user account and associated data via admin interface or database |
 | **Restriction** (Art. 18) | Disable user account |

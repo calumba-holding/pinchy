@@ -4,7 +4,7 @@
 
 Pinchy is an **enterprise AI agent platform** built on top of [OpenClaw](https://github.com/openclaw/openclaw). OpenClaw is the most powerful open-source AI agent runtime — but it's designed for individual power users. Pinchy adds the enterprise layer: permissions, audit trails, user management, and governance.
 
-**Status: Early development.** The core is working — setup wizard, authentication, provider configuration, agent chat via OpenClaw, and Docker Compose deployment. Enterprise features (RBAC, audit trail, plugins) are next.
+**Status: Early development.** The core is working — setup wizard, authentication, provider configuration, agent chat via OpenClaw, audit trail, and Docker Compose deployment. Enterprise features (RBAC, plugins) are next.
 
 ### The Problem Pinchy Solves
 
@@ -14,7 +14,7 @@ Companies want AI agents but face a trilemma:
 - **Frameworks** (CrewAI, LangChain) → libraries, not platforms. No UI, no permissions, no deployment.
 - **OpenClaw** → best agent runtime, but no multi-user, no RBAC, no audit trail.
 
-### Target Architecture (NOT YET IMPLEMENTED)
+### Target Architecture (PARTIALLY IMPLEMENTED)
 
 ```
 ┌─────────────────────────────────────────┐
@@ -37,7 +37,7 @@ Companies want AI agents but face a trilemma:
 │                                         │
 │  🔌 Plugin Architecture                │
 │  🔐 Role-Based Access Control          │
-│  📋 Audit Trail (every agent action)   │
+│  📋 Audit Trail (IMPLEMENTED)          │
 │  🔀 Cross-Channel Workflows            │
 │  🏠 Self-Hosted & Offline-Capable      │
 │  🤖 Model Agnostic (OpenAI, Anthropic, │
@@ -45,11 +45,11 @@ Companies want AI agents but face a trilemma:
 └─────────────────────────────────────────┘
 ```
 
-### Core Concepts (planned)
+### Core Concepts (planned and implemented)
 
 - **Plugin Architecture**: Agents get scoped tools (e.g., "Create Jira Ticket"), not raw shell access
 - **RBAC**: Who can use which agent, what each agent can do — per team, per role
-- **Audit Trail**: Every agent action logged — who, what, when. Compliance-ready
+- **Audit Trail** (implemented): Every agent action logged — who, what, when. HMAC-SHA256 signed rows, integrity verification, CSV export. Compliance-ready.
 - **Cross-Channel Workflows**: Input on email, output on Slack. Properly routed and permissioned
 - **Self-Hosted**: Your server, your data, your models. Works without internet
 - **Docker Compose Deployment**: Single `docker compose up` to run everything
@@ -184,7 +184,7 @@ cd docs && pnpm build                 # Build docs
 ## Context for AI Assistants
 
 When working on this project:
-1. **The core is working** — setup, auth, provider config, and agent chat are implemented. Enterprise features (RBAC, audit trail, plugins) are planned.
+1. **The core is working** — setup, auth, provider config, agent chat, and audit trail are implemented. Enterprise features (RBAC, plugins) are planned.
 2. **OpenClaw is the foundation** — familiarize yourself with [OpenClaw docs](https://docs.openclaw.ai) before making architectural decisions
 3. **Keep it simple** — prefer boring, proven technology over clever abstractions
 4. **Test everything** — no PR without tests

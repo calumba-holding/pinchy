@@ -142,7 +142,7 @@ Liability is governed by the underlying agreement between the Parties and applic
 | **Categories of Data Subjects** | Customer's employees, contractors, or other users of the Pinchy instance |
 | **Categories of Personal Data** | Email addresses, display names, hashed passwords, chat messages, session data, agent configurations |
 | **Sensitive Data** | None intentionally processed. Chat messages may incidentally contain sensitive data at the Controller's discretion. |
-| **Processing Operations** | Storage of user accounts; processing of chat messages for AI agent interaction; storage of agent configurations; encrypted storage of API keys; file access from configured mount points |
+| **Processing Operations** | Storage of user accounts; processing of chat messages for AI agent interaction; storage of agent configurations; encrypted storage of API keys; file access from configured mount points; audit logging of user actions (HMAC-signed, append-only) |
 | **Purpose of Processing** | Provision of the Pinchy AI agent platform |
 | **Data Location** | Controller's own infrastructure (determined by Controller) |
 
@@ -188,11 +188,18 @@ Liability is governed by the underlying agreement between the Parties and applic
 - **Docker Compose deployment** enables straightforward restart and recovery
 - **Database backups:** The Controller is responsible for configuring PostgreSQL backups according to their requirements
 
+### Audit Logging
+
+- **Append-only audit trail** logging 12 event types (authentication, agent management, user management, configuration changes, tool execution)
+- Each audit entry is signed with **HMAC-SHA256** for tamper detection
+- PostgreSQL triggers prevent modification or deletion of audit entries
+- Admin-only access to audit log viewing, integrity verification, and CSV export
+- Chat message content is **not** included in the audit log
+
 ### Measures Not Yet Implemented
 
 The following measures are planned but not yet available in the current version:
 
-- Audit logging of user actions
 - Single Sign-On (OAuth2/OIDC, SAML)
 - Granular role-based access control beyond admin/user
 

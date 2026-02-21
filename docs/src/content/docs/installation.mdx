@@ -44,11 +44,16 @@ NEXTAUTH_SECRET=your-random-secret
 
 # Encryption key for API keys — 64 hex characters (auto-generated if omitted)
 ENCRYPTION_KEY=
+
+# HMAC secret for audit trail signing (auto-generated if not provided)
+AUDIT_HMAC_SECRET=
 ```
 
 **`NEXTAUTH_SECRET`** — Used by Auth.js to sign JWT session tokens. Generate one with `openssl rand -hex 32`.
 
 **`ENCRYPTION_KEY`** — Used to encrypt provider API keys at rest (AES-256-GCM). If omitted, Pinchy auto-generates a key and persists it in the `pinchy-data` Docker volume. Set this explicitly if you want to share the key across deployments.
+
+**`AUDIT_HMAC_SECRET`** — Used to sign audit trail entries with HMAC-SHA256. If omitted, Pinchy auto-generates a secret at startup. Set this explicitly if you need consistent signatures across restarts or deployments.
 
 **`DB_PASSWORD`** — Password for the PostgreSQL `pinchy` user.
 

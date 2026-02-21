@@ -210,13 +210,40 @@ Since Pinchy is self-hosted, most security incidents will occur at the infrastru
 
 ---
 
-## 12. Roadmap Items
+## 12. Audit Logging
+
+Pinchy includes a built-in, cryptographic audit trail that logs every significant action on the platform.
+
+### 12.1 What Is Logged
+
+Twelve event types are tracked across authentication (login, failed login, logout), agent management (create, update, delete), user management (invite, update, delete), configuration changes, and tool execution (execute, denied).
+
+**Chat message content is not logged** in the audit trail.
+
+### 12.2 Integrity Protection
+
+- Each audit entry is signed with **HMAC-SHA256** using a server-side secret
+- The audit log table is **append-only** — PostgreSQL triggers prevent UPDATE and DELETE operations
+- Admins can verify integrity at any time via the admin UI or the `/api/audit/verify` API endpoint
+- Tampered entries are detected by recomputing and comparing HMAC signatures
+
+### 12.3 Access Control
+
+- Only administrators can view, verify, or export the audit log
+- The audit log is accessible via the admin UI and three API endpoints (`/api/audit`, `/api/audit/verify`, `/api/audit/export`)
+
+### 12.4 Export
+
+The audit log can be exported as CSV for external compliance tools and auditors.
+
+---
+
+## 13. Roadmap Items
 
 The following security features are planned but **not yet implemented**:
 
 | Feature | Status |
 |---|---|
-| Audit logging | Planned |
 | SSO (OAuth2/OIDC) | Planned |
 | SAML integration | Planned |
 | Granular RBAC | Planned |
@@ -225,9 +252,9 @@ This document will be updated as these features become available.
 
 ---
 
-## 13. Compliance
+## 14. Compliance
 
-### 13.1 GDPR
+### 14.1 GDPR
 
 Pinchy's self-hosted architecture supports GDPR compliance by design:
 
@@ -236,7 +263,7 @@ Pinchy's self-hosted architecture supports GDPR compliance by design:
 - Customer has full control over data retention and deletion
 - See [PRIVACY.md](PRIVACY.md) and [DPA.md](DPA.md) for details
 
-### 13.2 Customer Compliance Responsibilities
+### 14.2 Customer Compliance Responsibilities
 
 As the data controller and infrastructure operator, the customer is responsible for:
 
@@ -248,7 +275,7 @@ As the data controller and infrastructure operator, the customer is responsible 
 
 ---
 
-## 14. Contact
+## 15. Contact
 
 **Helmcraft GmbH**
 Vienna, Austria

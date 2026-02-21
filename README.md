@@ -75,12 +75,12 @@ Then open [http://localhost:7777](http://localhost:7777) — the setup wizard wi
 - **Knowledge Base agents** — Create agents with scoped read-only access to specific directories
 - **Provider management** — Configure API keys for Anthropic, OpenAI, and Google
 - **Docker Compose deployment** — Single command to run the full stack
+- **Audit trail** — Cryptographic audit logging with HMAC-signed entries, integrity verification, and CSV export
 - **CI pipeline** — Automated linting, testing, and security auditing
 
 ### What's coming
 
 - Full RBAC with team-scoped permissions
-- Audit trail logging (every agent action)
 - Plugin marketplace for agent tools
 - Cross-channel workflows (email, Slack)
 - Admin dashboard with usage analytics

@@ -352,6 +352,94 @@ Claim an invite token to create a new account or reset a password. **This endpoi
 **Errors:**
 - `400` — missing fields, invalid token, or token expired
 
+## Audit Trail (admin only)
+
+### `GET /api/audit`
+
+Retrieve a paginated, filterable audit log. **Admin only.**
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | number | 1 | Page number |
+| `limit` | number | 50 | Entries per page |
+| `eventType` | string | — | Filter by event type (e.g., `auth.login`, `tool.execute`) |
+| `actorId` | string | — | Filter by user ID |
+| `from` | string | — | Start date (ISO 8601) |
+| `to` | string | — | End date (ISO 8601) |
+
+**Response:**
+
+```json
+{
+  "entries": [
+    {
+      "id": "uuid",
+      "eventType": "auth.login",
+      "actorId": "user-uuid",
+      "actorEmail": "alice@example.com",
+      "metadata": {},
+      "hmac": "sha256-hex-string",
+      "createdAt": "2026-02-21T10:00:00.000Z"
+    }
+  ],
+  "total": 142,
+  "page": 1,
+  "limit": 50
+}
+```
+
+**Errors:**
+- `401` — not authenticated
+- `403` — not an admin
+
+### `GET /api/audit/verify`
+
+Verify the integrity of audit log entries by recomputing HMAC signatures. **Admin only.**
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `fromId` | string | — | Start verification from this entry ID (optional) |
+| `toId` | string | — | End verification at this entry ID (optional) |
+
+**Response:**
+
+```json
+{
+  "verified": true,
+  "entriesChecked": 142,
+  "tamperedEntries": []
+}
+```
+
+If tampered entries are found, `verified` is `false` and `tamperedEntries` contains the IDs of entries with mismatched signatures.
+
+**Errors:**
+- `401` — not authenticated
+- `403` — not an admin
+
+### `GET /api/audit/export`
+
+Export the audit log as a CSV file. Supports the same filters as `GET /api/audit`. **Admin only.**
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `eventType` | string | — | Filter by event type |
+| `actorId` | string | — | Filter by user ID |
+| `from` | string | — | Start date (ISO 8601) |
+| `to` | string | — | End date (ISO 8601) |
+
+**Response:** `200 OK` with `Content-Type: text/csv` and `Content-Disposition: attachment; filename="audit-log.csv"`.
+
+**Errors:**
+- `401` — not authenticated
+- `403` — not an admin
+
 ## User Self-Service
 
 ### `PATCH /api/users/me`

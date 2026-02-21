@@ -5,7 +5,7 @@ description: How Pinchy wraps OpenClaw, the request flow, and the tech stack.
 
 ## Overview
 
-Pinchy is **not a fork** of OpenClaw. It's a governance layer on top of it. OpenClaw handles agent execution, tool use, and model communication. Pinchy adds authentication, provider management, agent permissions, and (soon) audit trails and team management.
+Pinchy is **not a fork** of OpenClaw. It's a governance layer on top of it. OpenClaw handles agent execution, tool use, and model communication. Pinchy adds authentication, provider management, agent permissions, cryptographic audit trails, and (soon) team management.
 
 ```mermaid
 ---
@@ -124,6 +124,7 @@ PostgreSQL 16, accessed via [Drizzle ORM](https://orm.drizzle.team/). The schema
 - **`chatSessions`** — Maps `(userId, agentId)` to a server-side `sessionKey` for OpenClaw conversation continuity
 - **`invites`** — Invite tokens (SHA-256 hashed token, email, expiry, status)
 - **`settings`** — Key-value store for app configuration (provider keys, onboarding state)
+- **`auditLog`** — Append-only audit trail with HMAC-SHA256 signed rows, protected by PostgreSQL triggers preventing UPDATE and DELETE
 
 Migrations are generated with `drizzle-kit generate` and applied automatically on container startup via `drizzle-kit migrate`.
 
@@ -134,6 +135,31 @@ Provider API keys are encrypted at rest using **AES-256-GCM**:
 - A 256-bit encryption key is either provided via the `ENCRYPTION_KEY` environment variable or auto-generated and persisted in the `pinchy-data` Docker volume
 - Each encrypted value stores the IV, auth tag, and ciphertext together
 - Decryption happens on-demand when Pinchy writes the OpenClaw configuration file
+
+## Audit Trail
+
+Pinchy includes a cryptographic audit trail for compliance and security. Every significant action is logged to the `auditLog` table with an HMAC-SHA256 signature.
+
+### Design principles
+
+- **Append-only** — PostgreSQL triggers prevent UPDATE and DELETE operations on audit rows. Once written, entries are immutable.
+- **Cryptographically signed** — Each row is signed with HMAC-SHA256 using a server-side secret (auto-generated if not provided via `AUDIT_HMAC_SECRET`).
+- **Fire-and-forget** — Audit logging never blocks or breaks the main operation. If logging fails, the original action still succeeds.
+- **Admin-only access** — Only admins can view, verify, or export the audit log.
+
+### What gets logged
+
+Pinchy logs 12 event types covering authentication, agent management, user management, configuration changes, and tool execution. Chat message content is **not** logged — only tool calls and permission-relevant actions.
+
+### Integrity verification
+
+Admins can verify the integrity of audit entries via the admin UI or the `/api/audit/verify` endpoint. Verification recomputes HMAC signatures and reports any tampered rows.
+
+### CSV export
+
+The audit log can be exported as CSV for compliance reporting via the admin UI or the `/api/audit/export` endpoint.
+
+For the full details, see [Audit Trail](/concepts/audit-trail/).
 
 ## OpenClaw integration
 
