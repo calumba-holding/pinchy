@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { agents } from "@/db/schema";
+import { eq, or, and } from "drizzle-orm";
 import { getTemplate } from "@/lib/agent-templates";
 import { validateAllowedPaths } from "@/lib/path-validation";
 import { ensureWorkspace, writeWorkspaceFile } from "@/lib/workspace";
@@ -15,8 +16,24 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const allAgents = await db.select().from(agents);
-  return NextResponse.json(allAgents);
+  const isAdmin = session.user.role === "admin";
+
+  if (isAdmin) {
+    const allAgents = await db.select().from(agents);
+    return NextResponse.json(allAgents);
+  }
+
+  // Non-admins see shared agents + their own personal agents
+  const visibleAgents = await db
+    .select()
+    .from(agents)
+    .where(
+      or(
+        eq(agents.isPersonal, false),
+        and(eq(agents.isPersonal, true), eq(agents.ownerId, session.user.id!))
+      )
+    );
+  return NextResponse.json(visibleAgents);
 }
 
 export async function POST(request: NextRequest) {
@@ -69,6 +86,7 @@ export async function POST(request: NextRequest) {
       model,
       templateId,
       pluginConfig: template.pluginId ? pluginConfig : null,
+      ownerId: session.user.id,
     })
     .returning();
 

@@ -4,10 +4,13 @@ vi.mock("@/lib/auth", () => ({
   auth: vi.fn().mockResolvedValue({ user: { id: "1", email: "admin@test.com" } }),
 }));
 
+const { insertValuesMock } = vi.hoisted(() => ({
+  insertValuesMock: vi.fn(),
+}));
 vi.mock("@/db", () => ({
   db: {
     insert: vi.fn().mockReturnValue({
-      values: vi.fn().mockReturnValue({
+      values: insertValuesMock.mockReturnValue({
         returning: vi.fn().mockResolvedValue([
           {
             id: "new-agent-id",
@@ -15,6 +18,7 @@ vi.mock("@/db", () => ({
             model: "anthropic/claude-haiku-4-5-20251001",
             templateId: "knowledge-base",
             pluginConfig: { allowed_paths: ["/data/hr-docs/"] },
+            ownerId: "1",
           },
         ]),
       }),
@@ -77,6 +81,27 @@ describe("POST /api/agents", () => {
     expect(ensureWorkspace).toHaveBeenCalledWith("new-agent-id");
     expect(writeWorkspaceFile).toHaveBeenCalledWith("new-agent-id", "SOUL.md", expect.any(String));
     expect(regenerateOpenClawConfig).toHaveBeenCalled();
+  });
+
+  it("should set ownerId to the current user's id", async () => {
+    const request = new NextRequest("http://localhost:7777/api/agents", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "HR Knowledge Base",
+        templateId: "knowledge-base",
+        pluginConfig: {
+          allowed_paths: ["/data/hr-docs/"],
+        },
+      }),
+    });
+
+    await POST(request);
+
+    expect(insertValuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerId: "1",
+      })
+    );
   });
 
   it("should reject unknown template", async () => {

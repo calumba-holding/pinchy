@@ -4,6 +4,7 @@ import { agents } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { updateAgent, deleteAgent } from "@/lib/agents";
 import { auth } from "@/lib/auth";
+import { assertAgentAccess } from "@/lib/agent-access";
 
 export async function GET(
   request: NextRequest,
@@ -24,6 +25,12 @@ export async function GET(
     return NextResponse.json({ error: "Agent not found" }, { status: 404 });
   }
 
+  try {
+    assertAgentAccess(agent, session.user.id!, session.user.role || "user");
+  } catch {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   return NextResponse.json(agent);
 }
 
@@ -37,6 +44,21 @@ export async function PATCH(
   }
 
   const { agentId } = await params;
+
+  const existingAgent = await db.query.agents.findFirst({
+    where: eq(agents.id, agentId),
+  });
+
+  if (!existingAgent) {
+    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+  }
+
+  try {
+    assertAgentAccess(existingAgent, session.user.id!, session.user.role || "user");
+  } catch {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const body = await request.json();
   const data: { name?: string; model?: string } = {};
   if (body.name !== undefined) data.name = body.name;
@@ -65,6 +87,12 @@ export async function DELETE(
 
   if (!agent) {
     return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+  }
+
+  try {
+    assertAgentAccess(agent, session.user.id!, session.user.role || "user");
+  } catch {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   if (agent.isPersonal) {

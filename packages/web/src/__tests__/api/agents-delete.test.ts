@@ -57,6 +57,8 @@ describe("GET /api/agents/[agentId]", () => {
       id: "agent-1",
       name: "Test Agent",
       model: "anthropic/claude-sonnet-4-20250514",
+      isPersonal: false,
+      ownerId: null,
     } as never);
 
     const request = new NextRequest("http://localhost:7777/api/agents/agent-1");
@@ -67,6 +69,30 @@ describe("GET /api/agents/[agentId]", () => {
 
     const body = await response.json();
     expect(body.name).toBe("Test Agent");
+  });
+
+  it("returns 403 when non-owner user tries to access personal agent of another user", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "user-2", role: "user" },
+      expires: "",
+    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+
+    vi.mocked(db.query.agents.findFirst).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Personal Agent",
+      model: "anthropic/claude-sonnet-4-20250514",
+      isPersonal: true,
+      ownerId: "user-1",
+    } as never);
+
+    const request = new NextRequest("http://localhost:7777/api/agents/agent-1");
+    const response = await GET(request, {
+      params: Promise.resolve({ agentId: "agent-1" }),
+    });
+    expect(response.status).toBe(403);
+
+    const body = await response.json();
+    expect(body.error).toBe("Forbidden");
   });
 });
 
@@ -101,6 +127,13 @@ describe("PATCH /api/agents/[agentId]", () => {
       expires: "",
     } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
 
+    vi.mocked(db.query.agents.findFirst).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Test Agent",
+      isPersonal: false,
+      ownerId: null,
+    } as never);
+
     const { updateAgent } = await import("@/lib/agents");
     vi.mocked(updateAgent).mockResolvedValueOnce({
       id: "agent-1",
@@ -120,6 +153,55 @@ describe("PATCH /api/agents/[agentId]", () => {
 
     const body = await response.json();
     expect(body.name).toBe("New Name");
+  });
+
+  it("returns 403 when non-owner user tries to update personal agent of another user", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "user-2", role: "user" },
+      expires: "",
+    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+
+    vi.mocked(db.query.agents.findFirst).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Personal Agent",
+      isPersonal: true,
+      ownerId: "user-1",
+    } as never);
+
+    const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
+      method: "PATCH",
+      body: JSON.stringify({ name: "New Name" }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const response = await PATCH(request, {
+      params: Promise.resolve({ agentId: "agent-1" }),
+    });
+    expect(response.status).toBe(403);
+
+    const body = await response.json();
+    expect(body.error).toBe("Forbidden");
+  });
+
+  it("returns 404 when agent not found for update", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "user-1", role: "user" },
+      expires: "",
+    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+
+    vi.mocked(db.query.agents.findFirst).mockResolvedValueOnce(undefined);
+
+    const request = new NextRequest("http://localhost:7777/api/agents/nonexistent", {
+      method: "PATCH",
+      body: JSON.stringify({ name: "New Name" }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const response = await PATCH(request, {
+      params: Promise.resolve({ agentId: "nonexistent" }),
+    });
+    expect(response.status).toBe(404);
+
+    const body = await response.json();
+    expect(body.error).toBe("Agent not found");
   });
 });
 
