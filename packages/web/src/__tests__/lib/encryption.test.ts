@@ -89,6 +89,86 @@ describe("encryption", () => {
     expect(() => mod.getEncryptionKey()).toThrow("ENCRYPTION_KEY");
   });
 
+  describe("getOrCreateSecret", () => {
+    const SECRET_NAME = "audit_hmac_secret";
+    const ENV_VAR_NAME = "AUDIT_HMAC_SECRET";
+    const FILE_NAME = ".audit_hmac_secret";
+
+    beforeEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("should read secret from env variable (uppercased name)", async () => {
+      const validHex = "c".repeat(64);
+      vi.stubEnv(ENV_VAR_NAME, validHex);
+
+      const mod = await import("@/lib/encryption");
+      const secret = mod.getOrCreateSecret(SECRET_NAME);
+      expect(secret).toEqual(Buffer.from(validHex, "hex"));
+    });
+
+    it("should fall back to file when env var is not set", async () => {
+      const validHex = "d".repeat(64);
+      mockedExistsSync.mockImplementation((path) => {
+        return String(path).endsWith(FILE_NAME);
+      });
+      mockedReadFileSync.mockReturnValue(validHex);
+
+      const mod = await import("@/lib/encryption");
+      const secret = mod.getOrCreateSecret(SECRET_NAME);
+      expect(secret).toEqual(Buffer.from(validHex, "hex"));
+      expect(mockedReadFileSync).toHaveBeenCalledWith(expect.stringContaining(FILE_NAME), "utf-8");
+    });
+
+    it("should auto-generate and persist when neither env nor file exists", async () => {
+      mockedExistsSync.mockImplementation((path) => {
+        // No secret file, but directory exists
+        return !String(path).endsWith(FILE_NAME);
+      });
+
+      const mod = await import("@/lib/encryption");
+      const secret = mod.getOrCreateSecret(SECRET_NAME);
+      expect(secret).toBeInstanceOf(Buffer);
+      expect(secret.length).toBe(32);
+      expect(mockedWriteFileSync).toHaveBeenCalledWith(
+        expect.stringContaining(FILE_NAME),
+        expect.stringMatching(/^[0-9a-f]{64}$/),
+        { mode: 0o600 }
+      );
+    });
+
+    it("should throw when env var is invalid hex", async () => {
+      vi.stubEnv(ENV_VAR_NAME, "g".repeat(64));
+
+      mockedExistsSync.mockReturnValue(false);
+
+      const mod = await import("@/lib/encryption");
+      expect(() => mod.getOrCreateSecret(SECRET_NAME)).toThrow(ENV_VAR_NAME);
+    });
+
+    it("should throw on invalid hex in secret file", async () => {
+      mockedExistsSync.mockImplementation((path) => {
+        return String(path).endsWith(FILE_NAME);
+      });
+      mockedReadFileSync.mockReturnValue("not-valid-hex!");
+
+      const mod = await import("@/lib/encryption");
+      expect(() => mod.getOrCreateSecret(SECRET_NAME)).toThrow("expected 64 hex characters");
+    });
+
+    it("should use ENCRYPTION_KEY_DIR for file location", async () => {
+      vi.stubEnv("ENCRYPTION_KEY_DIR", "/custom/dir");
+      mockedExistsSync.mockImplementation((path) => {
+        return String(path).endsWith(FILE_NAME);
+      });
+      mockedReadFileSync.mockReturnValue("e".repeat(64));
+
+      const mod = await import("@/lib/encryption");
+      mod.getOrCreateSecret(SECRET_NAME);
+      expect(mockedReadFileSync).toHaveBeenCalledWith(`/custom/dir/${FILE_NAME}`, "utf-8");
+    });
+  });
+
   describe("key file fallback", () => {
     beforeEach(() => {
       vi.unstubAllEnvs();

@@ -8,6 +8,8 @@ import {
   jsonb,
   index,
   uniqueIndex,
+  serial,
+  pgEnum,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
@@ -132,3 +134,26 @@ export const settings = pgTable("settings", {
   value: text("value").notNull(),
   encrypted: boolean("encrypted").default(false),
 });
+
+// ── Audit Trail ──────────────────────────────────────────────────────
+
+export const actorTypeEnum = pgEnum("actor_type", ["user", "agent", "system"]);
+
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: serial("id").primaryKey(),
+    timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
+    actorType: actorTypeEnum("actor_type").notNull(),
+    actorId: text("actor_id").notNull(),
+    eventType: text("event_type").notNull(),
+    resource: text("resource"),
+    detail: jsonb("detail"),
+    rowHmac: text("row_hmac").notNull(),
+  },
+  (table) => [
+    index("idx_audit_timestamp").on(table.timestamp),
+    index("idx_audit_actor").on(table.actorId),
+    index("idx_audit_event").on(table.eventType),
+  ]
+);

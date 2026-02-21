@@ -5,21 +5,23 @@ import { join } from "path";
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 
-export function getEncryptionKey(): Buffer {
+export function getOrCreateSecret(name: string): Buffer {
+  const envVarName = name.toUpperCase();
+  const fileName = `.${name}`;
   const keyFileDir = process.env.ENCRYPTION_KEY_DIR || "/data";
-  const keyFilePath = join(keyFileDir, ".encryption_key");
+  const keyFilePath = join(keyFileDir, fileName);
 
   // Priority 1: Environment variable
-  const envKey = process.env.ENCRYPTION_KEY;
+  const envKey = process.env[envVarName];
   if (envKey && envKey.length === 64 && /^[0-9a-fA-F]+$/.test(envKey)) {
     return Buffer.from(envKey, "hex");
   }
 
-  // Priority 2: Auto-generated key file
+  // Priority 2: Existing key file
   if (existsSync(keyFilePath)) {
     const fileKey = readFileSync(keyFilePath, "utf-8").trim();
     if (fileKey.length !== 64 || !/^[0-9a-fA-F]+$/.test(fileKey)) {
-      throw new Error(`Invalid encryption key in ${keyFilePath}: expected 64 hex characters`);
+      throw new Error(`Invalid secret in ${keyFilePath}: expected 64 hex characters`);
     }
     return Buffer.from(fileKey, "hex");
   }
@@ -32,10 +34,14 @@ export function getEncryptionKey(): Buffer {
   }
 
   throw new Error(
-    "ENCRYPTION_KEY environment variable is required (64 hex characters) " +
+    `${envVarName} environment variable is required (64 hex characters) ` +
       "or a writable directory at " +
       keyFileDir
   );
+}
+
+export function getEncryptionKey(): Buffer {
+  return getOrCreateSecret("encryption_key");
 }
 
 export function encrypt(plaintext: string): string {
