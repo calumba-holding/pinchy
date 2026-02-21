@@ -5,7 +5,7 @@ description: How Pinchy wraps OpenClaw, the request flow, and the tech stack.
 
 ## Overview
 
-Pinchy is **not a fork** of OpenClaw. It's a governance layer on top of it. OpenClaw handles agent execution, tool use, and model communication. Pinchy adds authentication, provider management, and (soon) permissions, audit trails, and team management.
+Pinchy is **not a fork** of OpenClaw. It's a governance layer on top of it. OpenClaw handles agent execution, tool use, and model communication. Pinchy adds authentication, provider management, agent permissions, and (soon) audit trails and team management.
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -80,13 +80,24 @@ Admins invite new users by generating an invite token:
 
 ## Permission layer
 
-Pinchy enforces agent permissions through a defense-in-depth approach. When an agent is created from a template like **Knowledge Base**, Pinchy:
+Pinchy uses an **allow-list** model for agent permissions: agents have **no tools by default**. Admins explicitly enable tools for each agent via the Permissions tab in Agent Settings.
 
-1. **Denies native tools** — tells OpenClaw to block the agent's access to file system, runtime, and web tool groups using OpenClaw's `tools.deny` policy
-2. **Installs scoped alternatives** — the `pinchy-files` plugin provides `pinchy_ls` and `pinchy_read` tools that only access directories the admin explicitly allowed
-3. **Validates paths at runtime** — every file access request is checked against the agent's allowed directories, with symlink resolution to prevent escapes
+Tools are organized into two categories:
+
+- **Safe tools** — sandboxed directory access (`pinchy_ls`, `pinchy_read`). Only work within directories the admin has approved.
+- **Powerful tools** — direct server access (shell commands, unrestricted file access, web access). Only for trusted use cases.
+
+When an agent has safe tools enabled, the `pinchy-files` plugin validates every file access request against the agent's allowed directories, with symlink resolution to prevent escapes.
 
 All agent-accessible files live under `/data/` in the container, mounted via Docker volumes. This means even if all software layers failed, the agent can only see files that were explicitly mounted.
+
+### Agent access control
+
+Pinchy restricts which agents a user can see:
+
+- **Admins** can access all agents (personal and shared)
+- **Users** can access shared agents and their own personal agent
+- Only admins can view and modify agent permissions
 
 For the full details, see [Agent Permissions](/concepts/agent-permissions/).
 

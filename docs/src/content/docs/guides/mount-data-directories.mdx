@@ -67,13 +67,13 @@ volumes:
   - /srv/docs/compliance:/data/compliance:ro
 ```
 
-Each mounted directory appears as a separate selectable directory when creating an agent.
+Each mounted directory appears as a separate selectable option in the Permissions tab when configuring an agent.
 
 ## How directories appear in the UI
 
-When you create a Knowledge Base agent, Pinchy scans `/data/` for subdirectories and displays them as selectable options. Each mounted directory shows up by name — for example, `/data/hr-policies` appears as "hr-policies".
+When you configure an agent's permissions in the **Permissions tab** of Agent Settings, Pinchy scans `/data/` for subdirectories and displays them as selectable options. Each mounted directory shows up by name — for example, `/data/hr-policies` appears as "hr-policies".
 
-Only top-level subdirectories of `/data/` are listed. Nested directories within those are accessible to the agent but are not listed separately in the creation form.
+Only top-level subdirectories of `/data/` are listed. Nested directories within those are accessible to the agent but are not listed separately in the directory picker.
 
 ## Verifying your mounts
 

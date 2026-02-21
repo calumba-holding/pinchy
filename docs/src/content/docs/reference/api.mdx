@@ -11,7 +11,7 @@ Some endpoints are **admin only** — non-admin users receive a `403 Forbidden` 
 
 ### `GET /api/agents`
 
-List all agents.
+List agents visible to the current user. Admins see all agents. Non-admin users see shared agents and their own personal agents.
 
 **Response:**
 
@@ -22,9 +22,12 @@ List all agents.
     "name": "HR Policy Assistant",
     "model": "anthropic/claude-haiku-4-5-20251001",
     "templateId": "knowledge-base",
+    "allowedTools": ["pinchy_ls", "pinchy_read"],
     "pluginConfig": {
       "allowed_paths": ["/data/hr-policies"]
     },
+    "isPersonal": false,
+    "ownerId": "user-uuid",
     "createdAt": "2025-01-15T10:00:00.000Z",
     "updatedAt": "2025-01-15T10:00:00.000Z"
   }
@@ -33,7 +36,7 @@ List all agents.
 
 ### `POST /api/agents`
 
-Create a new agent.
+Create a new agent. The agent inherits default tool permissions from its template. Use `PATCH /api/agents/:id` to configure permissions after creation.
 
 **Request body:**
 
@@ -41,18 +44,13 @@ Create a new agent.
 |-------|------|----------|-------------|
 | `name` | string | Yes | Display name for the agent |
 | `templateId` | string | Yes | Template to use (`knowledge-base` or `custom`) |
-| `pluginConfig` | object | Conditional | Required for `knowledge-base` template |
-| `pluginConfig.allowed_paths` | string[] | Conditional | Directories the agent can access (must be under `/data/`) |
 
 **Example — Knowledge Base agent:**
 
 ```json
 {
   "name": "HR Policy Assistant",
-  "templateId": "knowledge-base",
-  "pluginConfig": {
-    "allowed_paths": ["/data/hr-policies", "/data/company-handbook"]
-  }
+  "templateId": "knowledge-base"
 }
 ```
 
@@ -68,7 +66,7 @@ Create a new agent.
 **Response:** `201 Created` with the created agent object.
 
 **Errors:**
-- `400` — missing or invalid `name`, `templateId`, or `pluginConfig`
+- `400` — missing or invalid `name` or `templateId`
 - `401` — not authenticated
 
 ### `GET /api/agents/:id`
@@ -79,7 +77,7 @@ Get a single agent by ID.
 
 ### `PATCH /api/agents/:id`
 
-Update an agent's name or model.
+Update an agent's settings. Any combination of fields can be included.
 
 **Request body:**
 
@@ -87,8 +85,27 @@ Update an agent's name or model.
 |-------|------|----------|-------------|
 | `name` | string | No | New display name |
 | `model` | string | No | New model identifier |
+| `allowedTools` | string[] | No | List of tool IDs the agent can use (**admin only**) |
+| `pluginConfig` | object | No | Plugin configuration, e.g. `{ "allowed_paths": ["/data/hr"] }` (**admin only**) |
+
+**Example — update permissions:**
+
+```json
+{
+  "allowedTools": ["pinchy_ls", "pinchy_read"],
+  "pluginConfig": {
+    "allowed_paths": ["/data/hr-policies"]
+  }
+}
+```
 
 **Response:** The updated agent object.
+
+**Errors:**
+- `400` — cannot change permissions for personal agents
+- `401` — not authenticated
+- `403` — only admins can change `allowedTools` or `pluginConfig`
+- `404` — agent not found
 
 ### `DELETE /api/agents/:id`
 

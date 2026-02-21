@@ -1,33 +1,100 @@
 ---
 title: Agent Permissions
-description: How Pinchy restricts what agents can see and do using scoped tools and path validation.
+description: How Pinchy controls what each agent can do using an allow-list of tools and scoped directory access.
 ---
 
 ## Why agent permissions matter
 
-AI agents are powerful — but in an enterprise setting, they must be constrained. An agent that can read any file on the server or execute arbitrary commands is a liability. Pinchy enforces **scoped permissions** so each agent can only access what it explicitly needs.
+AI agents are powerful — but in an enterprise setting, they must be constrained. An agent that can read any file on the server or execute arbitrary commands is a liability. Pinchy enforces **per-agent permissions** so each agent can only use the tools an admin explicitly enables.
 
-## The two-layer permission model
+## Allow-list approach
 
-Pinchy restricts agent capabilities at two levels:
+Pinchy uses an **allow-list** model: agents have **no tools by default**. An admin must explicitly enable each tool an agent is allowed to use. This is the opposite of a deny-list approach where everything is allowed unless blocked — with Pinchy, nothing is allowed unless granted.
 
-1. **OpenClaw tool deny** — blocks the agent from using native file system and shell tools entirely
-2. **Plugin path validation** — provides restricted alternatives that only access approved directories
+This means a newly created agent cannot access files, run commands, or browse the web until an admin configures its permissions.
 
-When you create a Knowledge Base agent, Pinchy tells OpenClaw to deny the agent access to tool groups like `group:fs` (file system), `group:runtime` (shell commands), and `group:web` (network access). The agent cannot use these tools at all.
+## Tool categories
 
-Instead, Pinchy installs its own **scoped tools** via the `pinchy-files` OpenClaw plugin. These tools — `pinchy_ls` and `pinchy_read` — replace the native file tools but enforce path restrictions at the plugin level.
+Pinchy organizes tools into two categories:
 
-## Scoped tools
+### Safe Tools
 
-The `pinchy-files` plugin provides two tools:
+Safe tools provide **sandboxed access** to directories the admin has approved. The agent cannot access anything outside those directories.
 
-| Tool | Purpose | Restriction |
-|------|---------|-------------|
-| `pinchy_ls` | List files in a directory | Only directories the admin selected during agent creation |
-| `pinchy_read` | Read a file's contents | Only files within the allowed directories |
+| Tool | What it does |
+|------|-------------|
+| **List approved directories** | List files in directories the admin has selected |
+| **Read approved files** | Read file contents from approved directories only |
 
-These tools validate every path before executing. If an agent tries to read a file outside its allowed directories, the tool returns an error — the agent never sees the file.
+When you enable a safe tool, a directory picker appears so you can select which directories under `/data/` the agent can access. Every file access request is validated against these directories at runtime.
+
+### Powerful Tools
+
+Powerful tools give the agent **direct access to the server**. Only enable them if you understand the risks.
+
+| Tool | What it does |
+|------|-------------|
+| **Run commands** | Execute shell commands on the server |
+| **Read any file** | Read any file on the system, without restrictions |
+| **Write files** | Create and modify files on the system |
+| **Browse the web** | Fetch web pages |
+| **Search the web** | Perform web searches |
+
+An agent with powerful tools enabled has significantly broader capabilities. Use these only for trusted, internal use cases.
+
+## The Permissions tab
+
+Admins configure tool permissions in the **Permissions tab** of an agent's settings page. To access it:
+
+1. Open an agent's chat
+2. Click the settings icon (gear) to open Agent Settings
+3. Select the **Permissions** tab
+
+The Permissions tab shows all available tools grouped by category. Check or uncheck tools to control what the agent can do, then click **Save**.
+
+:::note
+The Permissions tab is only visible to admins and is not available for personal agents (the auto-created Smithers agent each user gets).
+:::
+
+### Configuring directory access
+
+When you enable a safe tool (like "List approved directories" or "Read approved files"), the **Allowed Directories** picker appears below the safe tools section. Select which directories under `/data/` this agent should be able to access.
+
+For example, if you mounted your HR policies at `/data/hr-policies`, select that directory to let the agent read those documents — and nothing else.
+
+See the [Mount Data Directories](/guides/mount-data-directories/) guide for instructions on making directories available.
+
+## Agent templates and default permissions
+
+When you create an agent, you pick a template. Each template comes with different default tool permissions:
+
+| Template | Default tools | Use case |
+|----------|--------------|----------|
+| **Knowledge Base** | `pinchy_ls`, `pinchy_read` (safe tools) | Answer questions from selected documents |
+| **Custom Agent** | None | Start from scratch, configure permissions manually |
+
+After creating an agent, you can change its permissions at any time via the Permissions tab.
+
+## Defense in depth
+
+Pinchy does not rely on any single layer for security. Four layers work together:
+
+1. **Docker volumes** — only directories explicitly mounted into the container are accessible at all
+2. **Allow-list enforcement** — only tools an admin explicitly enables are available to the agent
+3. **Plugin path validation** — the `pinchy-files` plugin checks every requested path against the agent's allowed directories
+4. **Symlink resolution** — paths are resolved to their real location before validation, preventing symlink-based escapes
+
+If any one layer fails, the others still prevent unauthorized access.
+
+## Agent access control
+
+Not every user can see every agent. Pinchy enforces access rules:
+
+- **Admins** can access all agents — personal and shared
+- **Users** can access shared agents (created by anyone) and their own personal agent
+- Users **cannot** see or access other users' personal agents
+
+Only admins can view and modify the Permissions tab. Regular users can chat with agents they have access to, but cannot change what tools those agents use.
 
 ## The `/data/` convention
 
@@ -36,31 +103,3 @@ All agent-accessible files live under `/data/` inside the Pinchy container. This
 For example, if you mount your company's HR policies at `/data/hr-policies`, an agent configured to access that directory can read those documents — and nothing else.
 
 See the [Mount Data Directories](/guides/mount-data-directories/) guide for setup instructions.
-
-## Defense in depth
-
-Pinchy does not rely on any single layer for security. Four layers work together:
-
-1. **Docker volumes** — only directories explicitly mounted into the container are accessible at all
-2. **OpenClaw tool deny** — native file system, runtime, and web tools are blocked for scoped agents
-3. **Plugin path validation** — the `pinchy-files` plugin checks every requested path against the agent's allowed directories
-4. **Symlink resolution** — paths are resolved to their real location before validation, preventing symlink-based escapes
-
-If any one layer fails, the others still prevent unauthorized access.
-
-## Agent templates
-
-Pinchy uses templates to define what permissions an agent starts with:
-
-| Template | Tools denied | Plugin | Use case |
-|----------|-------------|--------|----------|
-| **Knowledge Base** | `group:runtime`, `group:fs`, `group:web` | `pinchy-files` | Answer questions from selected documents |
-| **Custom Agent** | None | None | Full OpenClaw capabilities (for trusted use cases) |
-
-When creating an agent from the **Knowledge Base** template, you select which directories under `/data/` the agent can access. The **Custom Agent** template has no restrictions — it uses OpenClaw's full tool set.
-
-## Directory selection during agent creation
-
-When you create a Knowledge Base agent, Pinchy scans `/data/` for subdirectories and presents them in the creation form. You select one or more directories, and these become the agent's `allowed_paths`. The agent can only read files within those directories.
-
-This configuration is stored in the agent's `pluginConfig` field in the database and passed to the `pinchy-files` plugin at runtime.

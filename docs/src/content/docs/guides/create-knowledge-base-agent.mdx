@@ -21,28 +21,27 @@ In the Pinchy sidebar, click the **+** button next to "Agents" to open the agent
 
 ## 3. Select the "Knowledge Base" template
 
-Choose **Knowledge Base** from the template options. This template:
+Choose **Knowledge Base** from the template options. This template pre-configures the agent with safe file access tools (list and read files in approved directories).
 
-- Blocks the agent from using shell commands, native file access, and web requests
-- Provides scoped `pinchy_ls` and `pinchy_read` tools that only work within approved directories
+## 4. Enter a name and create
 
-## 4. Enter a name
+Give your agent a descriptive name, for example "HR Policy Assistant" or "Engineering Docs", then click **Create**.
 
-Give your agent a descriptive name, for example "HR Policy Assistant" or "Engineering Docs".
+The agent is created and you are taken to its chat page. The agent has safe file tools enabled by default (from the Knowledge Base template), but it does not yet know which directories to access. You need to configure that in the Permissions tab.
 
-## 5. Select directories
+## 5. Configure directory access
 
-The form displays all directories found under `/data/`. Select the directories that contain the documents this agent should be able to read.
+Open the agent's settings by clicking the gear icon, then select the **Permissions** tab.
 
-For example, if you mounted your HR policies at `/data/hr-policies` and your engineering handbook at `/data/engineering`, you could select one or both.
+Under **Safe Tools**, you will see that "List approved directories" and "Read approved files" are already enabled (because the Knowledge Base template includes them). Below the safe tools checkboxes, the **Allowed Directories** picker shows all directories found under `/data/`.
 
-## 6. Click Create
+Select the directories that contain the documents this agent should be able to read. For example, if you mounted your HR policies at `/data/hr-policies` and your engineering handbook at `/data/engineering`, select one or both.
 
-Pinchy creates the agent, configures its OpenClaw workspace with the appropriate tool restrictions, and installs the `pinchy-files` plugin with the selected directories.
+Click **Save** to apply the permissions.
 
-## 7. Chat with the agent
+## 6. Chat with the agent
 
-Select your new agent from the sidebar and start chatting. The agent can:
+Go back to the agent's chat and start asking questions. The agent can:
 
 - List files in the directories you selected
 - Read the contents of those files
@@ -55,6 +54,10 @@ The agent **cannot**:
 - Make network requests
 - Read system files
 
+## Changing permissions later
+
+You can update an agent's permissions at any time by returning to the **Permissions** tab. Add or remove directories, or enable additional tools as needed. Changes take effect after clicking **Save**.
+
 ## How it works
 
-Under the hood, Pinchy applies a defense-in-depth approach. See [Agent Permissions](/concepts/agent-permissions/) for the full explanation of how scoped tools, path validation, and tool deny policies work together.
+Under the hood, Pinchy uses an allow-list approach. The agent starts with no capabilities and only gets the tools an admin explicitly enables. For a full explanation, see [Agent Permissions](/concepts/agent-permissions/).
