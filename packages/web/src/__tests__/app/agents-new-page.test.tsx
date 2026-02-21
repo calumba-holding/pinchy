@@ -16,26 +16,6 @@ vi.mock("@/components/template-selector", () => ({
   ),
 }));
 
-vi.mock("@/components/directory-picker", () => ({
-  DirectoryPicker: ({
-    directories,
-    selected,
-    onChange,
-  }: {
-    directories: { path: string; name: string }[];
-    selected: string[];
-    onChange: (s: string[]) => void;
-  }) => (
-    <div data-testid="directory-picker">
-      {directories.map((d) => (
-        <button key={d.path} onClick={() => onChange([...selected, d.path])}>
-          {d.name}
-        </button>
-      ))}
-    </div>
-  ),
-}));
-
 import NewAgentPage from "@/app/(app)/agents/new/page";
 import { useRouter } from "next/navigation";
 
@@ -46,7 +26,7 @@ describe("New Agent Page", () => {
     fetchSpy = vi.spyOn(global, "fetch").mockImplementation(vi.fn());
     vi.clearAllMocks();
 
-    // Mock templates and directories APIs
+    // Mock templates API only — no more data-directories
     vi.mocked(global.fetch).mockImplementation(async (url) => {
       if (String(url).includes("/api/templates")) {
         return {
@@ -59,17 +39,6 @@ describe("New Agent Page", () => {
                 description: "Answer questions from your docs",
               },
               { id: "custom", name: "Custom Agent", description: "Start from scratch" },
-            ],
-          }),
-        } as Response;
-      }
-      if (String(url).includes("/api/data-directories")) {
-        return {
-          ok: true,
-          json: async () => ({
-            directories: [
-              { path: "/data/documents", name: "documents" },
-              { path: "/data/hr-docs", name: "hr-docs" },
             ],
           }),
         } as Response;
@@ -90,7 +59,7 @@ describe("New Agent Page", () => {
     });
   });
 
-  it("should show configuration form after selecting knowledge-base template", async () => {
+  it("should show name form after selecting template without directory picker", async () => {
     const user = userEvent.setup();
     render(<NewAgentPage />);
     await waitFor(() => {
@@ -99,8 +68,19 @@ describe("New Agent Page", () => {
     await user.click(screen.getByText("Knowledge Base"));
     await waitFor(() => {
       expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
-      expect(screen.getByTestId("directory-picker")).toBeInTheDocument();
     });
+    // Directory picker should NOT be present
+    expect(screen.queryByTestId("directory-picker")).not.toBeInTheDocument();
+  });
+
+  it("should not fetch data-directories API", async () => {
+    render(<NewAgentPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId("template-selector")).toBeInTheDocument();
+    });
+    // Only templates API should be called, not data-directories
+    const fetchCalls = vi.mocked(global.fetch).mock.calls.map((c) => String(c[0]));
+    expect(fetchCalls.some((url) => url.includes("/api/data-directories"))).toBe(false);
   });
 
   it("should show validation error when submitting with empty name", async () => {
@@ -144,7 +124,7 @@ describe("New Agent Page", () => {
     expect(formElement).not.toContainElement(backButton);
   });
 
-  it("should submit agent creation and redirect", async () => {
+  it("should submit agent creation without pluginConfig and redirect", async () => {
     const user = userEvent.setup();
     const push = vi.fn();
     vi.mocked(useRouter).mockReturnValue({ push, back: vi.fn() } as any);
@@ -168,14 +148,6 @@ describe("New Agent Page", () => {
           }),
         } as Response;
       }
-      if (String(url).includes("/api/data-directories")) {
-        return {
-          ok: true,
-          json: async () => ({
-            directories: [{ path: "/data/documents", name: "documents" }],
-          }),
-        } as Response;
-      }
       return { ok: true, json: async () => ({}) } as Response;
     });
 
@@ -195,14 +167,21 @@ describe("New Agent Page", () => {
     // Fill name
     await user.type(screen.getByLabelText(/name/i), "Test Agent");
 
-    // Select directory
-    await user.click(screen.getByText("documents"));
-
-    // Submit
+    // Submit — no directory selection needed
     await user.click(screen.getByRole("button", { name: /create/i }));
 
     await waitFor(() => {
       expect(push).toHaveBeenCalledWith("/chat/new-id");
     });
+
+    // Verify pluginConfig was NOT sent in the POST body
+    const agentCall = vi
+      .mocked(global.fetch)
+      .mock.calls.find(
+        (c) => String(c[0]).includes("/api/agents") && (c[1] as any)?.method === "POST"
+      );
+    expect(agentCall).toBeDefined();
+    const sentBody = JSON.parse((agentCall![1] as any).body);
+    expect(sentBody).not.toHaveProperty("pluginConfig");
   });
 });

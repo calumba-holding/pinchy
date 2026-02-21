@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Unknown template: ${templateId}` }, { status: 400 });
   }
 
-  // Validate pluginConfig for templates that require it
+  // Validate pluginConfig if provided
   if (template.pluginId && pluginConfig?.allowed_paths) {
     try {
       validateAllowedPaths(pluginConfig.allowed_paths);
@@ -66,11 +66,6 @@ export async function POST(request: NextRequest) {
       const message = error instanceof Error ? error.message : "Invalid paths";
       return NextResponse.json({ error: message }, { status: 400 });
     }
-  } else if (template.pluginId && !pluginConfig?.allowed_paths) {
-    return NextResponse.json(
-      { error: "allowed_paths is required for this template" },
-      { status: 400 }
-    );
   }
 
   // Determine default model from current provider
@@ -85,7 +80,7 @@ export async function POST(request: NextRequest) {
       name,
       model,
       templateId,
-      pluginConfig: template.pluginId ? pluginConfig : null,
+      pluginConfig: template.pluginId && pluginConfig ? pluginConfig : null,
       ownerId: session.user.id,
       allowedTools: template.allowedTools,
     })

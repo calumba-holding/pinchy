@@ -17,18 +17,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { TemplateSelector } from "@/components/template-selector";
-import { DirectoryPicker } from "@/components/directory-picker";
 import { ArrowLeft } from "lucide-react";
 
 interface Template {
   id: string;
   name: string;
   description: string;
-}
-
-interface Directory {
-  path: string;
-  name: string;
 }
 
 const agentFormSchema = z.object({
@@ -40,9 +34,7 @@ type AgentFormValues = z.infer<typeof agentFormSchema>;
 export default function NewAgentPage() {
   const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [directories, setDirectories] = useState<Directory[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [selectedDirs, setSelectedDirs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -52,17 +44,10 @@ export default function NewAgentPage() {
   });
 
   const fetchData = useCallback(async () => {
-    const [templatesRes, dirsRes] = await Promise.all([
-      fetch("/api/templates"),
-      fetch("/api/data-directories"),
-    ]);
+    const templatesRes = await fetch("/api/templates");
     if (templatesRes.ok) {
       const data = await templatesRes.json();
       setTemplates(data.templates);
-    }
-    if (dirsRes.ok) {
-      const data = await dirsRes.json();
-      setDirectories(data.directories);
     }
   }, []);
 
@@ -70,16 +55,8 @@ export default function NewAgentPage() {
     fetchData();
   }, [fetchData]);
 
-  const needsDirectories = selectedTemplate === "knowledge-base";
-
   async function onSubmit(values: AgentFormValues) {
     setError(null);
-
-    if (needsDirectories && selectedDirs.length === 0) {
-      setError("Select at least one directory");
-      return;
-    }
-
     setSubmitting(true);
 
     try {
@@ -87,10 +64,6 @@ export default function NewAgentPage() {
         name: values.name.trim(),
         templateId: selectedTemplate,
       };
-
-      if (needsDirectories) {
-        body.pluginConfig = { allowed_paths: selectedDirs };
-      }
 
       const res = await fetch("/api/agents", {
         method: "POST",
@@ -151,19 +124,6 @@ export default function NewAgentPage() {
                       </FormItem>
                     )}
                   />
-
-                  {needsDirectories && (
-                    <div>
-                      <p className="text-sm font-medium">Directories the agent can read</p>
-                      <div className="mt-2">
-                        <DirectoryPicker
-                          directories={directories}
-                          selected={selectedDirs}
-                          onChange={setSelectedDirs}
-                        />
-                      </div>
-                    </div>
-                  )}
 
                   {error && <p className="text-sm text-destructive">{error}</p>}
 

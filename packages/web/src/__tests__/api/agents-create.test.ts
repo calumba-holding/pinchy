@@ -139,6 +139,25 @@ describe("POST /api/agents", () => {
     expect(response.status).toBe(400);
   });
 
+  it("should create a knowledge-base agent without pluginConfig (set later via Permissions tab)", async () => {
+    const request = new NextRequest("http://localhost:7777/api/agents", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "HR Knowledge Base",
+        templateId: "knowledge-base",
+      }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(201);
+    expect(validateAllowedPaths).not.toHaveBeenCalled();
+    expect(insertValuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pluginConfig: null,
+      })
+    );
+  });
+
   it("should create a custom agent without pluginConfig", async () => {
     const request = new NextRequest("http://localhost:7777/api/agents", {
       method: "POST",
