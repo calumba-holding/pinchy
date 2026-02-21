@@ -52,6 +52,8 @@ const attachmentAdapter = new CompositeAttachmentAdapter([
   new CodeTextAttachmentAdapter(),
 ]);
 
+const MAX_RECONNECT_ATTEMPTS = 10;
+
 export function useWsRuntime(agentId: string): {
   runtime: AssistantRuntime;
   isConnected: boolean;
@@ -61,104 +63,125 @@ export function useWsRuntime(agentId: string): {
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+  const reconnectAttemptRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws?agentId=${agentId}`);
+    mountedRef.current = true;
+    reconnectAttemptRef.current = 0;
 
-    ws.onopen = () => {
-      setIsConnected(true);
-      ws.send(JSON.stringify({ type: "history", agentId }));
-    };
+    function connect() {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws?agentId=${agentId}`);
 
-    ws.onclose = () => {
-      setIsConnected(false);
-      setIsRunning(false);
-    };
+      ws.onopen = () => {
+        setIsConnected(true);
+        reconnectAttemptRef.current = 0;
+        ws.send(JSON.stringify({ type: "history", agentId }));
+      };
 
-    ws.onerror = () => {
-      setIsConnected(false);
-      setIsRunning(false);
-    };
+      ws.onclose = () => {
+        setIsConnected(false);
+        setIsRunning(false);
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        if (data.type === "history") {
-          setMessages((prev) => {
-            if (prev.length > 0) return prev;
-            return (data.messages ?? []).map(
-              (msg: { role: string; content: string; timestamp?: string }) => ({
-                id: crypto.randomUUID(),
-                role: msg.role === "system" ? "assistant" : msg.role,
-                content: msg.content,
-                timestamp: msg.timestamp,
-              })
-            );
-          });
-          return;
+        if (mountedRef.current && reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
+          reconnectAttemptRef.current++;
+          reconnectTimerRef.current = setTimeout(connect, delay);
         }
+      };
 
-        if (data.type === "chunk") {
-          setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            if (last?.role === "assistant" && last.id === data.messageId) {
-              return [...prev.slice(0, -1), { ...last, content: last.content + data.content }];
+      ws.onerror = () => {
+        setIsConnected(false);
+        setIsRunning(false);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          if (data.type === "history") {
+            setMessages((prev) => {
+              if (prev.length > 0) return prev;
+              return (data.messages ?? []).map(
+                (msg: { role: string; content: string; timestamp?: string }) => ({
+                  id: crypto.randomUUID(),
+                  role: msg.role === "system" ? "assistant" : msg.role,
+                  content: msg.content,
+                  timestamp: msg.timestamp,
+                })
+              );
+            });
+            return;
+          }
+
+          if (data.type === "chunk") {
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last?.role === "assistant" && last.id === data.messageId) {
+                return [...prev.slice(0, -1), { ...last, content: last.content + data.content }];
+              }
+              return [
+                ...prev,
+                {
+                  id: data.messageId,
+                  role: "assistant",
+                  content: data.content,
+                  timestamp: new Date().toISOString(),
+                },
+              ];
+            });
+
+            // Reset debounce timer on each chunk
+            if (debounceTimerRef.current) {
+              clearTimeout(debounceTimerRef.current);
             }
-            return [
+            debounceTimerRef.current = setTimeout(() => {
+              setIsRunning(false);
+            }, STREAM_DONE_DEBOUNCE_MS);
+          }
+
+          if (data.type === "done") {
+            if (debounceTimerRef.current) {
+              clearTimeout(debounceTimerRef.current);
+            }
+            setIsRunning(false);
+          }
+
+          if (data.type === "error") {
+            if (debounceTimerRef.current) {
+              clearTimeout(debounceTimerRef.current);
+            }
+            setMessages((prev) => [
               ...prev,
               {
-                id: data.messageId,
+                id: crypto.randomUUID(),
                 role: "assistant",
-                content: data.content,
-                timestamp: new Date().toISOString(),
+                content: data.message || "An unknown error occurred.",
               },
-            ];
-          });
-
-          // Reset debounce timer on each chunk
-          if (debounceTimerRef.current) {
-            clearTimeout(debounceTimerRef.current);
-          }
-          debounceTimerRef.current = setTimeout(() => {
+            ]);
             setIsRunning(false);
-          }, STREAM_DONE_DEBOUNCE_MS);
-        }
-
-        if (data.type === "done") {
-          if (debounceTimerRef.current) {
-            clearTimeout(debounceTimerRef.current);
           }
-          setIsRunning(false);
+        } catch {
+          // Ignore unparseable messages
         }
+      };
 
-        if (data.type === "error") {
-          if (debounceTimerRef.current) {
-            clearTimeout(debounceTimerRef.current);
-          }
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: crypto.randomUUID(),
-              role: "assistant",
-              content: data.message || "An unknown error occurred.",
-            },
-          ]);
-          setIsRunning(false);
-        }
-      } catch {
-        // Ignore unparseable messages
-      }
-    };
+      wsRef.current = ws;
+    }
 
-    wsRef.current = ws;
+    connect();
 
     return () => {
+      mountedRef.current = false;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
-      ws.close();
+      wsRef.current?.close();
     };
   }, [agentId]);
 

@@ -541,4 +541,140 @@ describe("useWsRuntime", () => {
     expect(imageContent).toBeDefined();
     expect(imageContent.image).toBe("data:image/png;base64,xyz789");
   });
+
+  describe("auto-reconnect", () => {
+    it("should reconnect after connection closes unexpectedly", () => {
+      renderHook(() => useWsRuntime("agent-1"));
+      const ws = wsInstances[0];
+
+      act(() => {
+        ws.onopen?.();
+      });
+      expect(wsInstances).toHaveLength(1);
+
+      act(() => {
+        ws.onclose?.();
+      });
+
+      // Advance past first reconnect delay (1 second)
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(wsInstances).toHaveLength(2);
+    });
+
+    it("should use exponential backoff for reconnect attempts", () => {
+      renderHook(() => useWsRuntime("agent-1"));
+      const ws1 = wsInstances[0];
+
+      act(() => {
+        ws1.onopen?.();
+      });
+
+      // First disconnect -> 1s delay
+      act(() => {
+        ws1.onclose?.();
+      });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(wsInstances).toHaveLength(2);
+
+      // Second disconnect -> 2s delay
+      const ws2 = wsInstances[1];
+      act(() => {
+        ws2.onclose?.();
+      });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(wsInstances).toHaveLength(2); // Not yet
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(wsInstances).toHaveLength(3);
+    });
+
+    it("should not reconnect when component unmounts", () => {
+      const { unmount } = renderHook(() => useWsRuntime("agent-1"));
+      const ws = wsInstances[0];
+
+      act(() => {
+        ws.onopen?.();
+      });
+
+      unmount();
+
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+
+      // Should only have the original connection
+      expect(wsInstances).toHaveLength(1);
+    });
+
+    it("should reset reconnect attempts on successful connection", () => {
+      renderHook(() => useWsRuntime("agent-1"));
+      const ws1 = wsInstances[0];
+
+      act(() => {
+        ws1.onopen?.();
+      });
+
+      // Disconnect and reconnect
+      act(() => {
+        ws1.onclose?.();
+      });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(wsInstances).toHaveLength(2);
+
+      // Successful reconnect resets counter
+      const ws2 = wsInstances[1];
+      act(() => {
+        ws2.onopen?.();
+      });
+
+      // Disconnect again - should use 1s delay (not 2s)
+      act(() => {
+        ws2.onclose?.();
+      });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(wsInstances).toHaveLength(3);
+    });
+
+    it("should stop reconnecting after max attempts", () => {
+      renderHook(() => useWsRuntime("agent-1"));
+      const ws1 = wsInstances[0];
+      act(() => {
+        ws1.onopen?.();
+      });
+
+      // Simulate 10 disconnects without successful reconnect
+      for (let i = 0; i < 10; i++) {
+        const ws = wsInstances[wsInstances.length - 1];
+        act(() => {
+          ws.onclose?.();
+        });
+        act(() => {
+          vi.advanceTimersByTime(30000);
+        }); // Max delay
+      }
+
+      expect(wsInstances).toHaveLength(11); // original + 10 reconnects
+
+      // 11th disconnect should NOT reconnect
+      const lastWs = wsInstances[wsInstances.length - 1];
+      act(() => {
+        lastWs.onclose?.();
+      });
+      act(() => {
+        vi.advanceTimersByTime(60000);
+      });
+      expect(wsInstances).toHaveLength(11); // No new connection
+    });
+  });
 });
