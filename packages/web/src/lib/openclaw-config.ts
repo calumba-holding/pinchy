@@ -76,6 +76,14 @@ export function writeOpenClawConfig({ provider, apiKey, model }: OpenClawConfigP
 export async function regenerateOpenClawConfig() {
   const existing = readExistingConfig();
 
+  // Preserve only the gateway block from existing config (contains auth token,
+  // mode, bind, and any OpenClaw-generated fields). Everything else is rebuilt
+  // from DB state so deleted providers/agents get cleaned up.
+  const gateway = (existing.gateway as Record<string, unknown>) || { mode: "local", bind: "lan" };
+  // Ensure mode and bind are always set
+  gateway.mode = "local";
+  gateway.bind = "lan";
+
   // Read all agents from DB
   const allAgents = await db.select().from(agents);
 
@@ -125,9 +133,9 @@ export async function regenerateOpenClawConfig() {
     return agentEntry;
   });
 
-  // Build plugins section if any agents use plugins
-  const pinchyFields: Record<string, unknown> = {
-    gateway: { mode: "local", bind: "lan" },
+  // Build complete config — gateway preserved, everything else from DB
+  const config: Record<string, unknown> = {
+    gateway,
     env,
     agents: {
       defaults,
@@ -145,15 +153,13 @@ export async function regenerateOpenClawConfig() {
         },
       };
     }
-    pinchyFields.plugins = { entries };
+    config.plugins = { entries };
   }
-
-  const merged = deepMerge(existing, pinchyFields);
 
   const dir = dirname(CONFIG_PATH);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
 
-  writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2), "utf-8");
+  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf-8");
 }

@@ -267,8 +267,8 @@ describe("regenerateOpenClawConfig", () => {
     const config = JSON.parse(written);
 
     expect(config.gateway.auth.token).toBe("existing-secret-token");
-    expect(config.meta.version).toBe("1.2.3");
-    expect(config.meta.generatedAt).toBe("2025-01-01T00:00:00Z");
+    // Only gateway block is preserved — other top-level fields (meta, etc.) are rebuilt from DB
+    expect(config.meta).toBeUndefined();
     expect(config.gateway.mode).toBe("local");
     expect(config.gateway.bind).toBe("lan");
   });
@@ -437,6 +437,37 @@ describe("regenerateOpenClawConfig", () => {
     expect(config.plugins.entries["pinchy-files"].config.agents["kb-agent-id"]).toEqual({
       allowed_paths: ["/data/hr-docs/", "/data/policies/"],
     });
+  });
+
+  it("should not keep stale env vars from previous config", async () => {
+    const existingConfig = {
+      gateway: {
+        mode: "local",
+        bind: "lan",
+        auth: { token: "existing-token" },
+      },
+      env: {
+        ANTHROPIC_API_KEY: "old-key",
+        OPENAI_API_KEY: "stale-key-should-be-removed",
+      },
+    };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(existingConfig));
+
+    // Only Anthropic is configured now
+    mockedGetSetting.mockImplementation(async (key: string) => {
+      if (key === "anthropic_api_key") return "sk-ant-new";
+      if (key === "default_provider") return "anthropic";
+      return null;
+    });
+
+    await regenerateOpenClawConfig();
+
+    const written = mockedWriteFileSync.mock.calls[0][1] as string;
+    const config = JSON.parse(written);
+
+    expect(config.env.ANTHROPIC_API_KEY).toBe("sk-ant-new");
+    expect(config.env.OPENAI_API_KEY).toBeUndefined();
+    expect(config.gateway.auth.token).toBe("existing-token");
   });
 
   it("should not include plugin config when no agents use it", async () => {
