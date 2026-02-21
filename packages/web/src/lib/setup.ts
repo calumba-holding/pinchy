@@ -17,13 +17,13 @@ export async function isSetupComplete(): Promise<boolean> {
 export async function createAdmin(name: string, email: string, password: string) {
   const passwordHash = await bcrypt.hash(password, 12);
 
-  return await db.transaction(async (tx) => {
+  const user = await db.transaction(async (tx) => {
     const existing = await tx.query.users.findFirst();
     if (existing) {
       throw new Error("Setup already complete");
     }
 
-    const [user] = await tx
+    const [created] = await tx
       .insert(users)
       .values({
         name,
@@ -33,8 +33,10 @@ export async function createAdmin(name: string, email: string, password: string)
       })
       .returning();
 
-    await seedDefaultAgent(user.id);
-
-    return { id: user.id, email: user.email };
+    return { id: created.id, email: created.email };
   });
+
+  await seedDefaultAgent(user.id);
+
+  return user;
 }
