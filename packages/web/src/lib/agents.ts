@@ -7,6 +7,8 @@ import { deleteWorkspace } from "@/lib/workspace";
 export interface UpdateAgentInput {
   name?: string;
   model?: string;
+  allowedTools?: string[];
+  pluginConfig?: unknown;
 }
 
 export async function deleteAgent(id: string) {

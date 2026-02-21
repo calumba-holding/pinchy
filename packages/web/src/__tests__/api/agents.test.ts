@@ -42,4 +42,33 @@ describe("updateAgent", () => {
 
     expect(regenerateOpenClawConfig).toHaveBeenCalled();
   });
+
+  it("should accept allowedTools and pluginConfig in update data", async () => {
+    const { db } = await import("@/db");
+    const setMock = vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([
+          {
+            id: "1",
+            name: "Smithers",
+            model: "anthropic/claude-opus-4-6",
+            allowedTools: ["shell", "pinchy_ls"],
+            pluginConfig: { allowed_paths: ["/data/"] },
+          },
+        ]),
+      }),
+    });
+    vi.mocked(db.update).mockReturnValueOnce({ set: setMock } as never);
+
+    const result = await updateAgent("1", {
+      allowedTools: ["shell", "pinchy_ls"],
+      pluginConfig: { allowed_paths: ["/data/"] },
+    });
+
+    expect(setMock).toHaveBeenCalledWith({
+      allowedTools: ["shell", "pinchy_ls"],
+      pluginConfig: { allowed_paths: ["/data/"] },
+    });
+    expect(result.allowedTools).toEqual(["shell", "pinchy_ls"]);
+  });
 });

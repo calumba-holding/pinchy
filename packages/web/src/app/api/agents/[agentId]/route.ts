@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { updateAgent, deleteAgent } from "@/lib/agents";
 import { auth } from "@/lib/auth";
 import { assertAgentAccess } from "@/lib/agent-access";
+import { regenerateOpenClawConfig } from "@/lib/openclaw-config";
 
 export async function GET(
   request: NextRequest,
@@ -60,10 +61,35 @@ export async function PATCH(
   }
 
   const body = await request.json();
-  const data: { name?: string; model?: string } = {};
+
+  // Only admins can change permissions
+  if (body.allowedTools !== undefined) {
+    if (session.user.role !== "admin") {
+      return NextResponse.json({ error: "Only admins can change permissions" }, { status: 403 });
+    }
+    if (existingAgent.isPersonal) {
+      return NextResponse.json(
+        { error: "Cannot change permissions for personal agents" },
+        { status: 400 }
+      );
+    }
+  }
+
+  // Build update data
+  const data: { name?: string; model?: string; allowedTools?: string[]; pluginConfig?: unknown } =
+    {};
   if (body.name !== undefined) data.name = body.name;
   if (body.model !== undefined) data.model = body.model;
+  if (body.allowedTools !== undefined) data.allowedTools = body.allowedTools;
+  if (body.pluginConfig !== undefined) data.pluginConfig = body.pluginConfig;
+
   const agent = await updateAgent(agentId, data);
+
+  // Regenerate config when permissions change
+  if (data.allowedTools !== undefined || data.pluginConfig !== undefined) {
+    await regenerateOpenClawConfig();
+  }
+
   return NextResponse.json(agent);
 }
 

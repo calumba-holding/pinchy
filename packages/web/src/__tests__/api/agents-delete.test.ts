@@ -12,6 +12,10 @@ vi.mock("@/lib/agents", () => ({
   updateAgent: vi.fn(),
 }));
 
+vi.mock("@/lib/openclaw-config", () => ({
+  regenerateOpenClawConfig: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/db", () => ({
   db: {
     query: {
@@ -23,7 +27,8 @@ vi.mock("@/db", () => ({
 }));
 
 import { auth } from "@/lib/auth";
-import { deleteAgent } from "@/lib/agents";
+import { deleteAgent, updateAgent } from "@/lib/agents";
+import { regenerateOpenClawConfig } from "@/lib/openclaw-config";
 import { db } from "@/db";
 
 // ── GET /api/agents/[agentId] ────────────────────────────────────────────
@@ -202,6 +207,164 @@ describe("PATCH /api/agents/[agentId]", () => {
 
     const body = await response.json();
     expect(body.error).toBe("Agent not found");
+  });
+
+  it("admin can update allowedTools for shared agent", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "admin-1", role: "admin" },
+      expires: "",
+    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+
+    vi.mocked(db.query.agents.findFirst).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Shared Agent",
+      isPersonal: false,
+      ownerId: null,
+    } as never);
+
+    vi.mocked(updateAgent).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Shared Agent",
+      model: "anthropic/claude-sonnet-4-20250514",
+      allowedTools: ["shell", "pinchy_ls"],
+    } as never);
+
+    const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
+      method: "PATCH",
+      body: JSON.stringify({ allowedTools: ["shell", "pinchy_ls"] }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const response = await PATCH(request, {
+      params: Promise.resolve({ agentId: "agent-1" }),
+    });
+    expect(response.status).toBe(200);
+
+    expect(updateAgent).toHaveBeenCalledWith("agent-1", {
+      allowedTools: ["shell", "pinchy_ls"],
+    });
+    expect(regenerateOpenClawConfig).toHaveBeenCalled();
+  });
+
+  it("returns 403 when non-admin tries to update allowedTools", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "user-1", role: "user" },
+      expires: "",
+    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+
+    vi.mocked(db.query.agents.findFirst).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Shared Agent",
+      isPersonal: false,
+      ownerId: null,
+    } as never);
+
+    const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
+      method: "PATCH",
+      body: JSON.stringify({ allowedTools: ["shell"] }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const response = await PATCH(request, {
+      params: Promise.resolve({ agentId: "agent-1" }),
+    });
+    expect(response.status).toBe(403);
+
+    const body = await response.json();
+    expect(body.error).toBe("Only admins can change permissions");
+  });
+
+  it("returns 400 when trying to update allowedTools for personal agent", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "admin-1", role: "admin" },
+      expires: "",
+    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+
+    vi.mocked(db.query.agents.findFirst).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Personal Agent",
+      isPersonal: true,
+      ownerId: "admin-1",
+    } as never);
+
+    const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
+      method: "PATCH",
+      body: JSON.stringify({ allowedTools: ["shell"] }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const response = await PATCH(request, {
+      params: Promise.resolve({ agentId: "agent-1" }),
+    });
+    expect(response.status).toBe(400);
+
+    const body = await response.json();
+    expect(body.error).toBe("Cannot change permissions for personal agents");
+  });
+
+  it("does not regenerate config when only updating name", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "admin-1", role: "admin" },
+      expires: "",
+    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+
+    vi.mocked(db.query.agents.findFirst).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Shared Agent",
+      isPersonal: false,
+      ownerId: null,
+    } as never);
+
+    vi.mocked(updateAgent).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "New Name",
+      model: "anthropic/claude-sonnet-4-20250514",
+    } as never);
+
+    const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
+      method: "PATCH",
+      body: JSON.stringify({ name: "New Name" }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const response = await PATCH(request, {
+      params: Promise.resolve({ agentId: "agent-1" }),
+    });
+    expect(response.status).toBe(200);
+
+    expect(regenerateOpenClawConfig).not.toHaveBeenCalled();
+  });
+
+  it("admin can update pluginConfig for shared agent", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "admin-1", role: "admin" },
+      expires: "",
+    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+
+    vi.mocked(db.query.agents.findFirst).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Shared Agent",
+      isPersonal: false,
+      ownerId: null,
+    } as never);
+
+    vi.mocked(updateAgent).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Shared Agent",
+      model: "anthropic/claude-sonnet-4-20250514",
+      pluginConfig: { allowed_paths: ["/data/docs/"] },
+    } as never);
+
+    const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
+      method: "PATCH",
+      body: JSON.stringify({ pluginConfig: { allowed_paths: ["/data/docs/"] } }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const response = await PATCH(request, {
+      params: Promise.resolve({ agentId: "agent-1" }),
+    });
+    expect(response.status).toBe(200);
+
+    expect(updateAgent).toHaveBeenCalledWith("agent-1", {
+      pluginConfig: { allowed_paths: ["/data/docs/"] },
+    });
+    expect(regenerateOpenClawConfig).toHaveBeenCalled();
   });
 });
 
