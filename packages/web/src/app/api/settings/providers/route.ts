@@ -16,6 +16,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const isAdmin = session.user.role === "admin";
   const defaultProvider = await getSetting("default_provider");
 
   const providers: Record<string, { configured: boolean; hint?: string }> = {};
@@ -23,7 +24,7 @@ export async function GET() {
     const value = await getSetting(config.settingsKey);
     providers[name] = {
       configured: value !== null,
-      ...(value ? { hint: value.slice(-4) } : {}),
+      ...(value && isAdmin ? { hint: value.slice(-4) } : {}),
     };
   }
 

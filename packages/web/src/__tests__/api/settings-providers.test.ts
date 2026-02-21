@@ -119,6 +119,23 @@ describe("GET /api/settings/providers", () => {
     expect(data.providers.google.hint).toBeUndefined();
   });
 
+  it("should not return hints for non-admin users", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "2", email: "user@test.com", role: "user" },
+    } as any);
+    vi.mocked(getSetting).mockImplementation(async (key: string) => {
+      if (key === "anthropic_api_key") return "sk-ant-secret-key-xY9z";
+      return null;
+    });
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.providers.anthropic.configured).toBe(true);
+    expect(data.providers.anthropic.hint).toBeUndefined();
+  });
+
   it("should return correct defaultProvider value", async () => {
     vi.mocked(getSetting).mockImplementation(async (key: string) => {
       if (key === "default_provider") return "anthropic";
