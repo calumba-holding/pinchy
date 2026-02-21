@@ -1,23 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockChat, mockReadSessionHistory, mockGetOrCreateSession, mockFindFirst } = vi.hoisted(
-  () => ({
-    mockChat: vi.fn(),
-    mockReadSessionHistory: vi.fn(),
-    mockGetOrCreateSession: vi.fn(),
-    mockFindFirst: vi.fn(),
-  })
-);
-
-vi.mock("openclaw-node", () => ({
-  OpenClawClient: vi.fn().mockImplementation(() => ({
-    chat: mockChat,
-    isConnected: true,
-  })),
-}));
-
-vi.mock("@/lib/session-history", () => ({
-  readSessionHistory: mockReadSessionHistory,
+const { mockChat, mockSessionsHistory, mockGetOrCreateSession, mockFindFirst } = vi.hoisted(() => ({
+  mockChat: vi.fn(),
+  mockSessionsHistory: vi.fn(),
+  mockGetOrCreateSession: vi.fn(),
+  mockFindFirst: vi.fn(),
 }));
 
 vi.mock("@/lib/agent-access", () => ({
@@ -74,6 +61,7 @@ describe("ClientRouter", () => {
   let router: ClientRouter;
   let mockOpenClawClient: {
     chat: typeof mockChat;
+    sessions: { history: typeof mockSessionsHistory };
     isConnected: boolean;
   };
 
@@ -81,6 +69,7 @@ describe("ClientRouter", () => {
     vi.clearAllMocks();
     mockOpenClawClient = {
       chat: mockChat,
+      sessions: { history: mockSessionsHistory },
       isConnected: true,
     };
     router = new ClientRouter(mockOpenClawClient as any, "user-1", "user");
@@ -153,13 +142,18 @@ describe("ClientRouter", () => {
     });
   });
 
-  it("should use server-side session for history", async () => {
+  it("should fetch history via openclawClient.sessions.history", async () => {
     const clientWs = createMockClientWs();
-    const historyMessages = [
-      { role: "user", content: "Hello" },
-      { role: "assistant", content: "Hi there!" },
-    ];
-    mockReadSessionHistory.mockReturnValue(historyMessages);
+    mockSessionsHistory.mockResolvedValue({
+      messages: [
+        { role: "user", content: "Hello", timestamp: 1708460000000 },
+        {
+          role: "assistant",
+          content: [{ type: "text", text: "Hi there!" }],
+          timestamp: 1708460001000,
+        },
+      ],
+    });
 
     await router.handleMessage(clientWs as any, {
       type: "history",
@@ -168,11 +162,14 @@ describe("ClientRouter", () => {
     });
 
     expect(mockGetOrCreateSession).toHaveBeenCalledWith("user-1", "agent-1");
-    expect(mockReadSessionHistory).toHaveBeenCalledWith("server-session-key");
+    expect(mockSessionsHistory).toHaveBeenCalledWith("server-session-key");
     const sent = clientWs.sent.map((s) => JSON.parse(s));
     expect(sent).toHaveLength(1);
     expect(sent[0].type).toBe("history");
-    expect(sent[0].messages).toEqual(historyMessages);
+    expect(sent[0].messages).toEqual([
+      { role: "user", content: "Hello", timestamp: 1708460000000 },
+      { role: "assistant", content: "Hi there!", timestamp: 1708460001000 },
+    ]);
   });
 
   it("should send streamed chunks to browser client", async () => {
@@ -277,7 +274,7 @@ describe("ClientRouter", () => {
 
   it("should return empty history when session has no messages", async () => {
     const clientWs = createMockClientWs();
-    mockReadSessionHistory.mockReturnValue([]);
+    mockSessionsHistory.mockResolvedValue({ messages: [] });
 
     await router.handleMessage(clientWs as any, {
       type: "history",
@@ -306,7 +303,7 @@ describe("ClientRouter", () => {
     });
 
     expect(mockChat).toHaveBeenCalledWith("Hi", { sessionKey: "server-session-key" });
-    expect(mockReadSessionHistory).not.toHaveBeenCalled();
+    expect(mockSessionsHistory).not.toHaveBeenCalled();
     const messages = clientWs.sent.map((s) => JSON.parse(s));
     expect(messages.some((m: any) => m.type === "chunk")).toBe(true);
   });
@@ -374,6 +371,93 @@ describe("ClientRouter", () => {
     expect(mockChat).toHaveBeenCalledWith("Hi", {
       sessionKey: "server-session-key",
     });
+  });
+
+  it("should extract text from content block arrays in history", async () => {
+    const clientWs = createMockClientWs();
+    mockSessionsHistory.mockResolvedValue({
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            { type: "thinking", thinking: "Let me think..." },
+            { type: "text", text: "Here is the answer." },
+            { type: "text", text: "And more." },
+          ],
+        },
+      ],
+    });
+
+    await router.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+    });
+
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent[0].messages).toEqual([
+      { role: "assistant", content: "Here is the answer. And more.", timestamp: undefined },
+    ]);
+  });
+
+  it("should strip timestamp prefix from user messages in history", async () => {
+    const clientWs = createMockClientWs();
+    mockSessionsHistory.mockResolvedValue({
+      messages: [
+        {
+          role: "user",
+          content: "[Fri 2026-02-20 21:30 UTC] Hello!",
+          timestamp: 1708460000000,
+        },
+      ],
+    });
+
+    await router.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+    });
+
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent[0].messages[0].content).toBe("Hello!");
+  });
+
+  it("should skip non-user/assistant roles in history", async () => {
+    const clientWs = createMockClientWs();
+    mockSessionsHistory.mockResolvedValue({
+      messages: [
+        { role: "user", content: "Hi" },
+        { role: "toolResult", content: "some data" },
+        { role: "assistant", content: [{ type: "text", text: "Hello!" }] },
+      ],
+    });
+
+    await router.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+    });
+
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent[0].messages).toHaveLength(2);
+    expect(sent[0].messages[0].role).toBe("user");
+    expect(sent[0].messages[1].role).toBe("assistant");
+  });
+
+  it("should send error when history fetch fails", async () => {
+    const clientWs = createMockClientWs();
+    mockSessionsHistory.mockRejectedValue(new Error("Gateway unavailable"));
+
+    await router.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+    });
+
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent).toHaveLength(1);
+    expect(sent[0].type).toBe("error");
+    expect(sent[0].message).toBe("Gateway unavailable");
   });
 
   it("should allow admin to access personal agents of other users", async () => {

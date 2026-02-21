@@ -1,6 +1,5 @@
 import type { OpenClawClient, ChatAttachment } from "openclaw-node";
 import type { WebSocket } from "ws";
-import { readSessionHistory } from "@/lib/session-history";
 import { assertAgentAccess } from "@/lib/agent-access";
 import { getOrCreateSession } from "@/lib/chat-sessions";
 import { db } from "@/db";
@@ -19,6 +18,12 @@ interface BrowserMessage {
   type: string;
   content: string | ContentPart[];
   agentId: string;
+}
+
+interface HistoryMessage {
+  role: string;
+  content: string | { type: string; text?: string }[];
+  timestamp?: number;
 }
 
 export class ClientRouter {
@@ -112,8 +117,46 @@ export class ClientRouter {
 
   private async handleHistory(clientWs: WebSocket, agentId: string): Promise<void> {
     const session = await getOrCreateSession(this.userId, agentId);
-    const messages = readSessionHistory(session.sessionKey);
-    this.sendToClient(clientWs, { type: "history", messages });
+
+    try {
+      const result = (await this.openclawClient.sessions.history(session.sessionKey)) as {
+        messages?: HistoryMessage[];
+      };
+      const rawMessages = result?.messages ?? [];
+
+      const messages = rawMessages
+        .filter((msg) => msg.role === "user" || msg.role === "assistant")
+        .map((msg) => {
+          let content: string;
+          if (Array.isArray(msg.content)) {
+            content = msg.content
+              .filter((part: { type: string; text?: string }) => part.type === "text" && part.text)
+              .map((part: { text?: string }) => part.text!)
+              .join(" ");
+          } else {
+            content = typeof msg.content === "string" ? msg.content : "";
+          }
+
+          // Strip OpenClaw timestamp prefix from user messages
+          if (msg.role === "user") {
+            content = content.replace(/^\[.*?\]\s*/, "");
+          }
+
+          return {
+            role: msg.role as "user" | "assistant",
+            content,
+            timestamp: msg.timestamp,
+          };
+        })
+        .filter((msg) => msg.content);
+
+      this.sendToClient(clientWs, { type: "history", messages });
+    } catch (err) {
+      this.sendToClient(clientWs, {
+        type: "error",
+        message: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
   }
 
   private sendToClient(ws: WebSocket, data: Record<string, unknown>): void {
