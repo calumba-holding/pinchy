@@ -36,6 +36,13 @@
       "when": 1771584351302,
       "tag": "0004_pink_maelstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1771654919731,
+      "tag": "0005_strange_echo",
+      "breakpoints": true
     }
   ]
 }
