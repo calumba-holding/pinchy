@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { TOOL_REGISTRY, getToolById, getToolsByCategory, toolsToGroups } from "@/lib/tool-registry";
+import {
+  TOOL_REGISTRY,
+  getToolById,
+  getToolsByCategory,
+  computeDeniedGroups,
+} from "@/lib/tool-registry";
 
 describe("TOOL_REGISTRY", () => {
   it("contains safe tools", () => {
@@ -52,28 +57,28 @@ describe("getToolsByCategory", () => {
   });
 });
 
-describe("toolsToGroups", () => {
+describe("computeDeniedGroups", () => {
   it("returns empty deny list when no tools are allowed", () => {
-    const denied = toolsToGroups([]);
+    const denied = computeDeniedGroups([]);
     expect(denied).toContain("group:runtime");
     expect(denied).toContain("group:fs");
     expect(denied).toContain("group:web");
   });
 
   it("removes group from deny list when a tool from that group is allowed", () => {
-    const denied = toolsToGroups(["shell"]);
+    const denied = computeDeniedGroups(["shell"]);
     expect(denied).not.toContain("group:runtime");
     expect(denied).toContain("group:fs");
     expect(denied).toContain("group:web");
   });
 
   it("removes fs group when any fs tool is allowed", () => {
-    const denied = toolsToGroups(["fs_read"]);
+    const denied = computeDeniedGroups(["fs_read"]);
     expect(denied).not.toContain("group:fs");
   });
 
   it("ignores safe tools for group computation", () => {
-    const denied = toolsToGroups(["pinchy_ls", "pinchy_read"]);
+    const denied = computeDeniedGroups(["pinchy_ls", "pinchy_read"]);
     expect(denied).toContain("group:runtime");
     expect(denied).toContain("group:fs");
     expect(denied).toContain("group:web");

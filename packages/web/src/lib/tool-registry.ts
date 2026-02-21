@@ -7,7 +7,7 @@ export interface ToolDefinition {
   requiresDirectories?: boolean;
 }
 
-export const TOOL_REGISTRY: ToolDefinition[] = [
+export const TOOL_REGISTRY: readonly ToolDefinition[] = [
   // Safe tools — sandboxed, admin-configured paths
   {
     id: "pinchy_ls",
@@ -62,7 +62,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
   },
 ];
 
-const ALL_GROUPS = ["group:runtime", "group:fs", "group:web"];
+const ALL_GROUPS = ["group:runtime", "group:fs", "group:web"] as const;
 
 export function getToolById(id: string): ToolDefinition | undefined {
   return TOOL_REGISTRY.find((t) => t.id === id);
@@ -77,10 +77,10 @@ export function getToolsByCategory(category: "safe" | "powerful"): ToolDefinitio
  * Any group that has at least one allowed tool is NOT denied.
  * Safe tools (pinchy_*) are ignored — they're managed via the plugin system.
  */
-export function toolsToGroups(allowedTools: string[]): string[] {
+export function computeDeniedGroups(allowedToolIds: string[]): string[] {
   const allowedGroups = new Set<string>();
 
-  for (const toolId of allowedTools) {
+  for (const toolId of allowedToolIds) {
     const tool = getToolById(toolId);
     if (tool?.group) {
       allowedGroups.add(tool.group);
