@@ -26,8 +26,11 @@ jobs:
       - name: Lint
         run: pnpm --filter @pinchy/web lint
 
-      - name: Format check
+      - name: Format check (web)
         run: pnpm --filter @pinchy/web format:check
+
+      - name: Format check (docs & workflows)
+        run: pnpm -C packages/web exec prettier --check "../../docs/src/**/*.{mdx,md}" "../../.github/**/*.yml"
 
       - name: Test
         run: pnpm test
