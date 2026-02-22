@@ -77,6 +77,7 @@ export default defineConfig({
           items: [
             { label: 'Architecture', slug: 'architecture' },
             { label: 'Agent Permissions', slug: 'concepts/agent-permissions' },
+            { label: 'Audit Trail', slug: 'concepts/audit-trail' },
           ],
         },
         {
