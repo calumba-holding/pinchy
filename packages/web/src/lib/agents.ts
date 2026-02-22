@@ -9,6 +9,7 @@ export interface UpdateAgentInput {
   model?: string;
   allowedTools?: string[];
   pluginConfig?: unknown;
+  greetingMessage?: string | null;
 }
 
 export async function deleteAgent(id: string) {

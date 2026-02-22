@@ -62,12 +62,18 @@ export async function PATCH(
   }
 
   // Build update data
-  const data: { name?: string; model?: string; allowedTools?: string[]; pluginConfig?: unknown } =
-    {};
+  const data: {
+    name?: string;
+    model?: string;
+    allowedTools?: string[];
+    pluginConfig?: unknown;
+    greetingMessage?: string | null;
+  } = {};
   if (body.name !== undefined) data.name = body.name;
   if (body.model !== undefined) data.model = body.model;
   if (body.allowedTools !== undefined) data.allowedTools = body.allowedTools;
   if (body.pluginConfig !== undefined) data.pluginConfig = body.pluginConfig;
+  if (body.greetingMessage !== undefined) data.greetingMessage = body.greetingMessage;
 
   const agent = await updateAgent(agentId, data);
 

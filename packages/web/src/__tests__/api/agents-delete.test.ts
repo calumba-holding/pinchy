@@ -366,6 +366,76 @@ describe("PATCH /api/agents/[agentId]", () => {
     });
     expect(regenerateOpenClawConfig).toHaveBeenCalled();
   });
+
+  it("should update greeting message", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "user-1", role: "user" },
+      expires: "",
+    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+
+    vi.mocked(db.query.agents.findFirst).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Test Agent",
+      isPersonal: false,
+      ownerId: null,
+    } as never);
+
+    vi.mocked(updateAgent).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Test Agent",
+      model: "anthropic/claude-sonnet-4-20250514",
+      greetingMessage: "Hello!",
+    } as never);
+
+    const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
+      method: "PATCH",
+      body: JSON.stringify({ greetingMessage: "Hello!" }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const response = await PATCH(request, {
+      params: Promise.resolve({ agentId: "agent-1" }),
+    });
+    expect(response.status).toBe(200);
+
+    expect(updateAgent).toHaveBeenCalledWith("agent-1", {
+      greetingMessage: "Hello!",
+    });
+  });
+
+  it("should allow clearing greeting message with null", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "user-1", role: "user" },
+      expires: "",
+    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+
+    vi.mocked(db.query.agents.findFirst).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Test Agent",
+      isPersonal: false,
+      ownerId: null,
+    } as never);
+
+    vi.mocked(updateAgent).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Test Agent",
+      model: "anthropic/claude-sonnet-4-20250514",
+      greetingMessage: null,
+    } as never);
+
+    const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
+      method: "PATCH",
+      body: JSON.stringify({ greetingMessage: null }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const response = await PATCH(request, {
+      params: Promise.resolve({ agentId: "agent-1" }),
+    });
+    expect(response.status).toBe(200);
+
+    expect(updateAgent).toHaveBeenCalledWith("agent-1", {
+      greetingMessage: null,
+    });
+  });
 });
 
 // ── DELETE /api/agents/[agentId] ─────────────────────────────────────────
