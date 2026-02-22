@@ -70,7 +70,7 @@ export function Chat({ agentId, agentName, configuring = false, isPersonal = fal
           </div>
         </header>
         <div className="flex-1 min-h-0">
-          <Thread />
+          <Thread isPersonal={isPersonal} />
         </div>
       </div>
     </AssistantRuntimeProvider>

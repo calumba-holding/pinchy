@@ -55,7 +55,11 @@ const MessageTimestamp: FC = () => {
   return <span className="text-xs text-muted-foreground/60">{formatTimestamp(timestamp)}</span>;
 };
 
-export const Thread: FC = () => {
+interface ThreadProps {
+  isPersonal?: boolean;
+}
+
+export const Thread: FC<ThreadProps> = ({ isPersonal = false }) => {
   return (
     <ThreadPrimitive.Root
       className="aui-root aui-thread-root @container flex h-full flex-col bg-background"
@@ -65,7 +69,7 @@ export const Thread: FC = () => {
     >
       <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth px-4 pt-4">
         <AuiIf condition={(s) => s.thread.isEmpty}>
-          <ThreadWelcome />
+          <ThreadWelcome isPersonal={isPersonal} />
         </AuiIf>
 
         <ThreadPrimitive.Messages
@@ -98,7 +102,7 @@ const ThreadScrollToBottom: FC = () => {
   );
 };
 
-const ThreadWelcome: FC = () => {
+const ThreadWelcome: FC<{ isPersonal: boolean }> = ({ isPersonal }) => {
   return (
     <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col">
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
@@ -108,6 +112,11 @@ const ThreadWelcome: FC = () => {
           </h1>
           <p className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-muted-foreground text-xl delay-75 duration-200">
             How can I help you today?
+          </p>
+          <p className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-xs text-muted-foreground/70 delay-150 duration-200 mt-4">
+            {isPersonal
+              ? "Your conversations are private and not shared with anyone."
+              : "This is a shared agent. Your conversations help build team knowledge that's available to all team members."}
           </p>
         </div>
       </div>
