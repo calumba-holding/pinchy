@@ -70,6 +70,7 @@ export default defineConfig({
           items: [
             { label: 'Create a Knowledge Base Agent', slug: 'guides/create-knowledge-base-agent' },
             { label: 'Mount Data Directories', slug: 'guides/mount-data-directories' },
+            { label: 'Hardening', slug: 'guides/hardening' },
           ],
         },
         {
@@ -84,6 +85,7 @@ export default defineConfig({
           label: 'Reference',
           items: [
             { label: 'API Reference', slug: 'reference/api' },
+            { label: 'SBOM', slug: 'reference/sbom' },
           ],
         },
       ],
