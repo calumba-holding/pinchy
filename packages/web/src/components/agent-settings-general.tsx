@@ -33,7 +33,7 @@ const agentSettingsSchema = z.object({
 type AgentSettingsValues = z.infer<typeof agentSettingsSchema>;
 
 interface AgentSettingsGeneralProps {
-  agent: { id: string; name: string; model: string };
+  agent: { id: string; name: string; model: string; isPersonal?: boolean };
   providers: Array<{
     id: string;
     name: string;
@@ -138,6 +138,17 @@ export function AgentSettingsGeneral({
           </div>
         </form>
       </Form>
+
+      <div className="pt-4 border-t">
+        <h3 className="text-sm font-medium mb-1">
+          {agent.isPersonal ? "Personal agent" : "Shared agent"}
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          {agent.isPersonal
+            ? "This agent is private to its owner. Memory and conversations are isolated."
+            : "All team members share this agent. Memory from all user conversations is shared across the team."}
+        </p>
+      </div>
 
       {canDelete && (
         <div className="pt-6 border-t">

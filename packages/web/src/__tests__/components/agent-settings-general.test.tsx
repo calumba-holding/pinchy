@@ -22,6 +22,7 @@ describe("AgentSettingsGeneral", () => {
     id: "agent-1",
     name: "Smithers",
     model: "anthropic/claude-sonnet-4-20250514",
+    isPersonal: false,
   };
   const defaultProviders = [
     {
@@ -228,6 +229,30 @@ describe("AgentSettingsGeneral", () => {
       render(<AgentSettingsGeneral agent={defaultAgent} providers={defaultProviders} />);
 
       expect(screen.queryByRole("button", { name: /delete agent/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("agent type display", () => {
+    it("should show 'Shared agent' for non-personal agents", () => {
+      render(
+        <AgentSettingsGeneral
+          agent={{ ...defaultAgent, isPersonal: false }}
+          providers={defaultProviders}
+        />
+      );
+      expect(screen.getByText("Shared agent")).toBeInTheDocument();
+      expect(screen.getByText(/memory from all user conversations is shared/i)).toBeInTheDocument();
+    });
+
+    it("should show 'Personal agent' for personal agents", () => {
+      render(
+        <AgentSettingsGeneral
+          agent={{ ...defaultAgent, isPersonal: true }}
+          providers={defaultProviders}
+        />
+      );
+      expect(screen.getByText("Personal agent")).toBeInTheDocument();
+      expect(screen.getByText(/this agent is private to its owner/i)).toBeInTheDocument();
     });
   });
 });
