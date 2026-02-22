@@ -61,7 +61,7 @@ export class ClientRouter {
     }
 
     if (message.type === "history") {
-      return this.handleHistory(clientWs, message.agentId);
+      return this.handleHistory(clientWs, agent);
     }
 
     // Get server-side session
@@ -99,6 +99,9 @@ export class ClientRouter {
       };
       if (attachments.length > 0) {
         chatOptions.attachments = attachments;
+      }
+      if (!session.runtimeActivated && agent.greetingMessage) {
+        chatOptions.extraSystemPrompt = `The user just opened this chat for the first time. You already greeted them with this message: "${agent.greetingMessage}". Do not introduce yourself again. Continue the conversation naturally.`;
       }
 
       const stream = this.openclawClient.chat(text, chatOptions);
@@ -141,14 +144,20 @@ export class ClientRouter {
     }
   }
 
-  private async handleHistory(clientWs: WebSocket, agentId: string): Promise<void> {
-    const session = await getOrCreateSession(this.userId, agentId);
+  private async handleHistory(
+    clientWs: WebSocket,
+    agent: { id: string; greetingMessage?: string | null }
+  ): Promise<void> {
+    const session = await getOrCreateSession(this.userId, agent.id);
 
     // Sessions that haven't had a successful chat() yet don't exist in OpenClaw.
     // Calling sessions.history() would create the session with the default agent
     // "main", which then conflicts when chat() passes the real agentId.
     if (!session.runtimeActivated) {
-      this.sendToClient(clientWs, { type: "history", messages: [] });
+      const messages = agent.greetingMessage
+        ? [{ role: "assistant", content: agent.greetingMessage }]
+        : [];
+      this.sendToClient(clientWs, { type: "history", messages });
       return;
     }
 

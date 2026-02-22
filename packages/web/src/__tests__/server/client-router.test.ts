@@ -70,6 +70,7 @@ const defaultAgent = {
   name: "Smithers",
   ownerId: null,
   isPersonal: false,
+  greetingMessage: null,
 };
 
 function createMockOpenClawClient(connected = true) {
@@ -485,6 +486,142 @@ describe("ClientRouter", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].type).toBe("history");
     expect(sent[0].messages).toEqual([]);
+  });
+
+  it("should return greeting message in history for unactivated sessions", async () => {
+    const clientWs = createMockClientWs();
+    mockFindFirst.mockResolvedValue({
+      ...defaultAgent,
+      greetingMessage: "Hello! I'm Smithers, your AI assistant. How can I help?",
+    });
+    mockGetOrCreateSession.mockResolvedValue({
+      id: "new-session-id",
+      sessionKey: "brand-new-key",
+      userId: "user-1",
+      agentId: "agent-1",
+      runtimeActivated: false,
+    });
+
+    await router.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+    });
+
+    expect(mockSessionsHistory).not.toHaveBeenCalled();
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent).toHaveLength(1);
+    expect(sent[0].type).toBe("history");
+    expect(sent[0].messages).toEqual([
+      {
+        role: "assistant",
+        content: "Hello! I'm Smithers, your AI assistant. How can I help?",
+      },
+    ]);
+  });
+
+  it("should return empty history for unactivated sessions with no greeting", async () => {
+    const clientWs = createMockClientWs();
+    mockFindFirst.mockResolvedValue({
+      ...defaultAgent,
+      greetingMessage: null,
+    });
+    mockGetOrCreateSession.mockResolvedValue({
+      id: "new-session-id",
+      sessionKey: "brand-new-key",
+      userId: "user-1",
+      agentId: "agent-1",
+      runtimeActivated: false,
+    });
+
+    await router.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+    });
+
+    expect(mockSessionsHistory).not.toHaveBeenCalled();
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent).toHaveLength(1);
+    expect(sent[0].type).toBe("history");
+    expect(sent[0].messages).toEqual([]);
+  });
+
+  it("should include extraSystemPrompt with greeting context on first message", async () => {
+    mockFindFirst.mockResolvedValue({
+      ...defaultAgent,
+      greetingMessage: "Hello! I'm Smithers.",
+    });
+    mockGetOrCreateSession.mockResolvedValue({
+      id: "new-session-id",
+      sessionKey: "brand-new-key",
+      userId: "user-1",
+      agentId: "agent-1",
+      runtimeActivated: false,
+    });
+    async function* fakeStream() {
+      yield { type: "text" as const, text: "Sure!" };
+      yield { type: "done" as const, text: "" };
+    }
+    mockChat.mockReturnValue(fakeStream());
+
+    await router.handleMessage(createMockClientWs() as any, {
+      type: "message",
+      content: "What can you do?",
+      agentId: "agent-1",
+    });
+
+    expect(mockChat).toHaveBeenCalledWith("What can you do?", {
+      agentId: "agent-1",
+      extraSystemPrompt: expect.stringContaining("Hello! I'm Smithers."),
+    });
+  });
+
+  it("should NOT include extraSystemPrompt on subsequent messages", async () => {
+    async function* fakeStream() {
+      yield { type: "text" as const, text: "Hello!" };
+      yield { type: "done" as const, text: "" };
+    }
+    mockChat.mockReturnValue(fakeStream());
+
+    await router.handleMessage(createMockClientWs() as any, {
+      type: "message",
+      content: "Hi",
+      agentId: "agent-1",
+    });
+
+    expect(mockChat).toHaveBeenCalledWith("Hi", {
+      agentId: "agent-1",
+    });
+  });
+
+  it("should NOT include extraSystemPrompt when agent has no greeting", async () => {
+    mockFindFirst.mockResolvedValue({
+      ...defaultAgent,
+      greetingMessage: null,
+    });
+    mockGetOrCreateSession.mockResolvedValue({
+      id: "new-session-id",
+      sessionKey: "brand-new-key",
+      userId: "user-1",
+      agentId: "agent-1",
+      runtimeActivated: false,
+    });
+    async function* fakeStream() {
+      yield { type: "text" as const, text: "Hello!" };
+      yield { type: "done" as const, text: "" };
+    }
+    mockChat.mockReturnValue(fakeStream());
+
+    await router.handleMessage(createMockClientWs() as any, {
+      type: "message",
+      content: "Hi",
+      agentId: "agent-1",
+    });
+
+    expect(mockChat).toHaveBeenCalledWith("Hi", {
+      agentId: "agent-1",
+    });
   });
 
   it("should mark session as activated after successful chat", async () => {
