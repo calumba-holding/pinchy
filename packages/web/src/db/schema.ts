@@ -88,6 +88,7 @@ export const agents = pgTable(
     allowedTools: jsonb("allowed_tools").$type<string[]>().notNull().default([]),
     ownerId: text("owner_id").references(() => users.id, { onDelete: "cascade" }),
     isPersonal: boolean("is_personal").notNull().default(false),
+    greetingMessage: text("greeting_message"),
     createdAt: timestamp("created_at").defaultNow(),
   },
   (table) => [index("agents_owner_id_idx").on(table.ownerId)]

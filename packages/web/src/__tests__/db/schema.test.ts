@@ -83,6 +83,12 @@ describe("chatSessions schema", () => {
   });
 });
 
+describe("agents schema — greetingMessage column", () => {
+  it("should have a greetingMessage column on agents table", () => {
+    expect(agents.greetingMessage).toBeDefined();
+  });
+});
+
 describe("agentRoles removal", () => {
   it("should NOT export agentRoles", () => {
     expect("agentRoles" in schema).toBe(false);
