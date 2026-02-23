@@ -37,7 +37,7 @@ export class ClientRouter {
   ) {}
 
   private computeSessionKey(agentId: string): string {
-    return `user:${this.userId}:agent:${agentId}`;
+    return `agent:${agentId}:user-${this.userId}`;
   }
 
   async handleMessage(clientWs: WebSocket, message: BrowserMessage): Promise<void> {

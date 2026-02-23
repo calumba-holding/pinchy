@@ -284,9 +284,21 @@ When a message arrives, the `ClientRouter` passes the `agentId` from the browser
 
 ### Chat sessions
 
-Pinchy derives a deterministic session key for each `(userId, agentId)` pair using the format `user:<userId>:agent:<agentId>`. Session keys are resolved in-memory via a `SessionCache` that periodically syncs with OpenClaw's session list — no database table is needed. The session key is opaque and never leaves the server — the browser only sends an `agentId`, and Pinchy resolves the session internally. This ensures users cannot access each other's conversations.
+Pinchy derives a deterministic session key for each `(agentId, userId)` pair using the format `agent:<agentId>:user-<userId>`. This gives each user their own conversation per agent — even for shared agents. Session keys are resolved in-memory via a `SessionCache` that periodically syncs with OpenClaw's session list — no database table is needed. The session key is opaque and never leaves the server — the browser only sends an `agentId`, and Pinchy resolves the session internally.
 
 The browser can request conversation history by sending a `{ type: "history", agentId }` message. Pinchy fetches the history from OpenClaw via `openclaw-node` and strips internal metadata (timestamps, thinking blocks) before returning it.
+
+### Session key naming convention
+
+Session keys follow the format `agent:<agentId>:<scope>`. OpenClaw validates that the `agentId` segment matches the `agentId` parameter passed to `chat()` — a mismatch causes silent failures.
+
+Current format: `agent:<agentId>:user-<userId>` (per-user session for both personal and shared agents). This means converting a personal agent to a shared agent is seamless.
+
+Planned formats: `agent:<agentId>:cron-<jobId>` (scheduled actions), `agent:<agentId>:hook-<hookId>` (webhook triggers).
+
+### Session lifecycle and compaction
+
+Sessions grow with each message. OpenClaw compacts automatically when the context window approaches its limit (`"compaction": { "mode": "safeguard" }`). There is also an explicit `sessions.compact(key, { maxLines })` API. Sessions track a `compactionCount` to record how many compactions have occurred.
 
 ## Authentication
 
