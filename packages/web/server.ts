@@ -5,6 +5,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import { readFileSync } from "fs";
 import { OpenClawClient } from "openclaw-node";
 import { ClientRouter } from "./src/server/client-router";
+import { SessionCache } from "./src/server/session-cache";
 import { validateWsSession } from "./src/server/ws-auth";
 
 const dev = process.env.NODE_ENV !== "production";
@@ -63,6 +64,8 @@ app.prepare().then(() => {
     console.log("OPENCLAW_WS_URL not set — skipping OpenClaw connection");
   }
 
+  const sessionCache = new SessionCache();
+
   const wss = new WebSocketServer({ noServer: true, maxPayload: 1 * 1024 * 1024 });
   const sessionMap = new Map<WebSocket, { userId: string; userRole: string }>();
 
@@ -91,7 +94,7 @@ app.prepare().then(() => {
     if (!sessionInfo) return;
 
     const router = openclawClient
-      ? new ClientRouter(openclawClient, sessionInfo.userId, sessionInfo.userRole)
+      ? new ClientRouter(openclawClient, sessionInfo.userId, sessionInfo.userRole, sessionCache)
       : null;
 
     clientWs.on("message", (data) => {

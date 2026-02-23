@@ -2,7 +2,7 @@ import type { OpenClawClient, ChatAttachment } from "openclaw-node";
 import type { WebSocket } from "ws";
 import { assertAgentAccess } from "@/lib/agent-access";
 import { appendAuditLog } from "@/lib/audit";
-import { getOrCreateSession, markSessionActivated } from "@/lib/chat-sessions";
+import { SessionCache } from "@/server/session-cache";
 import { db } from "@/db";
 import { agents } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -32,8 +32,13 @@ export class ClientRouter {
   constructor(
     private openclawClient: OpenClawClient,
     private userId: string,
-    private userRole: string
+    private userRole: string,
+    private sessionCache: SessionCache
   ) {}
+
+  private computeSessionKey(agentId: string): string {
+    return `user:${this.userId}:agent:${agentId}`;
+  }
 
   async handleMessage(clientWs: WebSocket, message: BrowserMessage): Promise<void> {
     // Look up agent and check access
@@ -64,8 +69,7 @@ export class ClientRouter {
       return this.handleHistory(clientWs, agent);
     }
 
-    // Get server-side session
-    const session = await getOrCreateSession(this.userId, message.agentId);
+    const sessionKey = this.computeSessionKey(message.agentId);
 
     const messageId = crypto.randomUUID();
 
@@ -96,12 +100,12 @@ export class ClientRouter {
 
       const chatOptions: Record<string, unknown> = {
         agentId: message.agentId,
-        sessionKey: session.sessionKey,
+        sessionKey,
       };
       if (attachments.length > 0) {
         chatOptions.attachments = attachments;
       }
-      if (!session.runtimeActivated && agent.greetingMessage) {
+      if (!this.sessionCache.has(sessionKey) && agent.greetingMessage) {
         chatOptions.extraSystemPrompt = `The user just opened this chat for the first time. You already greeted them with this message: "${agent.greetingMessage}". Do not introduce yourself again. Continue the conversation naturally.`;
       }
 
@@ -127,9 +131,7 @@ export class ClientRouter {
         }
 
         if (chunk.type === "done") {
-          if (!session.runtimeActivated) {
-            markSessionActivated(session.id).catch(() => {});
-          }
+          this.sessionCache.add(sessionKey);
           this.sendToClient(clientWs, {
             type: "done",
             messageId,
@@ -149,22 +151,29 @@ export class ClientRouter {
     clientWs: WebSocket,
     agent: { id: string; greetingMessage?: string | null }
   ): Promise<void> {
-    const session = await getOrCreateSession(this.userId, agent.id);
-
-    // Sessions that haven't had a successful chat() yet don't exist in OpenClaw.
-    // Calling sessions.history() would create the session with the default agent
-    // "main", which then conflicts when chat() passes the real agentId.
-    if (!session.runtimeActivated) {
-      const messages = agent.greetingMessage
-        ? [{ role: "assistant", content: agent.greetingMessage }]
-        : [];
-      this.sendToClient(clientWs, { type: "history", messages });
-      return;
-    }
+    const sessionKey = this.computeSessionKey(agent.id);
 
     try {
       await this.waitForConnection();
-      const result = (await this.openclawClient.sessions.history(session.sessionKey)) as {
+
+      // Check if session exists in OpenClaw (cached)
+      if (this.sessionCache.isStale()) {
+        const result = await this.openclawClient.sessions.list();
+        const sessions = (result as { sessions?: { key: string }[] })?.sessions ?? [];
+        this.sessionCache.refresh(sessions);
+      }
+
+      if (!this.sessionCache.has(sessionKey)) {
+        // Session doesn't exist in OpenClaw yet — return greeting or empty
+        const messages = agent.greetingMessage
+          ? [{ role: "assistant", content: agent.greetingMessage }]
+          : [];
+        this.sendToClient(clientWs, { type: "history", messages });
+        return;
+      }
+
+      // Session exists — fetch history from OpenClaw
+      const result = (await this.openclawClient.sessions.history(sessionKey)) as {
         messages?: HistoryMessage[];
       };
       const rawMessages = result?.messages ?? [];

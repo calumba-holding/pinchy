@@ -1,21 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventEmitter } from "events";
 
-const {
-  mockChat,
-  mockSessionsHistory,
-  mockGetOrCreateSession,
-  mockMarkSessionActivated,
-  mockFindFirst,
-  mockAppendAuditLog,
-} = vi.hoisted(() => ({
-  mockChat: vi.fn(),
-  mockSessionsHistory: vi.fn(),
-  mockGetOrCreateSession: vi.fn(),
-  mockMarkSessionActivated: vi.fn(),
-  mockFindFirst: vi.fn(),
-  mockAppendAuditLog: vi.fn().mockResolvedValue(undefined),
-}));
+const { mockChat, mockSessionsHistory, mockSessionsList, mockFindFirst, mockAppendAuditLog } =
+  vi.hoisted(() => ({
+    mockChat: vi.fn(),
+    mockSessionsHistory: vi.fn(),
+    mockSessionsList: vi.fn(),
+    mockFindFirst: vi.fn(),
+    mockAppendAuditLog: vi.fn().mockResolvedValue(undefined),
+  }));
 
 vi.mock("@/lib/agent-access", () => ({
   assertAgentAccess: vi.fn((agent, userId, userRole) => {
@@ -24,11 +17,6 @@ vi.mock("@/lib/agent-access", () => ({
     if (agent.ownerId === userId) return;
     throw new Error("Access denied");
   }),
-}));
-
-vi.mock("@/lib/chat-sessions", () => ({
-  getOrCreateSession: mockGetOrCreateSession,
-  markSessionActivated: mockMarkSessionActivated,
 }));
 
 vi.mock("@/db", () => ({
@@ -54,6 +42,7 @@ vi.mock("@/lib/audit", () => ({
 }));
 
 import { ClientRouter } from "@/server/client-router";
+import { SessionCache } from "@/server/session-cache";
 
 function createMockClientWs() {
   const sent: string[] = [];
@@ -77,7 +66,7 @@ function createMockOpenClawClient(connected = true) {
   const emitter = new EventEmitter();
   const client = Object.assign(emitter, {
     chat: mockChat,
-    sessions: { history: mockSessionsHistory },
+    sessions: { history: mockSessionsHistory, list: mockSessionsList },
     isConnected: connected,
   });
   return client;
@@ -86,24 +75,18 @@ function createMockOpenClawClient(connected = true) {
 describe("ClientRouter", () => {
   let router: ClientRouter;
   let mockOpenClawClient: ReturnType<typeof createMockOpenClawClient>;
+  let sessionCache: SessionCache;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionCache = new SessionCache();
+    // Default: session exists and cache is fresh (equivalent to runtimeActivated: true)
+    sessionCache.refresh([{ key: "user:user-1:agent:agent-1" }]);
     mockOpenClawClient = createMockOpenClawClient(true);
-    router = new ClientRouter(mockOpenClawClient as any, "user-1", "user");
+    router = new ClientRouter(mockOpenClawClient as any, "user-1", "user", sessionCache);
 
     // Default: agent exists and is accessible
     mockFindFirst.mockResolvedValue(defaultAgent);
-
-    // Default: session exists and has been activated in the runtime
-    mockGetOrCreateSession.mockResolvedValue({
-      id: "session-id",
-      sessionKey: "server-session-key",
-      userId: "user-1",
-      agentId: "agent-1",
-      runtimeActivated: true,
-    });
-    mockMarkSessionActivated.mockResolvedValue(undefined);
   });
 
   it("should return error when agent not found", async () => {
@@ -158,7 +141,7 @@ describe("ClientRouter", () => {
 
     expect(mockChat).toHaveBeenCalledWith("Hi Smithers", {
       agentId: "agent-1",
-      sessionKey: "server-session-key",
+      sessionKey: "user:user-1:agent:agent-1",
     });
   });
 
@@ -181,8 +164,9 @@ describe("ClientRouter", () => {
       agentId: "agent-1",
     });
 
-    expect(mockGetOrCreateSession).toHaveBeenCalledWith("user-1", "agent-1");
-    expect(mockSessionsHistory).toHaveBeenCalledWith("server-session-key");
+    // Session is in cache, so sessions.list should NOT be called
+    expect(mockSessionsList).not.toHaveBeenCalled();
+    expect(mockSessionsHistory).toHaveBeenCalledWith("user:user-1:agent:agent-1");
     const sent = clientWs.sent.map((s) => JSON.parse(s));
     expect(sent).toHaveLength(1);
     expect(sent[0].type).toBe("history");
@@ -324,7 +308,7 @@ describe("ClientRouter", () => {
 
     expect(mockChat).toHaveBeenCalledWith("Hi", {
       agentId: "agent-1",
-      sessionKey: "server-session-key",
+      sessionKey: "user:user-1:agent:agent-1",
     });
     expect(mockSessionsHistory).not.toHaveBeenCalled();
     const messages = clientWs.sent.map((s) => JSON.parse(s));
@@ -351,7 +335,7 @@ describe("ClientRouter", () => {
 
     expect(mockChat).toHaveBeenCalledWith("What is this?", {
       agentId: "agent-1",
-      sessionKey: "server-session-key",
+      sessionKey: "user:user-1:agent:agent-1",
       attachments: [{ mimeType: "image/png", content: "abc123" }],
     });
   });
@@ -376,7 +360,7 @@ describe("ClientRouter", () => {
 
     expect(mockChat).toHaveBeenCalledWith("First part. Second part.", {
       agentId: "agent-1",
-      sessionKey: "server-session-key",
+      sessionKey: "user:user-1:agent:agent-1",
     });
   });
 
@@ -395,7 +379,7 @@ describe("ClientRouter", () => {
 
     expect(mockChat).toHaveBeenCalledWith("Hi", {
       agentId: "agent-1",
-      sessionKey: "server-session-key",
+      sessionKey: "user:user-1:agent:agent-1",
     });
   });
 
@@ -470,17 +454,15 @@ describe("ClientRouter", () => {
     expect(sent[0].messages[1].role).toBe("assistant");
   });
 
-  it("should return empty history without calling OpenClaw for unactivated sessions", async () => {
+  it("should return empty history when session not in cache", async () => {
+    const freshCache = new SessionCache();
+    const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
     const clientWs = createMockClientWs();
-    mockGetOrCreateSession.mockResolvedValue({
-      id: "new-session-id",
-      sessionKey: "brand-new-key",
-      userId: "user-1",
-      agentId: "agent-1",
-      runtimeActivated: false,
-    });
 
-    await router.handleMessage(clientWs as any, {
+    // Cache is stale (never refreshed) and sessions.list returns no matching session
+    mockSessionsList.mockResolvedValue({ sessions: [] });
+
+    await freshRouter.handleMessage(clientWs as any, {
       type: "history",
       content: "",
       agentId: "agent-1",
@@ -493,21 +475,19 @@ describe("ClientRouter", () => {
     expect(sent[0].messages).toEqual([]);
   });
 
-  it("should return greeting message in history for unactivated sessions", async () => {
+  it("should return greeting message in history when session not in cache", async () => {
+    const freshCache = new SessionCache();
+    const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
     const clientWs = createMockClientWs();
     mockFindFirst.mockResolvedValue({
       ...defaultAgent,
       greetingMessage: "Hello! I'm Smithers, your AI assistant. How can I help?",
     });
-    mockGetOrCreateSession.mockResolvedValue({
-      id: "new-session-id",
-      sessionKey: "brand-new-key",
-      userId: "user-1",
-      agentId: "agent-1",
-      runtimeActivated: false,
-    });
 
-    await router.handleMessage(clientWs as any, {
+    // Cache is stale, sessions.list returns no matching session
+    mockSessionsList.mockResolvedValue({ sessions: [] });
+
+    await freshRouter.handleMessage(clientWs as any, {
       type: "history",
       content: "",
       agentId: "agent-1",
@@ -525,21 +505,19 @@ describe("ClientRouter", () => {
     ]);
   });
 
-  it("should return empty history for unactivated sessions with no greeting", async () => {
+  it("should return empty history when session not in cache and agent has no greeting", async () => {
+    const freshCache = new SessionCache();
+    const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
     const clientWs = createMockClientWs();
     mockFindFirst.mockResolvedValue({
       ...defaultAgent,
       greetingMessage: null,
     });
-    mockGetOrCreateSession.mockResolvedValue({
-      id: "new-session-id",
-      sessionKey: "brand-new-key",
-      userId: "user-1",
-      agentId: "agent-1",
-      runtimeActivated: false,
-    });
 
-    await router.handleMessage(clientWs as any, {
+    // Cache is stale, sessions.list returns no matching session
+    mockSessionsList.mockResolvedValue({ sessions: [] });
+
+    await freshRouter.handleMessage(clientWs as any, {
       type: "history",
       content: "",
       agentId: "agent-1",
@@ -553,16 +531,11 @@ describe("ClientRouter", () => {
   });
 
   it("should include extraSystemPrompt with greeting context on first message", async () => {
+    const freshCache = new SessionCache();
+    const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
     mockFindFirst.mockResolvedValue({
       ...defaultAgent,
       greetingMessage: "Hello! I'm Smithers.",
-    });
-    mockGetOrCreateSession.mockResolvedValue({
-      id: "new-session-id",
-      sessionKey: "brand-new-key",
-      userId: "user-1",
-      agentId: "agent-1",
-      runtimeActivated: false,
     });
     async function* fakeStream() {
       yield { type: "text" as const, text: "Sure!" };
@@ -570,7 +543,7 @@ describe("ClientRouter", () => {
     }
     mockChat.mockReturnValue(fakeStream());
 
-    await router.handleMessage(createMockClientWs() as any, {
+    await freshRouter.handleMessage(createMockClientWs() as any, {
       type: "message",
       content: "What can you do?",
       agentId: "agent-1",
@@ -578,7 +551,7 @@ describe("ClientRouter", () => {
 
     expect(mockChat).toHaveBeenCalledWith("What can you do?", {
       agentId: "agent-1",
-      sessionKey: "brand-new-key",
+      sessionKey: "user:user-1:agent:agent-1",
       extraSystemPrompt: expect.stringContaining("Hello! I'm Smithers."),
     });
   });
@@ -598,21 +571,16 @@ describe("ClientRouter", () => {
 
     expect(mockChat).toHaveBeenCalledWith("Hi", {
       agentId: "agent-1",
-      sessionKey: "server-session-key",
+      sessionKey: "user:user-1:agent:agent-1",
     });
   });
 
   it("should NOT include extraSystemPrompt when agent has no greeting", async () => {
+    const freshCache = new SessionCache();
+    const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
     mockFindFirst.mockResolvedValue({
       ...defaultAgent,
       greetingMessage: null,
-    });
-    mockGetOrCreateSession.mockResolvedValue({
-      id: "new-session-id",
-      sessionKey: "brand-new-key",
-      userId: "user-1",
-      agentId: "agent-1",
-      runtimeActivated: false,
     });
     async function* fakeStream() {
       yield { type: "text" as const, text: "Hello!" };
@@ -620,7 +588,7 @@ describe("ClientRouter", () => {
     }
     mockChat.mockReturnValue(fakeStream());
 
-    await router.handleMessage(createMockClientWs() as any, {
+    await freshRouter.handleMessage(createMockClientWs() as any, {
       type: "message",
       content: "Hi",
       agentId: "agent-1",
@@ -628,47 +596,30 @@ describe("ClientRouter", () => {
 
     expect(mockChat).toHaveBeenCalledWith("Hi", {
       agentId: "agent-1",
-      sessionKey: "brand-new-key",
+      sessionKey: "user:user-1:agent:agent-1",
     });
   });
 
-  it("should mark session as activated after successful chat", async () => {
-    mockGetOrCreateSession.mockResolvedValue({
-      id: "new-session-id",
-      sessionKey: "brand-new-key",
-      userId: "user-1",
-      agentId: "agent-1",
-      runtimeActivated: false,
-    });
+  it("should add session key to cache after successful chat", async () => {
+    const freshCache = new SessionCache();
+    const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
     async function* fakeStream() {
       yield { type: "text" as const, text: "Hello!" };
       yield { type: "done" as const, text: "" };
     }
     mockChat.mockReturnValue(fakeStream());
 
-    await router.handleMessage(createMockClientWs() as any, {
+    // Before chat: key is not in cache
+    expect(freshCache.has("user:user-1:agent:agent-1")).toBe(false);
+
+    await freshRouter.handleMessage(createMockClientWs() as any, {
       type: "message",
       content: "Hi",
       agentId: "agent-1",
     });
 
-    expect(mockMarkSessionActivated).toHaveBeenCalledWith("new-session-id");
-  });
-
-  it("should not re-activate an already activated session", async () => {
-    async function* fakeStream() {
-      yield { type: "text" as const, text: "Hello!" };
-      yield { type: "done" as const, text: "" };
-    }
-    mockChat.mockReturnValue(fakeStream());
-
-    await router.handleMessage(createMockClientWs() as any, {
-      type: "message",
-      content: "Hi",
-      agentId: "agent-1",
-    });
-
-    expect(mockMarkSessionActivated).not.toHaveBeenCalled();
+    // After chat completes: key should be in cache
+    expect(freshCache.has("user:user-1:agent:agent-1")).toBe(true);
   });
 
   it("should send error when history fetch fails", async () => {
@@ -725,7 +676,12 @@ describe("ClientRouter", () => {
   it("should wait for reconnect and succeed when OpenClaw reconnects in time", async () => {
     // Start disconnected — sessions.history throws like real client
     const disconnectedClient = createMockOpenClawClient(false);
-    const disconnectedRouter = new ClientRouter(disconnectedClient as any, "user-1", "user");
+    const disconnectedRouter = new ClientRouter(
+      disconnectedClient as any,
+      "user-1",
+      "user",
+      sessionCache
+    );
 
     mockSessionsHistory.mockResolvedValue({ messages: [] });
 
@@ -751,7 +707,12 @@ describe("ClientRouter", () => {
     vi.useFakeTimers();
 
     const disconnectedClient = createMockOpenClawClient(false);
-    const disconnectedRouter = new ClientRouter(disconnectedClient as any, "user-1", "user");
+    const disconnectedRouter = new ClientRouter(
+      disconnectedClient as any,
+      "user-1",
+      "user",
+      sessionCache
+    );
 
     mockSessionsHistory.mockRejectedValue(new Error("Not connected to OpenClaw Gateway"));
 
@@ -832,7 +793,12 @@ describe("ClientRouter", () => {
   });
 
   it("should allow admin to access personal agents of other users", async () => {
-    const adminRouter = new ClientRouter(mockOpenClawClient as any, "admin-user", "admin");
+    const adminRouter = new ClientRouter(
+      mockOpenClawClient as any,
+      "admin-user",
+      "admin",
+      sessionCache
+    );
     mockFindFirst.mockResolvedValue({
       id: "agent-1",
       name: "Personal Agent",
@@ -845,12 +811,6 @@ describe("ClientRouter", () => {
       yield { type: "done" as const, text: "" };
     }
     mockChat.mockReturnValue(fakeStream());
-    mockGetOrCreateSession.mockResolvedValue({
-      id: "session-id",
-      sessionKey: "admin-session-key",
-      userId: "admin-user",
-      agentId: "agent-1",
-    });
 
     const clientWs = createMockClientWs();
     await adminRouter.handleMessage(clientWs as any, {
@@ -861,5 +821,26 @@ describe("ClientRouter", () => {
 
     const messages = clientWs.sent.map((s) => JSON.parse(s));
     expect(messages.some((m: any) => m.type === "chunk")).toBe(true);
+  });
+
+  it("should call sessions.list when cache is stale for history", async () => {
+    const freshCache = new SessionCache();
+    const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
+    mockSessionsList.mockResolvedValue({
+      sessions: [{ key: "user:user-1:agent:agent-1" }],
+    });
+    mockSessionsHistory.mockResolvedValue({
+      messages: [{ role: "user", content: "Hi" }],
+    });
+
+    const clientWs = createMockClientWs();
+    await freshRouter.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+    });
+
+    expect(mockSessionsList).toHaveBeenCalled();
+    expect(mockSessionsHistory).toHaveBeenCalledWith("user:user-1:agent:agent-1");
   });
 });
