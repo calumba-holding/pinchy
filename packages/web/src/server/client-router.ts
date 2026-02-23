@@ -158,9 +158,18 @@ export class ClientRouter {
 
       // Check if session exists in OpenClaw (cached)
       if (this.sessionCache.isStale()) {
-        const result = await this.openclawClient.sessions.list();
-        const sessions = (result as { sessions?: { key: string }[] })?.sessions ?? [];
-        this.sessionCache.refresh(sessions);
+        try {
+          const result = await this.openclawClient.sessions.list();
+          const sessions = (result as { sessions?: { key: string }[] })?.sessions ?? [];
+          this.sessionCache.refresh(sessions);
+        } catch {
+          // If we can't list sessions, fall back to greeting/empty
+          const messages = agent.greetingMessage
+            ? [{ role: "assistant", content: agent.greetingMessage }]
+            : [];
+          this.sendToClient(clientWs, { type: "history", messages });
+          return;
+        }
       }
 
       if (!this.sessionCache.has(sessionKey)) {

@@ -843,4 +843,50 @@ describe("ClientRouter", () => {
     expect(mockSessionsList).toHaveBeenCalled();
     expect(mockSessionsHistory).toHaveBeenCalledWith("user:user-1:agent:agent-1");
   });
+
+  it("should return greeting when sessions.list fails", async () => {
+    const freshCache = new SessionCache();
+    const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
+
+    mockFindFirst.mockResolvedValue({
+      ...defaultAgent,
+      greetingMessage: "Hello!",
+    });
+    mockSessionsList.mockRejectedValue(new Error("Gateway timeout"));
+
+    const clientWs = createMockClientWs();
+    await freshRouter.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+    });
+
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent).toHaveLength(1);
+    expect(sent[0].type).toBe("history");
+    expect(sent[0].messages).toEqual([{ role: "assistant", content: "Hello!" }]);
+  });
+
+  it("should return empty history when sessions.list fails and no greeting", async () => {
+    const freshCache = new SessionCache();
+    const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
+
+    mockFindFirst.mockResolvedValue({
+      ...defaultAgent,
+      greetingMessage: null,
+    });
+    mockSessionsList.mockRejectedValue(new Error("Gateway timeout"));
+
+    const clientWs = createMockClientWs();
+    await freshRouter.handleMessage(clientWs as any, {
+      type: "history",
+      content: "",
+      agentId: "agent-1",
+    });
+
+    const sent = clientWs.sent.map((s) => JSON.parse(s));
+    expect(sent).toHaveLength(1);
+    expect(sent[0].type).toBe("history");
+    expect(sent[0].messages).toEqual([]);
+  });
 });
