@@ -49,6 +49,14 @@ describe("SessionCache", () => {
     expect(cache.isStale()).toBe(true);
   });
 
+  it("should preserve add()-ed keys after refresh()", () => {
+    const cache = new SessionCache();
+    cache.add("user:u1:agent:a1");
+    cache.refresh([{ key: "user:u2:agent:a2" }]);
+    expect(cache.has("user:u1:agent:a1")).toBe(true);
+    expect(cache.has("user:u2:agent:a2")).toBe(true);
+  });
+
   it("should clear cache on clear()", () => {
     const cache = new SessionCache();
     cache.refresh([{ key: "user:u1:agent:a1" }]);

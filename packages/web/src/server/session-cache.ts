@@ -18,7 +18,11 @@ export class SessionCache {
   }
 
   refresh(sessions: SessionEntry[]): void {
-    this.keys = new Set(sessions.map((s) => s.key));
+    const fromList = new Set(sessions.map((s) => s.key));
+    for (const existing of this.keys) {
+      fromList.add(existing);
+    }
+    this.keys = fromList;
     this.lastRefreshed = Date.now();
   }
 
