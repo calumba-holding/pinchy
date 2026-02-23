@@ -48,7 +48,7 @@ graph TD
 When a user sends a message, it flows through three layers:
 
 1. **Browser** → connects via WebSocket to `/api/ws` on Pinchy, sending a JSON message with `type`, `content`, and `agentId`
-2. **Pinchy** → authenticates the user, verifies agent access, looks up (or creates) a server-side **chat session**, generates a message ID, and forwards the message to OpenClaw Gateway with the `agentId` and `sessionKey`
+2. **Pinchy** → authenticates the user, verifies agent access, resolves the **session key** from the in-memory session cache, generates a message ID, and forwards the message to OpenClaw Gateway with the `agentId` and `sessionKey`
 3. **OpenClaw** → routes the message to the correct agent from its config, processes it through the configured model, and streams the response back
 4. **Pinchy** → attaches the message ID and forwards each chunk to the browser
 5. **Browser** → renders the streaming response in real time
@@ -61,7 +61,7 @@ When a message arrives, the `ClientRouter` passes the `agentId` from the browser
 
 ### Chat sessions
 
-Pinchy maintains a `chatSessions` table that maps each `(userId, agentId)` pair to a unique `sessionKey`. The session key is opaque and never leaves the server — the browser only sends an `agentId`, and Pinchy resolves the session internally. This ensures users cannot access each other's conversations.
+Pinchy derives a deterministic session key for each `(userId, agentId)` pair using the format `user:<userId>:agent:<agentId>`. Session keys are resolved in-memory via a `SessionCache` that periodically syncs with OpenClaw's session list — no database table is needed. The session key is opaque and never leaves the server — the browser only sends an `agentId`, and Pinchy resolves the session internally. This ensures users cannot access each other's conversations.
 
 The browser can request conversation history by sending a `{ type: "history", agentId }` message. Pinchy fetches the history from OpenClaw via `openclaw-node` and strips internal metadata (timestamps, thinking blocks) before returning it.
 
@@ -121,7 +121,6 @@ PostgreSQL 16, accessed via [Drizzle ORM](https://orm.drizzle.team/). The schema
 
 - **Auth tables** — `user`, `account`, `session`, `verificationToken` (managed by Auth.js adapter)
 - **`agents`** — Agent configuration (name, model, template, allowed tools, plugin config, owner)
-- **`chatSessions`** — Maps `(userId, agentId)` to a server-side `sessionKey` for OpenClaw conversation continuity
 - **`invites`** — Invite tokens (SHA-256 hashed token, email, expiry, status)
 - **`settings`** — Key-value store for app configuration (provider keys, onboarding state)
 - **`auditLog`** — Append-only audit trail with HMAC-SHA256 signed rows, protected by PostgreSQL triggers preventing UPDATE and DELETE

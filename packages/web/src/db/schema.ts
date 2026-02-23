@@ -7,7 +7,6 @@ import {
   primaryKey,
   jsonb,
   index,
-  uniqueIndex,
   serial,
   pgEnum,
 } from "drizzle-orm/pg-core";
@@ -92,25 +91,6 @@ export const agents = pgTable(
     createdAt: timestamp("created_at").defaultNow(),
   },
   (table) => [index("agents_owner_id_idx").on(table.ownerId)]
-);
-
-export const chatSessions = pgTable(
-  "chat_sessions",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    sessionKey: text("session_key").notNull().unique(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    agentId: text("agent_id")
-      .notNull()
-      .references(() => agents.id, { onDelete: "cascade" }),
-    runtimeActivated: boolean("runtime_activated").notNull().default(false),
-    createdAt: timestamp("created_at").defaultNow(),
-  },
-  (table) => [uniqueIndex("chat_sessions_user_agent_idx").on(table.userId, table.agentId)]
 );
 
 export const invites = pgTable("invites", {

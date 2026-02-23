@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as schema from "@/db/schema";
 
-const { agents, settings, invites, chatSessions } = schema;
+const { agents, settings, invites } = schema;
 
 describe("database schema", () => {
   it("should export agents table", () => {
@@ -71,15 +71,6 @@ describe("invites schema", () => {
 describe("agents schema — allowedTools column", () => {
   it("agents table has allowedTools column", () => {
     expect(agents.allowedTools).toBeDefined();
-  });
-});
-
-describe("chatSessions schema", () => {
-  it("chatSessions table exists with expected columns", () => {
-    expect(chatSessions.id).toBeDefined();
-    expect(chatSessions.sessionKey).toBeDefined();
-    expect(chatSessions.userId).toBeDefined();
-    expect(chatSessions.agentId).toBeDefined();
   });
 });
 
