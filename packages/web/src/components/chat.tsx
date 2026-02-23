@@ -16,7 +16,7 @@ interface ChatProps {
 }
 
 export function Chat({ agentId, agentName, configuring = false, isPersonal = false }: ChatProps) {
-  const { runtime, isConnected, isDelayed } = useWsRuntime(agentId);
+  const { runtime, isConnected, isDelayed, isHistoryLoaded } = useWsRuntime(agentId);
 
   const statusMessage = !isConnected
     ? configuring
@@ -70,7 +70,7 @@ export function Chat({ agentId, agentName, configuring = false, isPersonal = fal
           </div>
         </header>
         <div className="flex-1 min-h-0">
-          <Thread />
+          <Thread isHistoryLoaded={isHistoryLoaded} />
         </div>
         {isDelayed && (
           <div className="px-4 py-2 text-center text-xs text-muted-foreground border-t">

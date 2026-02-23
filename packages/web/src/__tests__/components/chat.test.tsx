@@ -8,6 +8,7 @@ vi.mock("@/hooks/use-ws-runtime", () => ({
     runtime: {},
     isConnected: true,
     isDelayed: false,
+    isHistoryLoaded: true,
   }),
 }));
 
@@ -16,7 +17,11 @@ vi.mock("@assistant-ui/react", () => ({
 }));
 
 vi.mock("@/components/assistant-ui/thread", () => ({
-  Thread: () => <div data-testid="thread">Thread</div>,
+  Thread: (props: any) => (
+    <div data-testid="thread" data-history-loaded={props.isHistoryLoaded}>
+      Thread
+    </div>
+  ),
 }));
 
 vi.mock("next/link", () => ({
@@ -44,7 +49,34 @@ describe("Chat", () => {
       runtime: {} as any,
       isConnected: true,
       isDelayed: false,
+      isHistoryLoaded: true,
     });
+  });
+
+  it("should pass isHistoryLoaded to Thread", () => {
+    vi.mocked(useWsRuntime).mockReturnValue({
+      runtime: {} as any,
+      isConnected: true,
+      isDelayed: false,
+      isHistoryLoaded: true,
+    });
+
+    render(<Chat agentId="agent-1" agentName="Smithers" />);
+    const thread = screen.getByTestId("thread");
+    expect(thread).toHaveAttribute("data-history-loaded", "true");
+  });
+
+  it("should pass isHistoryLoaded=false to Thread when not loaded", () => {
+    vi.mocked(useWsRuntime).mockReturnValue({
+      runtime: {} as any,
+      isConnected: true,
+      isDelayed: false,
+      isHistoryLoaded: false,
+    });
+
+    render(<Chat agentId="agent-1" agentName="Smithers" />);
+    const thread = screen.getByTestId("thread");
+    expect(thread).toHaveAttribute("data-history-loaded", "false");
   });
 
   it("should render agent name in header", () => {
@@ -67,6 +99,7 @@ describe("Chat", () => {
       runtime: {} as any,
       isConnected: false,
       isDelayed: false,
+      isHistoryLoaded: false,
     });
 
     render(<Chat agentId="agent-1" agentName="Smithers" />);
@@ -78,6 +111,7 @@ describe("Chat", () => {
       runtime: {} as any,
       isConnected: false,
       isDelayed: false,
+      isHistoryLoaded: false,
     });
 
     render(<Chat agentId="agent-1" agentName="Smithers" configuring={true} />);
@@ -137,6 +171,7 @@ describe("Chat", () => {
       runtime: {} as any,
       isConnected: true,
       isDelayed: true,
+      isHistoryLoaded: true,
     });
 
     render(<Chat agentId="agent-1" agentName="Smithers" />);

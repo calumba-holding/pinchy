@@ -54,7 +54,7 @@ const MessageTimestamp: FC = () => {
   return <span className="text-xs text-muted-foreground/60">{formatTimestamp(timestamp)}</span>;
 };
 
-export const Thread: FC = () => {
+export const Thread: FC<{ isHistoryLoaded?: boolean }> = ({ isHistoryLoaded = false }) => {
   return (
     <ThreadPrimitive.Root
       className="aui-root aui-thread-root @container flex h-full flex-col bg-background"
@@ -64,7 +64,7 @@ export const Thread: FC = () => {
     >
       <ThreadPrimitive.Viewport className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-auto overflow-y-scroll scroll-smooth px-4 pt-4">
         <AuiIf condition={(s) => s.thread.isEmpty}>
-          <ThreadWelcome />
+          <ThreadWelcome isHistoryLoaded={isHistoryLoaded} />
         </AuiIf>
 
         <ThreadPrimitive.Messages
@@ -112,7 +112,7 @@ export const STARTUP_MESSAGES = [
 
 const ROTATION_INTERVAL_MS = 3000;
 
-const ThreadWelcome: FC = () => {
+const ThreadWelcome: FC<{ isHistoryLoaded?: boolean }> = ({ isHistoryLoaded = false }) => {
   const [messageIndex, setMessageIndex] = useState(() =>
     Math.floor(Math.random() * STARTUP_MESSAGES.length)
   );
@@ -135,9 +135,7 @@ const ThreadWelcome: FC = () => {
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground" />
-          <p className="text-sm font-medium text-muted-foreground">
-            Starting agent...
-          </p>
+          <p className="text-sm font-medium text-muted-foreground">Starting agent...</p>
           <p
             data-testid="startup-message"
             className="text-xs text-muted-foreground/60 transition-opacity duration-300"
