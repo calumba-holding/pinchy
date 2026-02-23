@@ -119,6 +119,7 @@ const ThreadWelcome: FC<{ isHistoryLoaded?: boolean }> = ({ isHistoryLoaded = fa
   const indexRef = useRef(messageIndex);
 
   useEffect(() => {
+    if (isHistoryLoaded) return; // Don't rotate when ready
     const timer = setInterval(() => {
       let next: number;
       do {
@@ -128,13 +129,30 @@ const ThreadWelcome: FC<{ isHistoryLoaded?: boolean }> = ({ isHistoryLoaded = fa
       setMessageIndex(next);
     }, ROTATION_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, []);
+  }, [isHistoryLoaded]);
 
+  if (isHistoryLoaded) {
+    // Ready state: agent is loaded, waiting for user input
+    return (
+      <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col">
+        <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-sm font-medium text-muted-foreground">How can I help you?</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state: connecting or loading history
   return (
     <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col">
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground" />
+          <div
+            data-testid="loading-spinner"
+            className="h-8 w-8 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground"
+          />
           <p className="text-sm font-medium text-muted-foreground">Starting agent...</p>
           <p
             data-testid="startup-message"

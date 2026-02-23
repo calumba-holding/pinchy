@@ -76,7 +76,7 @@ vi.mock("@/components/ui/button", () => ({
 import { Thread } from "@/components/assistant-ui/thread";
 import { STARTUP_MESSAGES } from "@/components/assistant-ui/thread";
 
-describe("ThreadWelcome startup messages", () => {
+describe("ThreadWelcome — loading state (isHistoryLoaded=false)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -85,40 +85,50 @@ describe("ThreadWelcome startup messages", () => {
     vi.useRealTimers();
   });
 
+  it("shows 'Starting agent...' heading", () => {
+    render(<Thread isHistoryLoaded={false} />);
+    expect(screen.getByText("Starting agent...")).toBeInTheDocument();
+  });
+
   it("shows a startup message from the known list", () => {
-    render(<Thread />);
+    render(<Thread isHistoryLoaded={false} />);
     const messageEl = screen.getByTestId("startup-message");
     expect(STARTUP_MESSAGES).toContain(messageEl.textContent);
   });
 
-  it("does not show the old 'Hello there' greeting", () => {
-    render(<Thread />);
-    expect(screen.queryByText("Hello there!")).not.toBeInTheDocument();
-  });
-
-  it("does not show the old privacy notice", () => {
-    render(<Thread />);
-    expect(screen.queryByText(/conversations help build team knowledge/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/conversations are private/i)).not.toBeInTheDocument();
-  });
-
-  it("shows 'Starting agent...' heading", () => {
-    render(<Thread />);
-    expect(screen.getByText("Starting agent...")).toBeInTheDocument();
+  it("shows the spinner animation", () => {
+    render(<Thread isHistoryLoaded={false} />);
+    expect(screen.getByTestId("loading-spinner")).toBeInTheDocument();
   });
 
   it("rotates to a different message after interval", () => {
-    render(<Thread />);
+    render(<Thread isHistoryLoaded={false} />);
     const firstMessage = screen.getByTestId("startup-message").textContent;
 
-    // Advance past the rotation interval (3 seconds)
     act(() => {
       vi.advanceTimersByTime(3000);
     });
 
     const secondMessage = screen.getByTestId("startup-message").textContent;
-    // Both should be valid messages
     expect(STARTUP_MESSAGES).toContain(firstMessage);
     expect(STARTUP_MESSAGES).toContain(secondMessage);
+  });
+});
+
+describe("ThreadWelcome — ready state (isHistoryLoaded=true)", () => {
+  it("shows 'How can I help you?' instead of 'Starting agent...'", () => {
+    render(<Thread isHistoryLoaded={true} />);
+    expect(screen.getByText("How can I help you?")).toBeInTheDocument();
+    expect(screen.queryByText("Starting agent...")).not.toBeInTheDocument();
+  });
+
+  it("does NOT show the spinner animation", () => {
+    render(<Thread isHistoryLoaded={true} />);
+    expect(screen.queryByTestId("loading-spinner")).not.toBeInTheDocument();
+  });
+
+  it("does NOT show startup messages", () => {
+    render(<Thread isHistoryLoaded={true} />);
+    expect(screen.queryByTestId("startup-message")).not.toBeInTheDocument();
   });
 });
