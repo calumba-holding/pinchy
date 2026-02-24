@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Bot, ClipboardList, Plus, Settings, User } from "lucide-react";
+import { ClipboardList, Plus, Settings } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -10,12 +10,15 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
+import { getAgentAvatarSvg } from "@/lib/avatar";
 
 interface Agent {
   id: string;
   name: string;
   model: string;
   isPersonal: boolean;
+  tagline: string | null;
+  avatarSeed: string | null;
 }
 
 interface AppSidebarProps {
@@ -45,8 +48,20 @@ export function AppSidebar({ agents, isAdmin }: AppSidebarProps) {
             <SidebarMenuItem key={agent.id}>
               <SidebarMenuButton asChild>
                 <Link href={`/chat/${agent.id}`}>
-                  {agent.isPersonal ? <User className="size-4" /> : <Bot className="size-4" />}
-                  <span>{agent.name}</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={getAgentAvatarSvg({ avatarSeed: agent.avatarSeed, name: agent.name })}
+                    alt=""
+                    className="size-6 rounded-full shrink-0"
+                  />
+                  <div className="flex flex-col min-w-0">
+                    <span className="truncate">{agent.name}</span>
+                    {agent.tagline && (
+                      <span className="text-xs text-muted-foreground/70 truncate">
+                        {agent.tagline}
+                      </span>
+                    )}
+                  </div>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

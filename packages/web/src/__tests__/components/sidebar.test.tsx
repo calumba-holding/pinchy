@@ -14,6 +14,13 @@ vi.mock("next/image", () => ({
   },
 }));
 
+vi.mock("@/lib/avatar", () => ({
+  getAgentAvatarSvg: vi.fn((agent: { avatarSeed: string | null; name: string }) => {
+    if (agent.avatarSeed === "__smithers__") return "/images/smithers-avatar.png";
+    return `data:image/svg+xml;utf8,mock-${agent.avatarSeed ?? agent.name}`;
+  }),
+}));
+
 describe("AppSidebar", () => {
   it("should render Pinchy branding", () => {
     render(
@@ -37,7 +44,14 @@ describe("AppSidebar", () => {
 
   it("should render agent names", () => {
     const agents = [
-      { id: "1", name: "Smithers", model: "anthropic/claude-sonnet-4-20250514", isPersonal: false },
+      {
+        id: "1",
+        name: "Smithers",
+        model: "anthropic/claude-sonnet-4-20250514",
+        isPersonal: false,
+        tagline: null,
+        avatarSeed: null,
+      },
     ];
     render(
       <SidebarProvider>
@@ -78,33 +92,58 @@ describe("AppSidebar", () => {
     });
   });
 
-  describe("personal agent styling", () => {
-    it("should render a User icon for personal agents", () => {
+  describe("avatar rendering", () => {
+    it("should render avatar image for agents", () => {
       const agents = [
         {
           id: "1",
-          name: "My Agent",
+          name: "Test Agent",
           model: "anthropic/claude-sonnet-4-20250514",
-          isPersonal: true,
+          isPersonal: false,
+          tagline: null,
+          avatarSeed: "my-seed",
         },
       ];
-      render(
+      const { container } = render(
         <SidebarProvider>
           <AppSidebar agents={agents} isAdmin={false} />
         </SidebarProvider>
       );
-      const agentLink = screen.getByRole("link", { name: /my agent/i });
-      const userIcon = agentLink.querySelector("svg.lucide-user");
-      expect(userIcon).toBeInTheDocument();
+      const avatar = container.querySelector('img[src="data:image/svg+xml;utf8,mock-my-seed"]');
+      expect(avatar).toBeInTheDocument();
     });
 
-    it("should render a Bot icon for non-personal agents", () => {
+    it("should render Smithers avatar for __smithers__ seed", () => {
       const agents = [
         {
           id: "1",
           name: "Smithers",
           model: "anthropic/claude-sonnet-4-20250514",
+          isPersonal: true,
+          tagline: null,
+          avatarSeed: "__smithers__",
+        },
+      ];
+      const { container } = render(
+        <SidebarProvider>
+          <AppSidebar agents={agents} isAdmin={false} />
+        </SidebarProvider>
+      );
+      const avatar = container.querySelector('img[src="/images/smithers-avatar.png"]');
+      expect(avatar).toBeInTheDocument();
+    });
+  });
+
+  describe("tagline rendering", () => {
+    it("should render tagline when present", () => {
+      const agents = [
+        {
+          id: "1",
+          name: "HR Bot",
+          model: "anthropic/claude-sonnet-4-20250514",
           isPersonal: false,
+          tagline: "Answers HR questions",
+          avatarSeed: null,
         },
       ];
       render(
@@ -112,9 +151,29 @@ describe("AppSidebar", () => {
           <AppSidebar agents={agents} isAdmin={false} />
         </SidebarProvider>
       );
-      const agentLink = screen.getByRole("link", { name: /smithers/i });
-      const botIcon = agentLink.querySelector("svg.lucide-bot");
-      expect(botIcon).toBeInTheDocument();
+      expect(screen.getByText("Answers HR questions")).toBeInTheDocument();
+    });
+
+    it("should not render tagline when null", () => {
+      const agents = [
+        {
+          id: "1",
+          name: "HR Bot",
+          model: "anthropic/claude-sonnet-4-20250514",
+          isPersonal: false,
+          tagline: null,
+          avatarSeed: null,
+        },
+      ];
+      render(
+        <SidebarProvider>
+          <AppSidebar agents={agents} isAdmin={false} />
+        </SidebarProvider>
+      );
+      // Only the agent name should be rendered, no additional text
+      const link = screen.getByRole("link", { name: /hr bot/i });
+      expect(link).toBeInTheDocument();
+      expect(link.textContent).toBe("HR Bot");
     });
   });
 
@@ -126,12 +185,16 @@ describe("AppSidebar", () => {
           name: "Shared Agent",
           model: "anthropic/claude-sonnet-4-20250514",
           isPersonal: false,
+          tagline: null,
+          avatarSeed: null,
         },
         {
           id: "2",
           name: "My Personal Agent",
           model: "anthropic/claude-sonnet-4-20250514",
           isPersonal: true,
+          tagline: null,
+          avatarSeed: null,
         },
       ];
       render(
