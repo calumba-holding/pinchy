@@ -127,6 +127,31 @@ describe("GET /api/agents/[agentId]/files/[filename]", () => {
     expect(readWorkspaceFile).toHaveBeenCalledWith("agent-1", "USER.md");
   });
 
+  it("should read AGENTS.md file", async () => {
+    vi.mocked(readWorkspaceFile).mockReturnValueOnce("# Agent instructions");
+
+    const request = makeGetRequest("agent-1", "AGENTS.md");
+    const response = await GET(request, makeParams("agent-1", "AGENTS.md"));
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.content).toBe("# Agent instructions");
+    expect(readWorkspaceFile).toHaveBeenCalledWith("agent-1", "AGENTS.md");
+  });
+
+  it("should return 400 for IDENTITY.md (not in ALLOWED_FILES)", async () => {
+    vi.mocked(readWorkspaceFile).mockImplementationOnce(() => {
+      throw new Error("File not allowed: IDENTITY.md");
+    });
+
+    const request = makeGetRequest("agent-1", "IDENTITY.md");
+    const response = await GET(request, makeParams("agent-1", "IDENTITY.md"));
+
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toBe("File not allowed: IDENTITY.md");
+  });
+
   it("should return empty string when file does not exist yet", async () => {
     vi.mocked(readWorkspaceFile).mockReturnValueOnce("");
 
@@ -224,6 +249,18 @@ describe("PUT /api/agents/[agentId]/files/[filename]", () => {
     const data = await response.json();
     expect(data.success).toBe(true);
     expect(writeWorkspaceFile).toHaveBeenCalledWith("agent-1", "USER.md", "# Team info");
+  });
+
+  it("should write AGENTS.md file", async () => {
+    const request = makePutRequest("agent-1", "AGENTS.md", {
+      content: "# Agent instructions",
+    });
+    const response = await PUT(request, makeParams("agent-1", "AGENTS.md"));
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    expect(writeWorkspaceFile).toHaveBeenCalledWith("agent-1", "AGENTS.md", "# Agent instructions");
   });
 
   it("should handle empty content", async () => {
