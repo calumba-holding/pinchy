@@ -69,12 +69,18 @@ export async function PATCH(
     allowedTools?: string[];
     pluginConfig?: unknown;
     greetingMessage?: string | null;
+    tagline?: string | null;
+    avatarSeed?: string | null;
+    personalityPresetId?: string | null;
   } = {};
   if (body.name !== undefined) data.name = body.name;
   if (body.model !== undefined) data.model = body.model;
   if (body.allowedTools !== undefined) data.allowedTools = body.allowedTools;
   if (body.pluginConfig !== undefined) data.pluginConfig = body.pluginConfig;
   if (body.greetingMessage !== undefined) data.greetingMessage = body.greetingMessage;
+  if (body.tagline !== undefined) data.tagline = body.tagline;
+  if (body.avatarSeed !== undefined) data.avatarSeed = body.avatarSeed;
+  if (body.personalityPresetId !== undefined) data.personalityPresetId = body.personalityPresetId;
 
   const agent = await updateAgent(agentId, data);
 

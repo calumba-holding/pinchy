@@ -10,6 +10,9 @@ export interface UpdateAgentInput {
   allowedTools?: string[];
   pluginConfig?: unknown;
   greetingMessage?: string | null;
+  tagline?: string | null;
+  avatarSeed?: string | null;
+  personalityPresetId?: string | null;
 }
 
 export async function deleteAgent(id: string) {
