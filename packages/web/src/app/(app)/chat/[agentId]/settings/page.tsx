@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AgentSettingsGeneral } from "@/components/agent-settings-general";
 import { AgentSettingsFile } from "@/components/agent-settings-file";
+import { AgentSettingsPersonality } from "@/components/agent-settings-personality";
 import { AgentSettingsPermissions } from "@/components/agent-settings-permissions";
 
 interface Agent {
@@ -16,6 +17,9 @@ interface Agent {
   isPersonal: boolean;
   allowedTools: string[];
   pluginConfig: { allowed_paths?: string[] } | null;
+  tagline: string | null;
+  avatarSeed: string | null;
+  personalityPresetId: string | null;
 }
 
 interface Directory {
@@ -110,17 +114,35 @@ export default function AgentSettingsPage() {
       <Tabs defaultValue="general">
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="soul">SOUL.md</TabsTrigger>
+          <TabsTrigger value="personality">Personality</TabsTrigger>
           <TabsTrigger value="user">USER.md</TabsTrigger>
           {showPermissions && <TabsTrigger value="permissions">Permissions</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="general">
-          <AgentSettingsGeneral agent={agent} providers={providers} canDelete={canDelete} />
+          <AgentSettingsGeneral
+            agent={{
+              id: agent.id,
+              name: agent.name,
+              model: agent.model,
+              isPersonal: agent.isPersonal,
+              tagline: agent.tagline,
+            }}
+            providers={providers}
+            canDelete={canDelete}
+          />
         </TabsContent>
 
-        <TabsContent value="soul">
-          <AgentSettingsFile agentId={agentId} filename="SOUL.md" content={soulContent} />
+        <TabsContent value="personality">
+          <AgentSettingsPersonality
+            agentId={agentId}
+            agent={{
+              avatarSeed: agent.avatarSeed,
+              name: agent.name,
+              personalityPresetId: agent.personalityPresetId,
+            }}
+            soulContent={soulContent}
+          />
         </TabsContent>
 
         <TabsContent value="user">
