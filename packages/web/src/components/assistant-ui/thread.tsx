@@ -27,7 +27,8 @@ import {
   MoreHorizontalIcon,
   SquareIcon,
 } from "lucide-react";
-import { type FC, useState, useEffect, useRef } from "react";
+import { type FC, useState, useEffect, useRef, useContext } from "react";
+import { AgentAvatarContext } from "@/components/chat";
 
 function formatTimestamp(iso: string): string {
   const date = new Date(iso);
@@ -113,6 +114,7 @@ export const STARTUP_MESSAGES = [
 const ROTATION_INTERVAL_MS = 3000;
 
 const ThreadWelcome: FC<{ isHistoryLoaded?: boolean }> = ({ isHistoryLoaded = false }) => {
+  const avatarUrl = useContext(AgentAvatarContext);
   const [messageIndex, setMessageIndex] = useState(0);
   const indexRef = useRef(0);
 
@@ -140,6 +142,10 @@ const ThreadWelcome: FC<{ isHistoryLoaded?: boolean }> = ({ isHistoryLoaded = fa
       <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col">
         <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
           <div className="flex flex-col items-center gap-2">
+            {avatarUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="" className="size-12 rounded-full" />
+            )}
             <p className="text-sm font-medium text-muted-foreground">How can I help you?</p>
           </div>
         </div>

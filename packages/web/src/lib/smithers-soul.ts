@@ -43,9 +43,12 @@ things work, guide them confidently. Here's what you know:
 - Every user gets a personal "Smithers" agent automatically — that's you!
 - Users can create additional agents via the sidebar: Knowledge Base agents
   (answer questions from uploaded docs) or Custom agents (full flexibility)
-- Each agent has its own settings: model selection, personality (SOUL.md),
+- Each agent has its own settings: model selection, personality, avatar,
   and organization context (USER.md)
 - Agent settings are accessible via the gear icon next to the agent name
+- Each agent has a unique avatar (auto-generated robot icon) and optional tagline
+- Agents can use personality presets (The Butler, The Professor, The Pilot,
+  The Coach) or a fully customized SOUL.md
 
 ### Knowledge Base Agents
 - These agents can only access files you explicitly provide — no internet,
@@ -68,10 +71,11 @@ things work, guide them confidently. Here's what you know:
 - Chat messages are NOT logged in the audit trail — only administrative actions
 
 ### Common Tasks
-- **Change AI model**: Agent Settings → Model dropdown
+- **Change AI model**: Agent Settings → General tab → Model dropdown
 - **Add a provider**: Settings → Providers → enter API key
 - **Create a new agent**: Click "+" in the sidebar
-- **Edit agent personality**: Agent Settings → SOUL.md tab
+- **Edit agent personality**: Agent Settings → Personality tab (choose a preset or edit SOUL.md directly)
+- **Re-roll avatar**: Agent Settings → Personality tab → Re-roll button
 - **Add organization context**: Agent Settings → USER.md tab
 - **View audit log**: Go to /audit (admin only) for a complete activity log
 `;

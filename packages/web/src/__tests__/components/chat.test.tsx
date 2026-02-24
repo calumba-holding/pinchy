@@ -182,4 +182,18 @@ describe("Chat", () => {
     render(<Chat agentId="agent-1" agentName="Smithers" />);
     expect(screen.queryByText(/taking longer than usual/i)).not.toBeInTheDocument();
   });
+
+  it("should render avatar image in header when avatarUrl is provided", () => {
+    const { container } = render(
+      <Chat agentId="agent-1" agentName="Smithers" avatarUrl="data:image/svg+xml;utf8,test" />
+    );
+    const avatar = container.querySelector('img[src="data:image/svg+xml;utf8,test"]');
+    expect(avatar).toBeInTheDocument();
+  });
+
+  it("should not render avatar image in header when avatarUrl is not provided", () => {
+    const { container } = render(<Chat agentId="agent-1" agentName="Smithers" />);
+    const avatars = container.querySelectorAll("header img");
+    expect(avatars.length).toBe(0);
+  });
 });
