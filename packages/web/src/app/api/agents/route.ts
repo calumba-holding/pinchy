@@ -5,6 +5,8 @@ import { db } from "@/db";
 import { agents } from "@/db/schema";
 import { eq, or, and } from "drizzle-orm";
 import { getTemplate } from "@/lib/agent-templates";
+import { getPersonalityPreset } from "@/lib/personality-presets";
+import { generateAvatarSeed } from "@/lib/avatar";
 import { validateAllowedPaths } from "@/lib/path-validation";
 import { ensureWorkspace, writeWorkspaceFile } from "@/lib/workspace";
 import { regenerateOpenClawConfig } from "@/lib/openclaw-config";
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { name, templateId, pluginConfig } = body;
+  const { name, templateId, tagline, pluginConfig } = body;
 
   if (!name || typeof name !== "string") {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -81,6 +83,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Resolve personality preset from template
+  const preset = getPersonalityPreset(template.defaultPersonality);
+
   // Determine default model from current provider
   const defaultProvider = (await getSetting("default_provider")) as ProviderName | null;
   const model = defaultProvider
@@ -96,7 +101,10 @@ export async function POST(request: NextRequest) {
       pluginConfig: template.pluginId && pluginConfig ? pluginConfig : null,
       ownerId: session.user.id,
       allowedTools: template.allowedTools,
-      greetingMessage: template.defaultGreeting,
+      tagline: tagline || template.defaultTagline || null,
+      avatarSeed: generateAvatarSeed(),
+      personalityPresetId: template.defaultPersonality,
+      greetingMessage: preset?.greetingMessage ?? null,
     })
     .returning();
 
@@ -108,9 +116,9 @@ export async function POST(request: NextRequest) {
     detail: { name: agent.name, model: agent.model, templateId },
   }).catch(() => {});
 
-  // Create workspace with template's default SOUL.md
+  // Create workspace with personality preset's SOUL.md
   ensureWorkspace(agent.id);
-  writeWorkspaceFile(agent.id, "SOUL.md", template.defaultSoulMd);
+  writeWorkspaceFile(agent.id, "SOUL.md", preset?.soulMd ?? "");
 
   await regenerateOpenClawConfig();
 

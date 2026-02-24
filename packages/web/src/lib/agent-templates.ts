@@ -3,8 +3,8 @@ export interface AgentTemplate {
   description: string;
   allowedTools: string[];
   pluginId: string | null;
-  defaultSoulMd: string;
-  defaultGreeting: string | null;
+  defaultPersonality: string;
+  defaultTagline: string | null;
 }
 
 export const AGENT_TEMPLATES: Record<string, AgentTemplate> = {
@@ -13,19 +13,16 @@ export const AGENT_TEMPLATES: Record<string, AgentTemplate> = {
     description: "Answer questions from your docs",
     allowedTools: ["pinchy_ls", "pinchy_read"],
     pluginId: "pinchy-files",
-    defaultSoulMd: `<!-- Describe your agent's personality here. For example:
-You are a helpful knowledge base assistant. You answer questions
-based on the documents available to you. Always cite your sources. -->`,
-    defaultGreeting:
-      "Hello! I'm your knowledge base assistant. Ask me anything about the documents I have access to.",
+    defaultPersonality: "the-professor",
+    defaultTagline: "Answer questions from your docs",
   },
   custom: {
     name: "Custom Agent",
     description: "Start from scratch",
     allowedTools: [],
     pluginId: null,
-    defaultSoulMd: `<!-- Describe your agent's personality and instructions here. -->`,
-    defaultGreeting: null,
+    defaultPersonality: "the-butler",
+    defaultTagline: null,
   },
 };
 

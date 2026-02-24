@@ -52,13 +52,32 @@ vi.mock("@/lib/settings", () => ({
   getSetting: vi.fn().mockResolvedValue("anthropic"),
 }));
 
+vi.mock("@/lib/personality-presets", () => ({
+  getPersonalityPreset: vi.fn((id: string) => {
+    const presets: Record<string, { greetingMessage: string | null; soulMd: string }> = {
+      "the-professor": {
+        greetingMessage: "Hello! I'm here to help you find answers in your documents.",
+        soulMd: "# Professor SOUL.md",
+      },
+      "the-butler": {
+        greetingMessage: "Good day. How may I be of assistance?",
+        soulMd: "# Butler SOUL.md",
+      },
+    };
+    return presets[id];
+  }),
+}));
+
+vi.mock("@/lib/avatar", () => ({
+  generateAvatarSeed: vi.fn().mockReturnValue("mock-seed-uuid"),
+}));
+
 import { POST } from "@/app/api/agents/route";
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { validateAllowedPaths } from "@/lib/path-validation";
 import { ensureWorkspace, writeWorkspaceFile } from "@/lib/workspace";
 import { regenerateOpenClawConfig } from "@/lib/openclaw-config";
-import { AGENT_TEMPLATES } from "@/lib/agent-templates";
 
 describe("POST /api/agents", () => {
   beforeEach(() => {
@@ -194,7 +213,7 @@ describe("POST /api/agents", () => {
     expect(validateAllowedPaths).not.toHaveBeenCalled();
   });
 
-  it("should set greetingMessage from template's defaultGreeting", async () => {
+  it("should set greetingMessage from personality preset", async () => {
     const request = new NextRequest("http://localhost:7777/api/agents", {
       method: "POST",
       body: JSON.stringify({
@@ -210,17 +229,21 @@ describe("POST /api/agents", () => {
 
     expect(insertValuesMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        greetingMessage: AGENT_TEMPLATES["knowledge-base"].defaultGreeting,
+        greetingMessage: "Hello! I'm here to help you find answers in your documents.",
+        personalityPresetId: "the-professor",
       })
     );
   });
 
-  it("should set greetingMessage to null for custom template", async () => {
+  it("should set avatarSeed from generateAvatarSeed", async () => {
     const request = new NextRequest("http://localhost:7777/api/agents", {
       method: "POST",
       body: JSON.stringify({
-        name: "Dev Assistant",
-        templateId: "custom",
+        name: "HR Knowledge Base",
+        templateId: "knowledge-base",
+        pluginConfig: {
+          allowed_paths: ["/data/hr-docs/"],
+        },
       }),
     });
 
@@ -228,7 +251,68 @@ describe("POST /api/agents", () => {
 
     expect(insertValuesMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        greetingMessage: null,
+        avatarSeed: "mock-seed-uuid",
+      })
+    );
+  });
+
+  it("should write SOUL.md from personality preset", async () => {
+    const request = new NextRequest("http://localhost:7777/api/agents", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "HR Knowledge Base",
+        templateId: "knowledge-base",
+        pluginConfig: {
+          allowed_paths: ["/data/hr-docs/"],
+        },
+      }),
+    });
+
+    await POST(request);
+
+    expect(writeWorkspaceFile).toHaveBeenCalledWith(
+      "new-agent-id",
+      "SOUL.md",
+      "# Professor SOUL.md"
+    );
+  });
+
+  it("should use tagline from request body when provided", async () => {
+    const request = new NextRequest("http://localhost:7777/api/agents", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "HR Bot",
+        templateId: "custom",
+        tagline: "Custom tagline",
+      }),
+    });
+
+    await POST(request);
+
+    expect(insertValuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tagline: "Custom tagline",
+      })
+    );
+  });
+
+  it("should use template defaultTagline when tagline not provided", async () => {
+    const request = new NextRequest("http://localhost:7777/api/agents", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "HR Knowledge Base",
+        templateId: "knowledge-base",
+        pluginConfig: {
+          allowed_paths: ["/data/hr-docs/"],
+        },
+      }),
+    });
+
+    await POST(request);
+
+    expect(insertValuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tagline: "Answer questions from your docs",
       })
     );
   });
