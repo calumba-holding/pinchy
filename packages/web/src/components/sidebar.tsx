@@ -6,11 +6,14 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 import { getAgentAvatarSvg } from "@/lib/avatar";
 
 interface Agent {
@@ -37,47 +40,54 @@ export function AppSidebar({ agents, isAdmin }: AppSidebarProps) {
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="p-4 flex items-center gap-2">
-          <Image src="/pinchy-logo.png" alt="Pinchy" width={28} height={30} />
+        <div className="px-2 py-3 flex items-center gap-3">
+          <Image src="/pinchy-logo.png" alt="Pinchy" width={32} height={34} />
           <span className="font-bold text-lg">Pinchy</span>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarMenu>
-          {sortedAgents.map((agent) => (
-            <SidebarMenuItem key={agent.id}>
-              <SidebarMenuButton asChild>
-                <Link href={`/chat/${agent.id}`} className="items-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={getAgentAvatarSvg({ avatarSeed: agent.avatarSeed, name: agent.name })}
-                    alt=""
-                    className="size-8 rounded-full shrink-0"
-                  />
-                  <div className="flex flex-col min-w-0">
-                    <span className="truncate">{agent.name}</span>
-                    {agent.tagline && (
-                      <span className="text-xs text-muted-foreground/70 truncate">
-                        {agent.tagline}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-          {isAdmin && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild>
-                <Link href="/agents/new">
-                  <Plus className="size-4" />
-                  <span>New Agent</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
-        </SidebarMenu>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {sortedAgents.map((agent) => (
+                <SidebarMenuItem key={agent.id}>
+                  <SidebarMenuButton asChild size="lg">
+                    <Link href={`/chat/${agent.id}`}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={getAgentAvatarSvg({
+                          avatarSeed: agent.avatarSeed,
+                          name: agent.name,
+                        })}
+                        alt=""
+                        className="size-8 rounded-full shrink-0"
+                      />
+                      <div className="flex flex-col min-w-0">
+                        <span className="truncate font-medium">{agent.name}</span>
+                        {agent.tagline && (
+                          <span className="text-xs text-muted-foreground/70 truncate">
+                            {agent.tagline}
+                          </span>
+                        )}
+                      </div>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        {isAdmin && (
+          <div className="px-3">
+            <Button variant="outline" size="sm" className="w-full justify-start gap-2" asChild>
+              <Link href="/agents/new">
+                <Plus className="size-4" />
+                New Agent
+              </Link>
+            </Button>
+          </div>
+        )}
       </SidebarContent>
 
       <SidebarFooter>
