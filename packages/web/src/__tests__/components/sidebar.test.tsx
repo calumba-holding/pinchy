@@ -1,8 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import { AppSidebar } from "@/components/sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
+
+const mockSignOut = vi.fn();
+vi.mock("next-auth/react", () => ({
+  signOut: (...args: unknown[]) => mockSignOut(...args),
+}));
 
 vi.mock("next/image", () => ({
   default: ({
@@ -115,6 +121,28 @@ describe("AppSidebar", () => {
       const agentLink = screen.getByRole("link", { name: /smithers/i });
       const botIcon = agentLink.querySelector("svg.lucide-bot");
       expect(botIcon).toBeInTheDocument();
+    });
+  });
+
+  describe("logout button", () => {
+    it("should render a logout button in the sidebar footer", () => {
+      render(
+        <SidebarProvider>
+          <AppSidebar agents={[]} isAdmin={false} />
+        </SidebarProvider>
+      );
+      expect(screen.getByRole("button", { name: /log out/i })).toBeInTheDocument();
+    });
+
+    it("should call signOut when clicked", async () => {
+      const user = userEvent.setup();
+      render(
+        <SidebarProvider>
+          <AppSidebar agents={[]} isAdmin={false} />
+        </SidebarProvider>
+      );
+      await user.click(screen.getByRole("button", { name: /log out/i }));
+      expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
     });
   });
 

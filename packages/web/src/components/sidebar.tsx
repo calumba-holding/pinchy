@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Bot, ClipboardList, Plus, Settings, User } from "lucide-react";
+import { LogoutButton } from "@/components/logout-button";
 import {
   Sidebar,
   SidebarContent,
@@ -84,6 +85,9 @@ export function AppSidebar({ agents, isAdmin }: AppSidebarProps) {
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
+          <SidebarMenuItem>
+            <LogoutButton />
+          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
