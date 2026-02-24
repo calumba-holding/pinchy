@@ -136,10 +136,12 @@ export function AgentSettingsPersonality({
       <div className="flex items-center gap-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={avatarUrl} alt="" className="size-16 rounded-full" />
-        <Button variant="outline" size="sm" onClick={handleReRoll}>
-          <Dices className="size-4 mr-2" />
-          Re-roll
-        </Button>
+        {agent.avatarSeed !== "__smithers__" && (
+          <Button variant="outline" size="sm" onClick={handleReRoll}>
+            <Dices className="size-4 mr-2" />
+            Re-roll
+          </Button>
+        )}
       </div>
 
       {/* Personality Preset Picker */}

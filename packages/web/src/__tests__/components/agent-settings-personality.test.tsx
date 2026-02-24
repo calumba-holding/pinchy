@@ -103,6 +103,17 @@ describe("AgentSettingsPersonality", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it("hides re-roll button when avatarSeed is __smithers__", () => {
+    render(
+      <AgentSettingsPersonality
+        {...defaultProps}
+        agent={{ ...defaultProps.agent, avatarSeed: "__smithers__" }}
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: /re-roll/i })).not.toBeInTheDocument();
+  });
+
   it("renders all 4 personality preset cards", () => {
     render(<AgentSettingsPersonality {...defaultProps} />);
 
