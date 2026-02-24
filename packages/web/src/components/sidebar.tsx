@@ -48,12 +48,12 @@ export function AppSidebar({ agents, isAdmin }: AppSidebarProps) {
           {sortedAgents.map((agent) => (
             <SidebarMenuItem key={agent.id}>
               <SidebarMenuButton asChild>
-                <Link href={`/chat/${agent.id}`}>
+                <Link href={`/chat/${agent.id}`} className="items-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={getAgentAvatarSvg({ avatarSeed: agent.avatarSeed, name: agent.name })}
                     alt=""
-                    className="size-6 rounded-full shrink-0"
+                    className="size-8 rounded-full shrink-0"
                   />
                   <div className="flex flex-col min-w-0">
                     <span className="truncate">{agent.name}</span>
