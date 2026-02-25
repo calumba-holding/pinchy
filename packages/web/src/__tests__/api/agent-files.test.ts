@@ -10,6 +10,13 @@ vi.mock("@/lib/workspace", () => ({
   writeWorkspaceFile: vi.fn(),
 }));
 
+const { mockNotifyRestart } = vi.hoisted(() => ({
+  mockNotifyRestart: vi.fn(),
+}));
+vi.mock("@/server/restart-state", () => ({
+  restartState: { notifyRestart: mockNotifyRestart },
+}));
+
 vi.mock("@/lib/agent-access", () => ({
   getAgentWithAccess: vi.fn(),
 }));
@@ -283,5 +290,27 @@ describe("PUT /api/agents/[agentId]/files/[filename]", () => {
     const data = await response.json();
     expect(data.error).toBe("content must be a string");
     expect(writeWorkspaceFile).not.toHaveBeenCalled();
+  });
+
+  it("should trigger OpenClaw restart after writing file", async () => {
+    const request = makePutRequest("agent-1", "SOUL.md", {
+      content: "# Updated soul",
+    });
+    await PUT(request, makeParams("agent-1", "SOUL.md"));
+
+    expect(mockNotifyRestart).toHaveBeenCalled();
+  });
+
+  it("should not trigger restart when file write fails", async () => {
+    vi.mocked(writeWorkspaceFile).mockImplementationOnce(() => {
+      throw new Error("File not allowed: HACK.md");
+    });
+
+    const request = makePutRequest("agent-1", "HACK.md", {
+      content: "malicious content",
+    });
+    await PUT(request, makeParams("agent-1", "HACK.md"));
+
+    expect(mockNotifyRestart).not.toHaveBeenCalled();
   });
 });
