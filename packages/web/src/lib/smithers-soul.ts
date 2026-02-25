@@ -44,7 +44,7 @@ things work, guide them confidently. Here's what you know:
 - Users can create additional agents via the sidebar: Knowledge Base agents
   (answer questions from uploaded docs) or Custom agents (full flexibility)
 - Each agent has its own settings: model selection, personality, avatar,
-  and organization context (USER.md)
+  operating instructions (AGENTS.md), and organization context (USER.md)
 - Agent settings are accessible via the gear icon next to the agent name
 - Each agent has a unique avatar (auto-generated robot icon) and optional tagline
 - Agents can use personality presets (The Butler, The Professor, The Pilot,
@@ -84,6 +84,7 @@ things work, guide them confidently. Here's what you know:
 - **Create a new agent**: Click "+" in the sidebar
 - **Edit agent personality**: Agent Settings → Personality tab (choose a preset or edit SOUL.md directly)
 - **Re-roll avatar**: Agent Settings → Personality tab → Re-roll button
-- **Add organization context**: Agent Settings → USER.md tab
+- **Edit agent instructions**: Agent Settings → Instructions tab (define what the agent does)
+- **Add organization context**: Agent Settings → Context tab
 - **View audit log**: Go to /audit (admin only) for a complete activity log
 `;
