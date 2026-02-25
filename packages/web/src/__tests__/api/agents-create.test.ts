@@ -23,6 +23,7 @@ vi.mock("@/db", () => ({
             templateId: "knowledge-base",
             pluginConfig: { allowed_paths: ["/data/hr-docs/"] },
             ownerId: "1",
+            tagline: "Answer questions from your docs",
           },
         ]),
       }),
@@ -36,6 +37,7 @@ vi.mock("@/db", () => ({
 vi.mock("@/lib/workspace", () => ({
   ensureWorkspace: vi.fn(),
   writeWorkspaceFile: vi.fn(),
+  writeIdentityFile: vi.fn(),
 }));
 
 vi.mock("@/lib/openclaw-config", () => ({
@@ -76,7 +78,7 @@ import { POST } from "@/app/api/agents/route";
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { validateAllowedPaths } from "@/lib/path-validation";
-import { ensureWorkspace, writeWorkspaceFile } from "@/lib/workspace";
+import { ensureWorkspace, writeWorkspaceFile, writeIdentityFile } from "@/lib/workspace";
 import { regenerateOpenClawConfig } from "@/lib/openclaw-config";
 
 describe("POST /api/agents", () => {
@@ -168,6 +170,34 @@ describe("POST /api/agents", () => {
         allowedTools: ["pinchy_ls", "pinchy_read"],
       })
     );
+  });
+
+  it("should reject name longer than 30 characters", async () => {
+    const request = new NextRequest("http://localhost:7777/api/agents", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "A".repeat(31),
+        templateId: "custom",
+      }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toMatch(/name/i);
+  });
+
+  it("should accept name with exactly 30 characters", async () => {
+    const request = new NextRequest("http://localhost:7777/api/agents", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "A".repeat(30),
+        templateId: "custom",
+      }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(201);
   });
 
   it("should reject unknown template", async () => {
@@ -293,6 +323,65 @@ describe("POST /api/agents", () => {
       expect.objectContaining({
         tagline: "Custom tagline",
       })
+    );
+  });
+
+  it("should call writeIdentityFile after creating agent", async () => {
+    const request = new NextRequest("http://localhost:7777/api/agents", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "HR Knowledge Base",
+        templateId: "knowledge-base",
+        pluginConfig: {
+          allowed_paths: ["/data/hr-docs/"],
+        },
+      }),
+    });
+
+    await POST(request);
+
+    expect(writeIdentityFile).toHaveBeenCalledWith("new-agent-id", {
+      name: "HR Knowledge Base",
+      tagline: "Answer questions from your docs",
+    });
+  });
+
+  it("should write AGENTS.md when template has defaultAgentsMd", async () => {
+    const request = new NextRequest("http://localhost:7777/api/agents", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "HR Knowledge Base",
+        templateId: "knowledge-base",
+        pluginConfig: {
+          allowed_paths: ["/data/hr-docs/"],
+        },
+      }),
+    });
+
+    await POST(request);
+
+    expect(writeWorkspaceFile).toHaveBeenCalledWith(
+      "new-agent-id",
+      "AGENTS.md",
+      expect.stringContaining("knowledge base agent")
+    );
+  });
+
+  it("should not write AGENTS.md when template has null defaultAgentsMd", async () => {
+    const request = new NextRequest("http://localhost:7777/api/agents", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Dev Assistant",
+        templateId: "custom",
+      }),
+    });
+
+    await POST(request);
+
+    expect(writeWorkspaceFile).not.toHaveBeenCalledWith(
+      expect.anything(),
+      "AGENTS.md",
+      expect.anything()
     );
   });
 

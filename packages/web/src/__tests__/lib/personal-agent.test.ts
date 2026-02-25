@@ -15,6 +15,7 @@ vi.mock("@/db", () => ({
 vi.mock("@/lib/workspace", () => ({
   ensureWorkspace: vi.fn(),
   writeWorkspaceFile: vi.fn(),
+  writeIdentityFile: vi.fn(),
 }));
 
 // ── Mock @/lib/settings ──────────────────────────────────────────────────────
@@ -65,7 +66,7 @@ vi.mock("@/lib/providers", () => ({
   },
 }));
 
-import { ensureWorkspace, writeWorkspaceFile } from "@/lib/workspace";
+import { ensureWorkspace, writeWorkspaceFile, writeIdentityFile } from "@/lib/workspace";
 
 describe("createSmithersAgent", () => {
   beforeEach(() => {
@@ -153,6 +154,31 @@ describe("createSmithersAgent", () => {
       "SOUL.md",
       "# Smithers\n\nTest soul content"
     );
+  });
+
+  it("writes IDENTITY.md after creating agent", async () => {
+    const fakeAgent = {
+      id: "agent-identity-1",
+      name: "Smithers",
+      model: "anthropic/claude-sonnet-4-20250514",
+      ownerId: "user-1",
+      isPersonal: true,
+      tagline: "Your reliable personal assistant",
+      createdAt: new Date(),
+    };
+    returningMock.mockResolvedValue([fakeAgent]);
+
+    const { createSmithersAgent } = await import("@/lib/personal-agent");
+    await createSmithersAgent({
+      model: "anthropic/claude-sonnet-4-20250514",
+      ownerId: "user-1",
+      isPersonal: true,
+    });
+
+    expect(writeIdentityFile).toHaveBeenCalledWith("agent-identity-1", {
+      name: "Smithers",
+      tagline: "Your reliable personal assistant",
+    });
   });
 
   it("returns the created agent", async () => {

@@ -46,4 +46,21 @@ describe("agent-templates", () => {
     expect(kb.defaultSoulMd).toBeUndefined();
     expect(kb.defaultGreeting).toBeUndefined();
   });
+
+  it("all templates should have defaultAgentsMd field", () => {
+    for (const template of Object.values(AGENT_TEMPLATES)) {
+      expect(template).toHaveProperty("defaultAgentsMd");
+    }
+  });
+
+  it("knowledge-base should have non-null defaultAgentsMd with document-answering instructions", () => {
+    const kb = AGENT_TEMPLATES["knowledge-base"];
+    expect(kb.defaultAgentsMd).not.toBeNull();
+    expect(kb.defaultAgentsMd).toContain("knowledge base agent");
+    expect(kb.defaultAgentsMd).toContain("cite");
+  });
+
+  it("custom should have null defaultAgentsMd", () => {
+    expect(AGENT_TEMPLATES["custom"].defaultAgentsMd).toBeNull();
+  });
 });

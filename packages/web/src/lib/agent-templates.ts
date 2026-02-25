@@ -5,6 +5,7 @@ export interface AgentTemplate {
   pluginId: string | null;
   defaultPersonality: string;
   defaultTagline: string | null;
+  defaultAgentsMd: string | null;
 }
 
 export const AGENT_TEMPLATES: Record<string, AgentTemplate> = {
@@ -15,6 +16,13 @@ export const AGENT_TEMPLATES: Record<string, AgentTemplate> = {
     pluginId: "pinchy-files",
     defaultPersonality: "the-professor",
     defaultTagline: "Answer questions from your docs",
+    defaultAgentsMd: `You are a knowledge base agent. Your job is to answer questions using the documents available to you.
+
+## Instructions
+- Always cite the document name when referencing information
+- If the documents don't contain an answer, say so clearly
+- Prefer quoting relevant passages over paraphrasing
+- Structure longer answers with headings and bullet points`,
   },
   custom: {
     name: "Custom Agent",
@@ -23,6 +31,7 @@ export const AGENT_TEMPLATES: Record<string, AgentTemplate> = {
     pluginId: null,
     defaultPersonality: "the-butler",
     defaultTagline: null,
+    defaultAgentsMd: null,
   },
 };
 

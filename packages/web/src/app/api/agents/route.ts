@@ -7,8 +7,9 @@ import { eq, or, and } from "drizzle-orm";
 import { getTemplate } from "@/lib/agent-templates";
 import { getPersonalityPreset } from "@/lib/personality-presets";
 import { generateAvatarSeed } from "@/lib/avatar";
+import { AGENT_NAME_MAX_LENGTH } from "@/lib/agents";
 import { validateAllowedPaths } from "@/lib/path-validation";
-import { ensureWorkspace, writeWorkspaceFile } from "@/lib/workspace";
+import { ensureWorkspace, writeWorkspaceFile, writeIdentityFile } from "@/lib/workspace";
 import { regenerateOpenClawConfig } from "@/lib/openclaw-config";
 import { getSetting } from "@/lib/settings";
 import { PROVIDERS, type ProviderName } from "@/lib/providers";
@@ -55,6 +56,13 @@ export async function POST(request: NextRequest) {
 
   if (!name || typeof name !== "string") {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+
+  if (name.length > AGENT_NAME_MAX_LENGTH) {
+    return NextResponse.json(
+      { error: `Name must be ${AGENT_NAME_MAX_LENGTH} characters or less` },
+      { status: 400 }
+    );
   }
 
   if (!templateId || typeof templateId !== "string") {
@@ -119,6 +127,10 @@ export async function POST(request: NextRequest) {
   // Create workspace with personality preset's SOUL.md
   ensureWorkspace(agent.id);
   writeWorkspaceFile(agent.id, "SOUL.md", preset?.soulMd ?? "");
+  writeIdentityFile(agent.id, { name: agent.name, tagline: agent.tagline });
+  if (template.defaultAgentsMd) {
+    writeWorkspaceFile(agent.id, "AGENTS.md", template.defaultAgentsMd);
+  }
 
   await regenerateOpenClawConfig();
 
