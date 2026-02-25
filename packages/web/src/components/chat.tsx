@@ -43,7 +43,7 @@ export function Chat({
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <AgentAvatarContext.Provider value={avatarUrl ?? null}>
-        <div className="flex flex-col h-full min-h-0">
+        <div className="flex flex-col h-full min-h-0 animate-in fade-in duration-300">
           <header className="p-4 border-b flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               {avatarUrl && (
