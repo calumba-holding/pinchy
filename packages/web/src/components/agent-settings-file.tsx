@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { MarkdownEditor } from "@/components/markdown-editor";
 
 const EXPLANATIONS: Record<string, string> = {
   "SOUL.md":
@@ -62,20 +62,16 @@ export function AgentSettingsFile({
     }
   }
 
-  function handleContentChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setContent(e.target.value);
-    setFeedback(null);
-  }
-
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">{EXPLANATIONS[filename]}</p>
 
-      <Textarea
-        className="font-mono min-h-[15rem]"
-        rows={15}
+      <MarkdownEditor
         value={content}
-        onChange={handleContentChange}
+        onChange={(v) => {
+          setContent(v);
+          setFeedback(null);
+        }}
       />
 
       <Button onClick={handleSave} disabled={saving}>

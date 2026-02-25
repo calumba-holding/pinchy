@@ -3,6 +3,24 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { AgentSettingsFile } from "@/components/agent-settings-file";
 
+vi.mock("@/components/markdown-editor", () => ({
+  MarkdownEditor: ({
+    value,
+    onChange,
+    className,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    className?: string;
+  }) => (
+    <textarea
+      className={`font-mono ${className ?? ""}`}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+}));
+
 describe("AgentSettingsFile", () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
