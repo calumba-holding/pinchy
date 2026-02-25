@@ -62,9 +62,11 @@ export function AppSidebar({ agents, isAdmin }: AppSidebarProps) {
                       asChild
                       size="lg"
                       isActive={isActive}
-                      className={
-                        isActive ? "border-l-3 border-primary" : "border-l-3 border-transparent"
-                      }
+                      className={`transition-colors duration-200 ${
+                        isActive
+                          ? "data-[active=true]:bg-[oklch(0.92_0.005_60)] data-[active=true]:text-foreground hover:bg-[oklch(0.92_0.005_60)] hover:text-foreground"
+                          : ""
+                      }`}
                     >
                       <Link href={`/chat/${agent.id}`}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -77,12 +79,12 @@ export function AppSidebar({ agents, isAdmin }: AppSidebarProps) {
                           className="size-8 rounded-full shrink-0"
                         />
                         <div className="flex flex-col min-w-0">
-                          <span className="truncate font-medium" title={agent.name}>
+                          <span className="truncate font-semibold" title={agent.name}>
                             {agent.name}
                           </span>
                           {agent.tagline && (
                             <span
-                              className="text-xs text-muted-foreground/70 truncate"
+                              className={`text-xs truncate ${isActive ? "text-muted-foreground" : "text-muted-foreground/70"}`}
                               title={agent.tagline}
                             >
                               {agent.tagline}

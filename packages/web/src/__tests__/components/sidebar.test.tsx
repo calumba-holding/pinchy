@@ -295,7 +295,7 @@ describe("AppSidebar", () => {
       expect(betaButton === null || betaButton.getAttribute("data-active") === "false").toBe(true);
     });
 
-    it("should show a primary-colored left border on the active agent", () => {
+    it("should apply custom active background on the active agent", () => {
       mockUsePathname.mockReturnValue("/chat/agent-1");
       render(
         <SidebarProvider>
@@ -303,11 +303,10 @@ describe("AppSidebar", () => {
         </SidebarProvider>
       );
       const activeLink = screen.getByRole("link", { name: /alpha/i });
-      expect(activeLink).toHaveClass("border-primary");
-      expect(activeLink).not.toHaveClass("border-transparent");
+      expect(activeLink.className).toContain("data-[active=true]:bg-[oklch");
     });
 
-    it("should show a transparent left border on inactive agents", () => {
+    it("should not apply custom active background on inactive agents", () => {
       mockUsePathname.mockReturnValue("/chat/agent-1");
       render(
         <SidebarProvider>
@@ -315,8 +314,7 @@ describe("AppSidebar", () => {
         </SidebarProvider>
       );
       const inactiveLink = screen.getByRole("link", { name: /beta/i });
-      expect(inactiveLink).toHaveClass("border-transparent");
-      expect(inactiveLink).not.toHaveClass("border-primary");
+      expect(inactiveLink.className).not.toContain("data-[active=true]:bg-[oklch");
     });
 
     it("should update active state for settings subpages", () => {
