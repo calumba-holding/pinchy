@@ -295,6 +295,30 @@ describe("AppSidebar", () => {
       expect(betaButton === null || betaButton.getAttribute("data-active") === "false").toBe(true);
     });
 
+    it("should show a primary-colored left border on the active agent", () => {
+      mockUsePathname.mockReturnValue("/chat/agent-1");
+      render(
+        <SidebarProvider>
+          <AppSidebar agents={agents} isAdmin={false} />
+        </SidebarProvider>
+      );
+      const activeLink = screen.getByRole("link", { name: /alpha/i });
+      expect(activeLink).toHaveClass("border-primary");
+      expect(activeLink).not.toHaveClass("border-transparent");
+    });
+
+    it("should show a transparent left border on inactive agents", () => {
+      mockUsePathname.mockReturnValue("/chat/agent-1");
+      render(
+        <SidebarProvider>
+          <AppSidebar agents={agents} isAdmin={false} />
+        </SidebarProvider>
+      );
+      const inactiveLink = screen.getByRole("link", { name: /beta/i });
+      expect(inactiveLink).toHaveClass("border-transparent");
+      expect(inactiveLink).not.toHaveClass("border-primary");
+    });
+
     it("should update active state for settings subpages", () => {
       mockUsePathname.mockReturnValue("/chat/agent-2/settings");
       render(

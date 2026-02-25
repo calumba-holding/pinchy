@@ -54,40 +54,46 @@ export function AppSidebar({ agents, isAdmin }: AppSidebarProps) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {sortedAgents.map((agent) => (
-                <SidebarMenuItem key={agent.id}>
-                  <SidebarMenuButton
-                    asChild
-                    size="lg"
-                    isActive={pathname.startsWith(`/chat/${agent.id}`)}
-                  >
-                    <Link href={`/chat/${agent.id}`}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={getAgentAvatarSvg({
-                          avatarSeed: agent.avatarSeed,
-                          name: agent.name,
-                        })}
-                        alt=""
-                        className="size-8 rounded-full shrink-0"
-                      />
-                      <div className="flex flex-col min-w-0">
-                        <span className="truncate font-medium" title={agent.name}>
-                          {agent.name}
-                        </span>
-                        {agent.tagline && (
-                          <span
-                            className="text-xs text-muted-foreground/70 truncate"
-                            title={agent.tagline}
-                          >
-                            {agent.tagline}
+              {sortedAgents.map((agent) => {
+                const isActive = pathname.startsWith(`/chat/${agent.id}`);
+                return (
+                  <SidebarMenuItem key={agent.id}>
+                    <SidebarMenuButton
+                      asChild
+                      size="lg"
+                      isActive={isActive}
+                      className={
+                        isActive ? "border-l-3 border-primary" : "border-l-3 border-transparent"
+                      }
+                    >
+                      <Link href={`/chat/${agent.id}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={getAgentAvatarSvg({
+                            avatarSeed: agent.avatarSeed,
+                            name: agent.name,
+                          })}
+                          alt=""
+                          className="size-8 rounded-full shrink-0"
+                        />
+                        <div className="flex flex-col min-w-0">
+                          <span className="truncate font-medium" title={agent.name}>
+                            {agent.name}
                           </span>
-                        )}
-                      </div>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+                          {agent.tagline && (
+                            <span
+                              className="text-xs text-muted-foreground/70 truncate"
+                              title={agent.tagline}
+                            >
+                              {agent.tagline}
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
