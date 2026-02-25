@@ -5,8 +5,10 @@ import "@testing-library/jest-dom";
 import { MarkdownEditor } from "@/components/markdown-editor";
 
 vi.mock("prismjs", () => ({
-  highlight: vi.fn((code: string) => code),
-  languages: { markdown: {} },
+  default: {
+    highlight: vi.fn((code: string) => code),
+    languages: { markdown: {} },
+  },
 }));
 
 vi.mock("prismjs/components/prism-markdown", () => ({}));

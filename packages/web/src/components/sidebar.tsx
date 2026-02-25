@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { ClipboardList, Plus, Settings } from "lucide-react";
 import { LogoutButton } from "@/components/logout-button";
 import {
@@ -31,6 +34,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ agents, isAdmin }: AppSidebarProps) {
+  const pathname = usePathname();
   const sortedAgents = [...agents].sort((a, b) => {
     if (a.isPersonal && !b.isPersonal) return -1;
     if (!a.isPersonal && b.isPersonal) return 1;
@@ -52,7 +56,11 @@ export function AppSidebar({ agents, isAdmin }: AppSidebarProps) {
             <SidebarMenu>
               {sortedAgents.map((agent) => (
                 <SidebarMenuItem key={agent.id}>
-                  <SidebarMenuButton asChild size="lg">
+                  <SidebarMenuButton
+                    asChild
+                    size="lg"
+                    isActive={pathname.startsWith(`/chat/${agent.id}`)}
+                  >
                     <Link href={`/chat/${agent.id}`}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img

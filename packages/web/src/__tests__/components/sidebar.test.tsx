@@ -6,8 +6,14 @@ import { AppSidebar } from "@/components/sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
 const mockSignOut = vi.fn();
+const mockUsePathname = vi.fn().mockReturnValue("/chat/1");
+
 vi.mock("next-auth/react", () => ({
   signOut: (...args: unknown[]) => mockSignOut(...args),
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => mockUsePathname(),
 }));
 
 vi.mock("next/image", () => ({
@@ -242,6 +248,62 @@ describe("AppSidebar", () => {
       );
       await user.click(screen.getByRole("button", { name: /log out/i }));
       expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+    });
+  });
+
+  describe("active agent highlighting", () => {
+    const agents = [
+      {
+        id: "agent-1",
+        name: "Alpha",
+        model: "anthropic/claude-sonnet-4-20250514",
+        isPersonal: false,
+        tagline: null,
+        avatarSeed: null,
+      },
+      {
+        id: "agent-2",
+        name: "Beta",
+        model: "anthropic/claude-sonnet-4-20250514",
+        isPersonal: false,
+        tagline: null,
+        avatarSeed: null,
+      },
+    ];
+
+    it("should mark the current agent's menu button as active", () => {
+      mockUsePathname.mockReturnValue("/chat/agent-1");
+      render(
+        <SidebarProvider>
+          <AppSidebar agents={agents} isAdmin={false} />
+        </SidebarProvider>
+      );
+      const activeButton = screen.getByRole("link", { name: /alpha/i }).closest("[data-active]");
+      expect(activeButton).toHaveAttribute("data-active", "true");
+    });
+
+    it("should not mark other agents as active", () => {
+      mockUsePathname.mockReturnValue("/chat/agent-1");
+      render(
+        <SidebarProvider>
+          <AppSidebar agents={agents} isAdmin={false} />
+        </SidebarProvider>
+      );
+      const betaLink = screen.getByRole("link", { name: /beta/i });
+      const betaButton = betaLink.closest("[data-active]");
+      // Either no data-active attribute or data-active="false"
+      expect(betaButton === null || betaButton.getAttribute("data-active") === "false").toBe(true);
+    });
+
+    it("should update active state for settings subpages", () => {
+      mockUsePathname.mockReturnValue("/chat/agent-2/settings");
+      render(
+        <SidebarProvider>
+          <AppSidebar agents={agents} isAdmin={false} />
+        </SidebarProvider>
+      );
+      const activeButton = screen.getByRole("link", { name: /beta/i }).closest("[data-active]");
+      expect(activeButton).toHaveAttribute("data-active", "true");
     });
   });
 
