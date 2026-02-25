@@ -9,11 +9,13 @@ const EXPLANATIONS: Record<string, string> = {
     "This is your agent's personality and identity. Describe who the agent is, how it should behave, and what values it represents. The agent reads this file at the start of every conversation.",
   "USER.md":
     "This is context about the people and organization the agent works with. Include relevant details like team structure, timezone, communication preferences, or domain-specific knowledge.",
+  "AGENTS.md":
+    "These are your agent's operating instructions — what it should do, how it should handle tasks, and any domain-specific rules. Think of it as the agent's job description.",
 };
 
 interface AgentSettingsFileProps {
   agentId: string;
-  filename: "SOUL.md" | "USER.md";
+  filename: "SOUL.md" | "USER.md" | "AGENTS.md";
   content: string;
 }
 

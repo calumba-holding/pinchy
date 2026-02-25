@@ -46,6 +46,7 @@ export default function AgentSettingsPage() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [soulContent, setSoulContent] = useState("");
+  const [agentsContent, setAgentsContent] = useState("");
   const [userContent, setUserContent] = useState("");
   const [directories, setDirectories] = useState<Directory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,10 +54,11 @@ export default function AgentSettingsPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [agentRes, modelsRes, soulRes, userRes, dirRes] = await Promise.all([
+        const [agentRes, modelsRes, soulRes, agentsRes, userRes, dirRes] = await Promise.all([
           fetch(`/api/agents/${agentId}`),
           fetch("/api/providers/models"),
           fetch(`/api/agents/${agentId}/files/SOUL.md`),
+          fetch(`/api/agents/${agentId}/files/AGENTS.md`),
           fetch(`/api/agents/${agentId}/files/USER.md`),
           fetch("/api/data-directories"),
         ]);
@@ -73,6 +75,11 @@ export default function AgentSettingsPage() {
         if (soulRes.ok) {
           const data = await soulRes.json();
           setSoulContent(data.content || "");
+        }
+
+        if (agentsRes.ok) {
+          const data = await agentsRes.json();
+          setAgentsContent(data.content || "");
         }
 
         if (userRes.ok) {
@@ -120,7 +127,8 @@ export default function AgentSettingsPage() {
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="personality">Personality</TabsTrigger>
-          <TabsTrigger value="user">USER.md</TabsTrigger>
+          <TabsTrigger value="instructions">Instructions</TabsTrigger>
+          <TabsTrigger value="user">Context</TabsTrigger>
           {showPermissions && <TabsTrigger value="permissions">Permissions</TabsTrigger>}
         </TabsList>
 
@@ -150,6 +158,10 @@ export default function AgentSettingsPage() {
             soulContent={soulContent}
             onSaved={refreshSidebar}
           />
+        </TabsContent>
+
+        <TabsContent value="instructions">
+          <AgentSettingsFile agentId={agentId} filename="AGENTS.md" content={agentsContent} />
         </TabsContent>
 
         <TabsContent value="user">

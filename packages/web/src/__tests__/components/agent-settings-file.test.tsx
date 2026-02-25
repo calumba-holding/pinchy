@@ -150,6 +150,35 @@ describe("AgentSettingsFile", () => {
     });
   });
 
+  describe("AGENTS.md", () => {
+    it("should render the AGENTS.md explanation text", () => {
+      render(<AgentSettingsFile agentId="agent-1" filename="AGENTS.md" content="" />);
+
+      expect(screen.getByText(/operating instructions/i)).toBeInTheDocument();
+    });
+
+    it("should PUT to the AGENTS.md API endpoint on save", async () => {
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      } as Response);
+
+      render(
+        <AgentSettingsFile agentId="agent-1" filename="AGENTS.md" content="Some instructions" />
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith("/api/agents/agent-1/files/AGENTS.md", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: "Some instructions" }),
+        });
+      });
+    });
+  });
+
   describe("USER.md", () => {
     it("should render the USER.md explanation text", () => {
       render(<AgentSettingsFile agentId="agent-1" filename="USER.md" content="" />);
