@@ -83,7 +83,17 @@ export function Chat({
                 >
                   <Settings className="h-5 w-5" />
                 </Link>
-                <span className={`text-xs ${statusColor}`}>{statusMessage}</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className={`size-2 rounded-full shrink-0 ${isConnected ? "bg-green-600" : "bg-destructive"}`}
+                        aria-label={statusMessage}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>{statusMessage}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </header>
             <div className="flex-1 min-h-0 animate-in fade-in duration-300">
