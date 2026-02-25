@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { agents } from "@/db/schema";
 import { eq, or, and } from "drizzle-orm";
 import { getTemplate } from "@/lib/agent-templates";
-import { getPersonalityPreset } from "@/lib/personality-presets";
+import { getPersonalityPreset, resolveGreetingMessage } from "@/lib/personality-presets";
 import { generateAvatarSeed } from "@/lib/avatar";
 import { AGENT_NAME_MAX_LENGTH } from "@/lib/agents";
 import { validateAllowedPaths } from "@/lib/path-validation";
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       tagline: tagline || template.defaultTagline || null,
       avatarSeed: generateAvatarSeed(),
       personalityPresetId: template.defaultPersonality,
-      greetingMessage: preset?.greetingMessage ?? null,
+      greetingMessage: resolveGreetingMessage(preset?.greetingMessage ?? null, name.trim()),
     })
     .returning();
 

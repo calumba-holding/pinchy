@@ -34,9 +34,11 @@ vi.mock("@/lib/personality-presets", () => ({
   PERSONALITY_PRESETS: {
     "the-butler": {
       id: "the-butler",
-      greetingMessage: "Good day. How may I be of assistance?",
+      greetingMessage: "Good day. I'm {name}. How may I be of assistance?",
     },
   },
+  resolveGreetingMessage: (greeting: string | null, name: string) =>
+    greeting ? greeting.replace("{name}", name) : null,
 }));
 
 // ── Mock @/lib/providers ─────────────────────────────────────────────────────
@@ -99,7 +101,7 @@ describe("createSmithersAgent", () => {
       tagline: "Your reliable personal assistant",
       avatarSeed: "__smithers__",
       personalityPresetId: "the-butler",
-      greetingMessage: "Good day. How may I be of assistance?",
+      greetingMessage: "Good day. I'm Smithers. How may I be of assistance?",
     });
     expect(agent).toEqual(fakeAgent);
   });
@@ -111,7 +113,7 @@ describe("createSmithersAgent", () => {
       model: "anthropic/claude-sonnet-4-20250514",
       ownerId: "user-1",
       isPersonal: true,
-      greetingMessage: "Good day. How may I be of assistance?",
+      greetingMessage: "Good day. I'm Smithers. How may I be of assistance?",
       createdAt: new Date(),
     };
     returningMock.mockResolvedValue([fakeAgent]);
@@ -125,7 +127,7 @@ describe("createSmithersAgent", () => {
 
     expect(valuesMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        greetingMessage: "Good day. How may I be of assistance?",
+        greetingMessage: "Good day. I'm Smithers. How may I be of assistance?",
       })
     );
   });

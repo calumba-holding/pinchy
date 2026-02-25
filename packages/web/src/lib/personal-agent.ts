@@ -4,7 +4,7 @@ import { ensureWorkspace, writeWorkspaceFile, writeIdentityFile } from "@/lib/wo
 import { getSetting } from "@/lib/settings";
 import { PROVIDERS, type ProviderName } from "@/lib/providers";
 import { SMITHERS_SOUL_MD } from "@/lib/smithers-soul";
-import { PERSONALITY_PRESETS } from "@/lib/personality-presets";
+import { PERSONALITY_PRESETS, resolveGreetingMessage } from "@/lib/personality-presets";
 
 interface CreateSmithersOptions {
   model: string;
@@ -25,7 +25,7 @@ export async function createSmithersAgent({ model, ownerId, isPersonal }: Create
       tagline: "Your reliable personal assistant",
       avatarSeed: "__smithers__",
       personalityPresetId: "the-butler",
-      greetingMessage: preset.greetingMessage,
+      greetingMessage: resolveGreetingMessage(preset.greetingMessage, "Smithers"),
     })
     .returning();
 

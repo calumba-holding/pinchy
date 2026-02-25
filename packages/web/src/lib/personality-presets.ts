@@ -39,7 +39,7 @@ and never say "nice to meet you" or act like it's a first encounter. Assume you'
 worked together before.
 
 Always respond in the same language the user writes in.`,
-    greetingMessage: "Good day. How may I be of assistance?",
+    greetingMessage: "Good day. I'm {name}. How may I be of assistance?",
     avatarSeed: "the-butler-default",
   },
 
@@ -75,7 +75,7 @@ in my documents" than guess.
 
 Always respond in the same language the user writes in.`,
     greetingMessage:
-      "Hello! I'm here to help you find answers in your documents. What would you like to know?",
+      "Hello! I'm {name}, and I'm here to help you find answers in your documents. What would you like to know?",
     avatarSeed: "the-professor-default",
   },
 
@@ -142,11 +142,16 @@ You're direct when needed. If something won't work, you say so kindly but
 clearly. Encouragement doesn't mean avoiding hard truths.
 
 Always respond in the same language the user writes in.`,
-    greetingMessage: "Hey! I'm here to help. What are you working on?",
+    greetingMessage: "Hey! I'm {name}. What are you working on?",
     avatarSeed: "the-coach-default",
   },
 };
 
 export function getPersonalityPreset(id: string): PersonalityPreset | undefined {
   return PERSONALITY_PRESETS[id];
+}
+
+export function resolveGreetingMessage(greeting: string | null, agentName: string): string | null {
+  if (!greeting) return null;
+  return greeting.replace("{name}", agentName);
 }

@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { PERSONALITY_PRESETS, getPersonalityPreset } from "@/lib/personality-presets";
+import {
+  PERSONALITY_PRESETS,
+  getPersonalityPreset,
+  resolveGreetingMessage,
+} from "@/lib/personality-presets";
 
 const EXPECTED_IDS = ["the-butler", "the-professor", "the-pilot", "the-coach"];
 
@@ -47,5 +51,28 @@ describe("getPersonalityPreset", () => {
 
   it("returns undefined for unknown id", () => {
     expect(getPersonalityPreset("nonexistent")).toBeUndefined();
+  });
+});
+
+describe("resolveGreetingMessage", () => {
+  it("replaces {name} placeholder with agent name", () => {
+    const result = resolveGreetingMessage("Good day. I'm {name}. How may I help?", "Smithers");
+    expect(result).toBe("Good day. I'm Smithers. How may I help?");
+  });
+
+  it("returns null when greeting is null", () => {
+    expect(resolveGreetingMessage(null, "Jet")).toBeNull();
+  });
+
+  it("returns greeting unchanged when no placeholder present", () => {
+    expect(resolveGreetingMessage("Hello!", "Ada")).toBe("Hello!");
+  });
+
+  it("preset greeting messages contain {name} placeholder", () => {
+    for (const preset of Object.values(PERSONALITY_PRESETS)) {
+      if (preset.greetingMessage) {
+        expect(preset.greetingMessage).toContain("{name}");
+      }
+    }
   });
 });

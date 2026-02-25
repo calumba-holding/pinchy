@@ -58,16 +58,19 @@ vi.mock("@/lib/personality-presets", () => ({
   getPersonalityPreset: vi.fn((id: string) => {
     const presets: Record<string, { greetingMessage: string | null; soulMd: string }> = {
       "the-professor": {
-        greetingMessage: "Hello! I'm here to help you find answers in your documents.",
+        greetingMessage:
+          "Hello! I'm {name}, and I'm here to help you find answers in your documents.",
         soulMd: "# Professor SOUL.md",
       },
       "the-butler": {
-        greetingMessage: "Good day. How may I be of assistance?",
+        greetingMessage: "Good day. I'm {name}. How may I be of assistance?",
         soulMd: "# Butler SOUL.md",
       },
     };
     return presets[id];
   }),
+  resolveGreetingMessage: (greeting: string | null, name: string) =>
+    greeting ? greeting.replace("{name}", name) : null,
 }));
 
 vi.mock("@/lib/avatar", () => ({
@@ -259,7 +262,8 @@ describe("POST /api/agents", () => {
 
     expect(insertValuesMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        greetingMessage: "Hello! I'm here to help you find answers in your documents.",
+        greetingMessage:
+          "Hello! I'm HR Knowledge Base, and I'm here to help you find answers in your documents.",
         personalityPresetId: "the-professor",
       })
     );
