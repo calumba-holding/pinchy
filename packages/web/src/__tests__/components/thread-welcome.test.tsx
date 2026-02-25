@@ -45,6 +45,7 @@ vi.mock("@assistant-ui/react", () => ({
     Error: ({ children }: any) => <div>{children}</div>,
   },
   useMessage: () => ({}),
+  useComposerRuntime: () => null,
 }));
 
 vi.mock("@/components/assistant-ui/attachment", () => ({
@@ -77,6 +78,7 @@ vi.mock("@/components/chat", async () => {
   const React = await import("react");
   return {
     AgentAvatarContext: React.createContext<string | null>(null),
+    AgentIdContext: React.createContext<string | null>(null),
   };
 });
 
