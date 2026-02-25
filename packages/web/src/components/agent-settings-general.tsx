@@ -26,8 +26,13 @@ import {
 import { DeleteAgentDialog } from "@/components/delete-agent-dialog";
 import { useRestart } from "@/components/restart-provider";
 
+import { AGENT_NAME_MAX_LENGTH } from "@/lib/agent-constants";
+
 const agentSettingsSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .max(AGENT_NAME_MAX_LENGTH, `Name must be ${AGENT_NAME_MAX_LENGTH} characters or less`),
   tagline: z.string(),
   model: z.string().min(1, "Model is required"),
 });
@@ -95,7 +100,7 @@ export function AgentSettingsGeneral({
               <FormItem>
                 <FormLabel>Name</FormLabel>
                 <FormControl>
-                  <Input {...field} />
+                  <Input maxLength={AGENT_NAME_MAX_LENGTH} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

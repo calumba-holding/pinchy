@@ -35,8 +35,13 @@ interface Directory {
   name: string;
 }
 
+import { AGENT_NAME_MAX_LENGTH } from "@/lib/agent-constants";
+
 const agentFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .max(AGENT_NAME_MAX_LENGTH, `Name must be ${AGENT_NAME_MAX_LENGTH} characters or less`),
   tagline: z.string(),
 });
 
@@ -166,7 +171,11 @@ export function NewAgentForm() {
                       <FormItem>
                         <FormLabel>Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. HR Knowledge Base" {...field} />
+                          <Input
+                            placeholder="e.g. HR Knowledge Base"
+                            maxLength={AGENT_NAME_MAX_LENGTH}
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
