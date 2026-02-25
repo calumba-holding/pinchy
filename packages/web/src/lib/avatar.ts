@@ -15,7 +15,16 @@ const BACKGROUND_COLORS = [
 ];
 
 // Only friendly/positive expressions
-const HAPPY_EYES = ["cute", "wink", "wink2", "plain", "stars", "love", "glasses", "shades"];
+const HAPPY_EYES = [
+  "cute",
+  "wink",
+  "wink2",
+  "plain",
+  "stars",
+  "love",
+  "glasses",
+  "shades",
+] as const;
 const HAPPY_MOUTHS = [
   "lilSmile",
   "cute",
@@ -24,7 +33,7 @@ const HAPPY_MOUTHS = [
   "smileLol",
   "kissHeart",
   "shy",
-];
+] as const;
 
 export function getAgentAvatarSvg(agent: { avatarSeed: string | null; name: string }): string {
   const seed = agent.avatarSeed ?? agent.name;
@@ -37,8 +46,8 @@ export function getAgentAvatarSvg(agent: { avatarSeed: string | null; name: stri
     seed,
     size: 64,
     backgroundColor: BACKGROUND_COLORS,
-    eyes: HAPPY_EYES,
-    mouth: HAPPY_MOUTHS,
+    eyes: [...HAPPY_EYES],
+    mouth: [...HAPPY_MOUTHS],
   });
   return avatar.toDataUri();
 }
