@@ -796,7 +796,7 @@ describe("ClientRouter", () => {
     const clientWs = createMockClientWs();
     async function* fakeStream() {
       yield { type: "tool_use" as const, text: "search_web" };
-      yield { type: "tool_result" as const, text: "result data" };
+      yield { type: "tool_result" as const, text: "search_web: Found 10 results" };
       yield { type: "text" as const, text: "Here are the results." };
       yield { type: "done" as const, text: "" };
     }
@@ -814,14 +814,14 @@ describe("ClientRouter", () => {
       actorId: "agent-1",
       eventType: "tool.execute",
       resource: "agent:agent-1",
-      detail: { chunkType: "tool_use", text: "search_web" },
+      detail: { toolName: "search_web", phase: "start" },
     });
     expect(mockAppendAuditLog).toHaveBeenCalledWith({
       actorType: "agent",
       actorId: "agent-1",
       eventType: "tool.execute",
       resource: "agent:agent-1",
-      detail: { chunkType: "tool_result", text: "result data" },
+      detail: { toolName: "search_web", phase: "end", result: "Found 10 results" },
     });
   });
 
