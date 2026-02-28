@@ -232,7 +232,7 @@ describe("createSmithersAgent", () => {
     );
   });
 
-  it("writes empty string to USER.md when no context exists", async () => {
+  it("writes onboarding prompt to USER.md when no context exists", async () => {
     getContextForAgentMock.mockResolvedValueOnce("");
     const fakeAgent = {
       id: "agent-context-2",
@@ -252,7 +252,11 @@ describe("createSmithersAgent", () => {
       isPersonal: true,
     });
 
-    expect(writeWorkspaceFileInternal).toHaveBeenCalledWith("agent-context-2", "USER.md", "");
+    expect(writeWorkspaceFileInternal).toHaveBeenCalledWith(
+      "agent-context-2",
+      "USER.md",
+      expect.stringContaining("Onboarding")
+    );
   });
 
   it("returns the created agent", async () => {
@@ -330,7 +334,7 @@ describe("createSmithersAgent", () => {
     );
   });
 
-  it("writes ONBOARDING.md to workspace when no context exists", async () => {
+  it("writes onboarding prompt to USER.md when no context exists", async () => {
     getContextForAgentMock.mockResolvedValueOnce("");
     const fakeAgent = {
       id: "agent-onboard-1",
@@ -352,12 +356,12 @@ describe("createSmithersAgent", () => {
 
     expect(writeWorkspaceFileInternal).toHaveBeenCalledWith(
       "agent-onboard-1",
-      "ONBOARDING.md",
+      "USER.md",
       expect.stringContaining("Onboarding")
     );
   });
 
-  it("does NOT write ONBOARDING.md when user already has context", async () => {
+  it("writes actual context to USER.md when user has context", async () => {
     getContextForAgentMock.mockResolvedValueOnce("I am a developer");
     const fakeAgent = {
       id: "agent-onboard-2",
@@ -377,10 +381,11 @@ describe("createSmithersAgent", () => {
       isAdmin: false,
     });
 
-    const onboardingCalls = vi
-      .mocked(writeWorkspaceFileInternal)
-      .mock.calls.filter((call) => call[1] === "ONBOARDING.md");
-    expect(onboardingCalls).toHaveLength(0);
+    expect(writeWorkspaceFileInternal).toHaveBeenCalledWith(
+      "agent-onboard-2",
+      "USER.md",
+      "I am a developer"
+    );
   });
 });
 

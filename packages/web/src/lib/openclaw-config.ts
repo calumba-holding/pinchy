@@ -87,6 +87,10 @@ export function writeOpenClawConfig({ provider, apiKey, model }: OpenClawConfigP
 }
 
 export async function regenerateOpenClawConfig() {
+  // Migrate existing Smithers agents first, so their updated allowedTools
+  // are reflected in the config we're about to generate.
+  await migrateExistingSmithers();
+
   const existing = readExistingConfig();
 
   // Preserve only the gateway block from existing config (contains auth token,
@@ -206,8 +210,4 @@ export async function regenerateOpenClawConfig() {
 
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), { encoding: "utf-8", mode: 0o600 });
   restartState.notifyRestart();
-
-  // Migrate existing Smithers agents that don't have onboarding set up yet.
-  // This is idempotent — skips agents whose owners already have context.
-  await migrateExistingSmithers();
 }

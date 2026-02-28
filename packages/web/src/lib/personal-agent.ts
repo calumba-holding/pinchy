@@ -55,12 +55,11 @@ export async function createSmithersAgent({
     isPersonal: agent.isPersonal,
     ownerId: agent.ownerId,
   });
-  writeWorkspaceFileInternal(agent.id, "USER.md", context);
 
-  // Write onboarding prompt if user has no context yet
-  if (!context) {
-    writeWorkspaceFileInternal(agent.id, "ONBOARDING.md", getOnboardingPrompt(isAdmin));
-  }
+  // Write onboarding prompt to USER.md if user has no context yet.
+  // OpenClaw reads USER.md as part of the agent's system prompt, so putting
+  // onboarding instructions there ensures Smithers sees them.
+  writeWorkspaceFileInternal(agent.id, "USER.md", context || getOnboardingPrompt(isAdmin));
 
   return agent;
 }

@@ -34,7 +34,7 @@ describe("migrateExistingSmithers", () => {
     vi.clearAllMocks();
   });
 
-  it("sets allowedTools and writes ONBOARDING.md for Smithers with null context", async () => {
+  it("sets allowedTools and writes onboarding prompt to USER.md for Smithers with null context", async () => {
     vi.mocked(db.query.agents.findMany).mockResolvedValue([
       { id: "smithers-1", ownerId: "user-1", isPersonal: true, allowedTools: [] },
     ] as any);
@@ -49,7 +49,7 @@ describe("migrateExistingSmithers", () => {
 
     expect(writeWorkspaceFileInternal).toHaveBeenCalledWith(
       "smithers-1",
-      "ONBOARDING.md",
+      "USER.md",
       expect.any(String)
     );
     expect(db.update).toHaveBeenCalled();
