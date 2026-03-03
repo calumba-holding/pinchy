@@ -269,9 +269,6 @@ export function AuditLogTable() {
               onChange={handleDateFromChange}
               className="w-[160px]"
             />
-          </div>
-
-          <div className="flex items-center gap-2">
             <label htmlFor="date-to" className="text-sm text-muted-foreground whitespace-nowrap">
               To
             </label>
