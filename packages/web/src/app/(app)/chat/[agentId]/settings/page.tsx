@@ -148,7 +148,12 @@ export default function AgentSettingsPage() {
         </TabsContent>
 
         <TabsContent value="instructions">
-          <AgentSettingsFile agentId={agentId} filename="AGENTS.md" content={agentsContent} />
+          <AgentSettingsFile
+            agentId={agentId}
+            filename="AGENTS.md"
+            content={agentsContent}
+            onChange={() => {}}
+          />
         </TabsContent>
 
         {showPermissions && (
