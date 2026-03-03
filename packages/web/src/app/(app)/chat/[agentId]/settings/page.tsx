@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -286,7 +287,7 @@ export default function AgentSettingsPage() {
   const showPermissions = isAdmin && !agent.isPersonal;
 
   return (
-    <div className="overflow-y-auto p-8 max-w-2xl">
+    <div className={`overflow-y-auto p-8 max-w-2xl${hasDirtyTabs ? " pb-24" : ""}`}>
       <div className="flex items-center justify-between mb-6">
         <button
           onClick={() => {
@@ -363,17 +364,22 @@ export default function AgentSettingsPage() {
         )}
       </Tabs>
 
-      {/* Unified save footer — only visible when there are unsaved changes */}
+      {/* Sticky save bar — fixed at bottom of viewport when there are unsaved changes */}
       {hasDirtyTabs && (
-        <div className="mt-6 pt-6 border-t space-y-3">
-          <Button onClick={handleSaveClick} disabled={saving}>
-            {saving ? "Saving..." : needsRestart ? "Save & Restart" : "Save"}
-          </Button>
-          {needsRestart && (
-            <p className="text-sm text-muted-foreground">
-              Saving will briefly disconnect all active chats while the agent runtime restarts.
-            </p>
-          )}
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background px-6 py-3 flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Unsaved changes</span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="sm" onClick={handleSaveClick} disabled={saving}>
+                  {saving ? "Saving..." : needsRestart ? "Save & Restart" : "Save"}
+                </Button>
+              </TooltipTrigger>
+              {needsRestart && (
+                <TooltipContent>Will briefly restart the agent runtime</TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         </div>
       )}
 
