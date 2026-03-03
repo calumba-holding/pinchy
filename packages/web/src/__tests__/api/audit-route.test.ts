@@ -407,4 +407,75 @@ describe("GET /api/audit", () => {
     const body = await res.json();
     expect(body.entries[0].actorDeleted).toBe(true);
   });
+
+  it("resolves resourceName from users table when resource is user:<id>", async () => {
+    const entries = [
+      {
+        ...sampleEntries[0],
+        resource: "user:user-2",
+        resourceAgentName: null,
+        resourceAgentDeleted: null,
+        resourceUserName: "Charlie",
+        resourceUserDeleted: null,
+      },
+    ];
+
+    mockSelect.mockReturnValueOnce({ from: mockEntriesFrom });
+    mockEntriesOffset.mockResolvedValueOnce(entries);
+    mockSelect.mockReturnValueOnce({ from: mockCountFrom });
+    mockCountWhere.mockResolvedValueOnce([{ count: 1 }]);
+
+    const req = new NextRequest("http://localhost/api/audit");
+    const res = await GET(req);
+    const body = await res.json();
+    expect(body.entries[0].resourceName).toBe("Charlie");
+  });
+
+  it("sets resourceDeleted to true when agent resource has deletedAt", async () => {
+    const entries = [
+      {
+        ...sampleEntries[0],
+        resource: "agent:agent-1",
+        resourceAgentName: "Old Agent",
+        resourceAgentDeleted: new Date("2024-01-01"),
+        resourceUserName: null,
+        resourceUserDeleted: null,
+      },
+    ];
+
+    mockSelect.mockReturnValueOnce({ from: mockEntriesFrom });
+    mockEntriesOffset.mockResolvedValueOnce(entries);
+    mockSelect.mockReturnValueOnce({ from: mockCountFrom });
+    mockCountWhere.mockResolvedValueOnce([{ count: 1 }]);
+
+    const req = new NextRequest("http://localhost/api/audit");
+    const res = await GET(req);
+    const body = await res.json();
+    expect(body.entries[0].resourceName).toBe("Old Agent");
+    expect(body.entries[0].resourceDeleted).toBe(true);
+  });
+
+  it("sets resourceDeleted to true when user resource has deletedAt", async () => {
+    const entries = [
+      {
+        ...sampleEntries[0],
+        resource: "user:user-2",
+        resourceAgentName: null,
+        resourceAgentDeleted: null,
+        resourceUserName: "Deleted User",
+        resourceUserDeleted: new Date("2024-06-01"),
+      },
+    ];
+
+    mockSelect.mockReturnValueOnce({ from: mockEntriesFrom });
+    mockEntriesOffset.mockResolvedValueOnce(entries);
+    mockSelect.mockReturnValueOnce({ from: mockCountFrom });
+    mockCountWhere.mockResolvedValueOnce([{ count: 1 }]);
+
+    const req = new NextRequest("http://localhost/api/audit");
+    const res = await GET(req);
+    const body = await res.json();
+    expect(body.entries[0].resourceName).toBe("Deleted User");
+    expect(body.entries[0].resourceDeleted).toBe(true);
+  });
 });
