@@ -504,7 +504,7 @@ describe("AuditLogTable", () => {
     const rows = screen.getAllByRole("row");
     // rows[0] is the header; rows[1] is the first data row
     const firstDataRow = rows[1];
-    fireEvent.keyDown(firstDataRow, { key: "Enter" });
+    fireEvent.keyUp(firstDataRow, { key: "Enter" });
 
     await waitFor(() => {
       expect(screen.getByText("Entry Detail")).toBeInTheDocument();

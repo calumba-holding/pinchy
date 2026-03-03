@@ -329,7 +329,14 @@ export function AuditLogTable() {
                 tabIndex={0}
                 className="rounded border p-3 space-y-1 cursor-pointer hover:bg-muted/50"
                 onClick={() => setSelectedEntry(entry)}
-                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setSelectedEntry(entry)}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === " ") e.preventDefault();
+                }}
+                onKeyUp={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === "Enter" || e.key === " ") setSelectedEntry(entry);
+                }}
               >
                 <div className="flex items-center justify-between">
                   <Badge variant={isNegativeEvent(entry.eventType) ? "destructive" : "secondary"}>
@@ -380,9 +387,14 @@ export function AuditLogTable() {
                       className="cursor-pointer hover:bg-muted/50"
                       tabIndex={0}
                       onClick={() => setSelectedEntry(entry)}
-                      onKeyDown={(e) =>
-                        (e.key === "Enter" || e.key === " ") && setSelectedEntry(entry)
-                      }
+                      onKeyDown={(e) => {
+                        if (e.target !== e.currentTarget) return;
+                        if (e.key === " ") e.preventDefault();
+                      }}
+                      onKeyUp={(e) => {
+                        if (e.target !== e.currentTarget) return;
+                        if (e.key === "Enter" || e.key === " ") setSelectedEntry(entry);
+                      }}
                     >
                       <TableCell>{new Date(entry.timestamp).toLocaleString()}</TableCell>
                       <TableCell>
