@@ -242,48 +242,50 @@ export function AuditLogTable() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Select value={eventTypeFilter || "all"} onValueChange={handleEventTypeChange}>
-          <SelectTrigger aria-label="Event Type" className="w-[200px]">
-            <SelectValue placeholder="All Events" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Events</SelectItem>
-            {availableEventTypes.map((type) => (
-              <SelectItem key={type} value={type}>
-                {type}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={eventTypeFilter || "all"} onValueChange={handleEventTypeChange}>
+            <SelectTrigger aria-label="Event Type" className="w-[200px]">
+              <SelectValue placeholder="All Events" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Events</SelectItem>
+              {availableEventTypes.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <div className="flex items-center gap-2">
-          <label htmlFor="date-from" className="text-sm text-muted-foreground whitespace-nowrap">
-            From
-          </label>
-          <Input
-            id="date-from"
-            type="date"
-            value={dateFrom}
-            onChange={handleDateFromChange}
-            className="w-[160px]"
-          />
+          <div className="flex items-center gap-2">
+            <label htmlFor="date-from" className="text-sm text-muted-foreground whitespace-nowrap">
+              From
+            </label>
+            <Input
+              id="date-from"
+              type="date"
+              value={dateFrom}
+              onChange={handleDateFromChange}
+              className="w-[160px]"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="date-to" className="text-sm text-muted-foreground whitespace-nowrap">
+              To
+            </label>
+            <Input
+              id="date-to"
+              type="date"
+              value={dateTo}
+              onChange={handleDateToChange}
+              className="w-[160px]"
+            />
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label htmlFor="date-to" className="text-sm text-muted-foreground whitespace-nowrap">
-            To
-          </label>
-          <Input
-            id="date-to"
-            type="date"
-            value={dateTo}
-            onChange={handleDateToChange}
-            className="w-[160px]"
-          />
-        </div>
-
-        <Button variant="outline" onClick={handleExportCsv} className="ml-auto">
+        <Button variant="outline" onClick={handleExportCsv}>
           Export CSV
         </Button>
       </div>
