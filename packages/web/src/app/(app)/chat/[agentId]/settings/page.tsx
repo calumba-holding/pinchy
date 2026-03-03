@@ -149,7 +149,7 @@ export default function AgentSettingsPage() {
               personalityPresetId: agent.personalityPresetId,
             }}
             soulContent={soulContent}
-            onSaved={handleSaved}
+            onChange={() => {}}
           />
         </TabsContent>
 

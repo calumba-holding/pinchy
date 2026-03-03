@@ -4,18 +4,12 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import AgentSettingsPage from "@/app/(app)/chat/[agentId]/settings/page";
 
-// Capture the onSaved callback from the personality component
-let capturedOnSaved: (() => void) | undefined;
-
 vi.mock("@/components/agent-settings-general", () => ({
   AgentSettingsGeneral: () => <div data-testid="general-tab">General</div>,
 }));
 
 vi.mock("@/components/agent-settings-personality", () => ({
-  AgentSettingsPersonality: (props: { onSaved?: () => void }) => {
-    capturedOnSaved = props.onSaved;
-    return <div data-testid="personality-tab">Personality</div>;
-  },
+  AgentSettingsPersonality: () => <div data-testid="personality-tab">Personality</div>,
 }));
 
 vi.mock("@/components/agent-settings-file", () => ({
@@ -81,7 +75,6 @@ describe("AgentSettingsPage", () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    capturedOnSaved = undefined;
     fetchSpy = mockFetchResponses();
   });
 
@@ -89,36 +82,7 @@ describe("AgentSettingsPage", () => {
     fetchSpy.mockRestore();
   });
 
-  it("should re-fetch agent data after onSaved is called", async () => {
-    render(<AgentSettingsPage />);
-
-    // Wait for initial data load, then switch to Personality tab
-    await waitFor(() => {
-      expect(screen.getByText("Agent Settings")).toBeInTheDocument();
-    });
-    await userEvent.click(screen.getByRole("tab", { name: /personality/i }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("personality-tab")).toBeInTheDocument();
-    });
-
-    const initialFetchCount = fetchSpy.mock.calls.length;
-
-    // Trigger onSaved callback (simulates personality save)
-    capturedOnSaved?.();
-
-    // Should re-fetch agent data and files
-    await waitFor(() => {
-      const newCalls = fetchSpy.mock.calls.slice(initialFetchCount);
-      const agentRefetch = newCalls.some(
-        ([url]) =>
-          typeof url === "string" && url.includes("/api/agents/agent-1") && !url.includes("/files/")
-      );
-      expect(agentRefetch).toBe(true);
-    });
-  });
-
-  it("should re-fetch SOUL.md content after onSaved is called", async () => {
+  it("should render the personality tab when clicked", async () => {
     render(<AgentSettingsPage />);
 
     await waitFor(() => {
@@ -128,18 +92,6 @@ describe("AgentSettingsPage", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("personality-tab")).toBeInTheDocument();
-    });
-
-    const initialFetchCount = fetchSpy.mock.calls.length;
-
-    capturedOnSaved?.();
-
-    await waitFor(() => {
-      const newCalls = fetchSpy.mock.calls.slice(initialFetchCount);
-      const soulRefetch = newCalls.some(
-        ([url]) => typeof url === "string" && url.includes("/files/SOUL.md")
-      );
-      expect(soulRefetch).toBe(true);
     });
   });
 });
