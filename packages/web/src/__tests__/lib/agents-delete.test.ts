@@ -52,7 +52,7 @@ describe("deleteAgent", () => {
     } as never);
   });
 
-  it("should delete agent from DB and return it", async () => {
+  it("should soft-delete agent and return the updated row", async () => {
     const result = await deleteAgent("agent-1");
 
     expect(result).toMatchObject({
@@ -93,6 +93,21 @@ describe("deleteAgent", () => {
 describe("deleteAgent — soft-delete", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Re-wire the update mock after clearAllMocks
+    vi.mocked(db.update).mockReturnValue({
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([
+          {
+            id: "agent-1",
+            name: "Test Agent",
+            model: "anthropic/claude-opus-4-6",
+            deletedAt: new Date(),
+          },
+        ]),
+      }),
+    } as never);
   });
 
   it("sets deletedAt instead of deleting the row", async () => {
