@@ -1,5 +1,8 @@
 import { vi } from "vitest";
 
+// Ensure consistent date/time behavior across all test environments
+process.env.TZ = "UTC";
+
 // Radix UI Checkbox uses ResizeObserver which is not available in jsdom
 global.ResizeObserver = class {
   observe() {}

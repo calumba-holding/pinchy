@@ -14,9 +14,15 @@ describe("SettingsUsers", () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   const mockUsers = [
-    { id: "user-1", name: "Alice Admin", email: "alice@example.com", role: "admin" },
-    { id: "user-2", name: "Bob User", email: "bob@example.com", role: "user" },
-    { id: "user-3", name: "Carol User", email: "carol@example.com", role: "user" },
+    {
+      id: "user-1",
+      name: "Alice Admin",
+      email: "alice@example.com",
+      role: "admin",
+      deletedAt: null,
+    },
+    { id: "user-2", name: "Bob User", email: "bob@example.com", role: "user", deletedAt: null },
+    { id: "user-3", name: "Carol User", email: "carol@example.com", role: "user", deletedAt: null },
   ];
 
   beforeEach(() => {
@@ -90,20 +96,20 @@ describe("SettingsUsers", () => {
     });
   });
 
-  it("should not show Delete button for the current user", async () => {
+  it("should not show Deactivate button for the current user", async () => {
     renderWithUsersLoaded();
 
     await waitFor(() => {
       expect(screen.getByText("Alice Admin")).toBeInTheDocument();
     });
 
-    // Find the row for Alice (current user) - should not have a Delete button
+    // Find the row for Alice (current user) - should not have a Deactivate button
     const aliceRow = screen.getByText("Alice Admin").closest("tr")!;
-    expect(within(aliceRow).queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(within(aliceRow).queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
 
-    // Other users should have Delete buttons
+    // Other users should have Deactivate buttons
     const bobRow = screen.getByText("Bob User").closest("tr")!;
-    expect(within(bobRow).getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    expect(within(bobRow).getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
   });
 
   it("should show Reset button per user (not for current user)", async () => {
@@ -129,11 +135,11 @@ describe("SettingsUsers", () => {
     });
 
     const bobRow = screen.getByText("Bob User").closest("tr")!;
-    await user.click(within(bobRow).getByRole("button", { name: "Delete" }));
+    await user.click(within(bobRow).getByRole("button", { name: "Deactivate" }));
 
     // Confirmation dialog should appear
     await waitFor(() => {
-      expect(screen.getByText("Delete User")).toBeInTheDocument();
+      expect(screen.getByText("Deactivate User")).toBeInTheDocument();
     });
 
     vi.mocked(global.fetch).mockResolvedValueOnce({
@@ -147,7 +153,7 @@ describe("SettingsUsers", () => {
       json: async () => ({ users: [mockUsers[0], mockUsers[2]] }),
     } as Response);
 
-    await user.click(screen.getByRole("button", { name: "Confirm Delete" }));
+    await user.click(screen.getByRole("button", { name: "Confirm Deactivate" }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith("/api/users/user-2", {
@@ -226,5 +232,87 @@ describe("SettingsUsers", () => {
     render(<SettingsUsers currentUserId="user-1" />);
 
     expect(screen.getByText("Loading...")).toBeInTheDocument();
+  });
+
+  describe("deactivated user", () => {
+    const deactivatedUser = {
+      id: "user-4",
+      name: "Dave Deactivated",
+      email: "dave@example.com",
+      role: "user",
+      deletedAt: "2024-01-15T10:00:00.000Z",
+    };
+
+    function renderWithDeactivatedUser() {
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ users: [...mockUsers, deactivatedUser] }),
+      } as Response);
+
+      render(<SettingsUsers currentUserId="user-1" />);
+    }
+
+    it("should show Reactivate button instead of Deactivate for a deactivated user", async () => {
+      renderWithDeactivatedUser();
+
+      await waitFor(() => {
+        expect(screen.getByText("Dave Deactivated")).toBeInTheDocument();
+      });
+
+      const daveRow = screen.getByText("Dave Deactivated").closest("tr")!;
+      expect(within(daveRow).getByRole("button", { name: "Reactivate" })).toBeInTheDocument();
+      expect(within(daveRow).queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
+    });
+
+    it("should render a deactivated user row with opacity-50 class", async () => {
+      renderWithDeactivatedUser();
+
+      await waitFor(() => {
+        expect(screen.getByText("Dave Deactivated")).toBeInTheDocument();
+      });
+
+      const daveRow = screen.getByText("Dave Deactivated").closest("tr")!;
+      expect(daveRow).toHaveClass("opacity-50");
+    });
+
+    it("should show deactivated badge for a deactivated user", async () => {
+      renderWithDeactivatedUser();
+
+      await waitFor(() => {
+        expect(screen.getByText("Dave Deactivated")).toBeInTheDocument();
+      });
+
+      const daveRow = screen.getByText("Dave Deactivated").closest("tr")!;
+      expect(within(daveRow).getByText("deactivated")).toBeInTheDocument();
+    });
+
+    it("should call POST /api/users/:id/reactivate when Reactivate is clicked", async () => {
+      const user = userEvent.setup();
+      renderWithDeactivatedUser();
+
+      await waitFor(() => {
+        expect(screen.getByText("Dave Deactivated")).toBeInTheDocument();
+      });
+
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      } as Response);
+
+      // Also mock the re-fetch of user list after reactivation
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ users: [...mockUsers, { ...deactivatedUser, deletedAt: null }] }),
+      } as Response);
+
+      const daveRow = screen.getByText("Dave Deactivated").closest("tr")!;
+      await user.click(within(daveRow).getByRole("button", { name: "Reactivate" }));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith("/api/users/user-4/reactivate", {
+          method: "POST",
+        });
+      });
+    });
   });
 });

@@ -9,7 +9,9 @@ import {
   index,
   serial,
   pgEnum,
+  pgView,
 } from "drizzle-orm/pg-core";
+import { isNull } from "drizzle-orm";
 import type { AdapterAccountType } from "next-auth/adapters";
 
 // ── Auth.js tables ─────────────────────────────────────────────────────
@@ -25,6 +27,7 @@ export const users = pgTable("user", {
   passwordHash: text("password_hash"),
   role: text("role").notNull().default("user"),
   context: text("context"),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const accounts = pgTable(
@@ -93,6 +96,7 @@ export const agents = pgTable(
     avatarSeed: text("avatar_seed"),
     personalityPresetId: text("personality_preset_id"),
     createdAt: timestamp("created_at").defaultNow(),
+    deletedAt: timestamp("deleted_at"),
   },
   (table) => [index("agents_owner_id_idx").on(table.ownerId)]
 );
@@ -141,4 +145,14 @@ export const auditLog = pgTable(
     index("idx_audit_actor").on(table.actorId),
     index("idx_audit_event").on(table.eventType),
   ]
+);
+
+// ── Soft-delete views ─────────────────────────────────────────────────
+
+export const activeAgents = pgView("active_agents").as((qb) =>
+  qb.select().from(agents).where(isNull(agents.deletedAt))
+);
+
+export const activeUsers = pgView("active_users").as((qb) =>
+  qb.select().from(users).where(isNull(users.deletedAt))
 );

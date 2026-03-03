@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Prism from "prismjs";
+import "prismjs/components/prism-json";
+import "./json-highlight.css";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -32,8 +36,12 @@ interface AuditEntry {
   timestamp: string;
   actorType: string;
   actorId: string;
+  actorName: string | null;
+  actorDeleted: boolean;
   eventType: string;
   resource: string | null;
+  resourceName: string | null;
+  resourceDeleted: boolean;
   detail: Record<string, unknown>;
   rowHmac: string;
 }
@@ -51,23 +59,87 @@ interface VerifyResult {
   invalidIds: number[];
 }
 
-const EVENT_TYPES = [
-  "auth.login",
-  "auth.failed",
-  "auth.logout",
-  "agent.created",
-  "agent.updated",
-  "agent.deleted",
-  "user.invited",
-  "user.updated",
-  "user.deleted",
-  "config.changed",
-  "tool.execute",
-  "tool.denied",
-];
+// Convert a date-only string (YYYY-MM-DD) to a UTC ISO string at local midnight / end of day,
+// so that filters respect the user's browser timezone rather than UTC.
+function localDateStart(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day).toISOString();
+}
+
+function localDateEnd(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day, 23, 59, 59, 999).toISOString();
+}
+
+function highlightJson(json: string): string {
+  if (!Prism.languages.json) {
+    return json.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  return Prism.highlight(json, Prism.languages.json, "json");
+}
 
 function isNegativeEvent(eventType: string): boolean {
-  return eventType.endsWith(".denied") || eventType.endsWith(".failed");
+  return (
+    eventType.includes("failed") || eventType.includes("deleted") || eventType.includes("denied")
+  );
+}
+
+function ActorCell({
+  actorId,
+  actorName,
+  actorDeleted,
+}: {
+  actorId: string;
+  actorName: string | null;
+  actorDeleted: boolean;
+}) {
+  if (!actorName)
+    return <span className="font-mono text-xs text-muted-foreground">{actorId.slice(0, 8)}…</span>;
+  if (actorDeleted)
+    return (
+      <span>
+        {actorName}{" "}
+        <Badge variant="outline" className="text-xs ml-1">
+          deactivated
+        </Badge>
+      </span>
+    );
+  return <span>{actorName}</span>;
+}
+
+function ResourceCell({
+  resource,
+  resourceName,
+  resourceDeleted,
+}: {
+  resource: string | null;
+  resourceName: string | null;
+  resourceDeleted: boolean;
+}) {
+  if (!resource) return <span>-</span>;
+  if (!resourceName)
+    return (
+      <span className="font-mono text-xs text-muted-foreground">
+        {resource.length > 30 ? resource.slice(0, 30) + "…" : resource}
+      </span>
+    );
+  if (resourceDeleted)
+    return (
+      <span>
+        {resourceName}{" "}
+        <Badge variant="outline" className="text-xs ml-1">
+          deleted
+        </Badge>
+      </span>
+    );
+  const agentId = resource.startsWith("agent:") ? resource.slice(6) : null;
+  if (agentId)
+    return (
+      <Link href={`/chat/${agentId}`} className="underline" onClick={(e) => e.stopPropagation()}>
+        {resourceName}
+      </Link>
+    );
+  return <span>{resourceName}</span>;
 }
 
 export function AuditLogTable() {
@@ -81,6 +153,15 @@ export function AuditLogTable() {
   const [dateTo, setDateTo] = useState<string>("");
   const [selectedEntry, setSelectedEntry] = useState<AuditEntry | null>(null);
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [availableEventTypes, setAvailableEventTypes] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch("/api/audit/event-types")
+      .then((res) => res.json())
+      .then((data: { eventTypes: string[] }) => setAvailableEventTypes(data.eventTypes))
+      .catch(() => {});
+  }, []);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -93,10 +174,10 @@ export function AuditLogTable() {
         params.set("eventType", eventTypeFilter);
       }
       if (dateFrom) {
-        params.set("from", dateFrom);
+        params.set("from", localDateStart(dateFrom));
       }
       if (dateTo) {
-        params.set("to", dateTo);
+        params.set("to", localDateEnd(dateTo));
       }
 
       const res = await fetch(`/api/audit?${params.toString()}`);
@@ -116,7 +197,11 @@ export function AuditLogTable() {
   }, [fetchEntries]);
 
   async function handleExportCsv() {
-    const res = await fetch("/api/audit/export");
+    const params = new URLSearchParams();
+    if (eventTypeFilter) params.set("eventType", eventTypeFilter);
+    if (dateFrom) params.set("from", localDateStart(dateFrom));
+    if (dateTo) params.set("to", localDateEnd(dateTo));
+    const res = await fetch(`/api/audit/export?${params.toString()}`);
     if (res.ok) {
       const csvText = await res.text();
       const blob = new Blob([csvText], { type: "text/csv" });
@@ -133,10 +218,15 @@ export function AuditLogTable() {
 
   async function handleVerifyIntegrity() {
     setVerifyResult(null);
-    const res = await fetch("/api/audit/verify");
-    if (res.ok) {
-      const data: VerifyResult = await res.json();
-      setVerifyResult(data);
+    setVerifying(true);
+    try {
+      const res = await fetch("/api/audit/verify");
+      if (res.ok) {
+        const data: VerifyResult = await res.json();
+        setVerifyResult(data);
+      }
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -167,10 +257,7 @@ export function AuditLogTable() {
     setPage(1);
   }
 
-  function truncateDetail(detail: Record<string, unknown>): string {
-    const str = JSON.stringify(detail);
-    return str.length > 80 ? str.slice(0, 80) + "..." : str;
-  }
+  const tamperedIds = verifyResult && !verifyResult.valid ? new Set(verifyResult.invalidIds) : null;
 
   if (loading && entries.length === 0) {
     return <p>Loading...</p>;
@@ -178,15 +265,27 @@ export function AuditLogTable() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Audit Trail</h1>
+        <Button
+          variant="outline"
+          onClick={handleVerifyIntegrity}
+          disabled={verifying}
+          className="shrink-0"
+        >
+          {verifying ? "Verifying…" : "Verify Integrity"}
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Select value={eventTypeFilter || "all"} onValueChange={handleEventTypeChange}>
             <SelectTrigger aria-label="Event Type" className="w-[200px]">
               <SelectValue placeholder="All Events" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Events</SelectItem>
-              {EVENT_TYPES.map((type) => (
+              {availableEventTypes.map((type) => (
                 <SelectItem key={type} value={type}>
                   {type}
                 </SelectItem>
@@ -205,9 +304,6 @@ export function AuditLogTable() {
               onChange={handleDateFromChange}
               className="w-[160px]"
             />
-          </div>
-
-          <div className="flex items-center gap-2">
             <label htmlFor="date-to" className="text-sm text-muted-foreground whitespace-nowrap">
               To
             </label>
@@ -221,19 +317,14 @@ export function AuditLogTable() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleVerifyIntegrity}>
-            Verify Integrity
-          </Button>
-          <Button variant="outline" onClick={handleExportCsv}>
-            Export CSV
-          </Button>
-        </div>
+        <Button variant="outline" onClick={handleExportCsv}>
+          Export CSV
+        </Button>
       </div>
 
       {verifyResult && (
         <div
-          className={`rounded border p-3 text-sm ${
+          className={`rounded border p-3 text-sm flex items-center justify-between gap-3 ${
             verifyResult.valid
               ? "border-green-500 bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
               : "border-red-500 bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
@@ -244,9 +335,19 @@ export function AuditLogTable() {
           ) : (
             <span>
               {verifyResult.invalidIds.length} tampered entries detected out of{" "}
-              {verifyResult.totalChecked} checked. IDs: {verifyResult.invalidIds.join(", ")}
+              {verifyResult.totalChecked} checked. Tampered entries are highlighted in the table
+              below.
             </span>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Dismiss"
+            className="shrink-0 h-6 w-6 p-0 hover:bg-black/10 dark:hover:bg-white/10"
+            onClick={() => setVerifyResult(null)}
+          >
+            ×
+          </Button>
         </div>
       )}
 
@@ -254,38 +355,112 @@ export function AuditLogTable() {
         <p>No entries found.</p>
       ) : (
         <>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Timestamp</TableHead>
-                <TableHead>Actor</TableHead>
-                <TableHead>Event Type</TableHead>
-                <TableHead>Resource</TableHead>
-                <TableHead>Detail</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {entries.map((entry) => (
-                <TableRow
-                  key={entry.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => setSelectedEntry(entry)}
-                >
-                  <TableCell>{new Date(entry.timestamp).toLocaleString()}</TableCell>
-                  <TableCell>{entry.actorId}</TableCell>
-                  <TableCell>
-                    <Badge variant={isNegativeEvent(entry.eventType) ? "destructive" : "secondary"}>
-                      {entry.eventType}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{entry.resource ?? "-"}</TableCell>
-                  <TableCell className="max-w-[300px] truncate">
-                    {truncateDetail(entry.detail)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          {/* Mobile card-view */}
+          <div className="block lg:hidden space-y-2">
+            {entries.map((entry) => (
+              <div
+                key={entry.id}
+                role="button"
+                tabIndex={0}
+                className={`rounded border p-3 space-y-1 cursor-pointer hover:bg-muted/50 ${tamperedIds?.has(entry.id) ? "border-red-400 bg-red-50 dark:bg-red-950/20" : ""}`}
+                data-tampered={tamperedIds?.has(entry.id) ? "true" : undefined}
+                onClick={() => setSelectedEntry(entry)}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === " ") e.preventDefault();
+                }}
+                onKeyUp={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === "Enter" || e.key === " ") setSelectedEntry(entry);
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <Badge variant={isNegativeEvent(entry.eventType) ? "destructive" : "secondary"}>
+                    {entry.eventType}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(entry.timestamp).toLocaleString()}
+                  </span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Actor: </span>
+                  <ActorCell
+                    actorId={entry.actorId}
+                    actorName={entry.actorName}
+                    actorDeleted={entry.actorDeleted}
+                  />
+                </div>
+                {entry.resource && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Resource: </span>
+                    <ResourceCell
+                      resource={entry.resource}
+                      resourceName={entry.resourceName}
+                      resourceDeleted={entry.resourceDeleted}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden lg:block">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Timestamp</TableHead>
+                    <TableHead>Actor</TableHead>
+                    <TableHead>Event Type</TableHead>
+                    <TableHead>Resource</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {entries.map((entry) => (
+                    <TableRow
+                      key={entry.id}
+                      className={`cursor-pointer hover:bg-muted/50 ${tamperedIds?.has(entry.id) ? "bg-red-50 dark:bg-red-950/20" : ""}`}
+                      data-tampered={tamperedIds?.has(entry.id) ? "true" : undefined}
+                      tabIndex={0}
+                      onClick={() => setSelectedEntry(entry)}
+                      onKeyDown={(e) => {
+                        if (e.target !== e.currentTarget) return;
+                        if (e.key === " ") e.preventDefault();
+                      }}
+                      onKeyUp={(e) => {
+                        if (e.target !== e.currentTarget) return;
+                        if (e.key === "Enter" || e.key === " ") setSelectedEntry(entry);
+                      }}
+                    >
+                      <TableCell>{new Date(entry.timestamp).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <ActorCell
+                          actorId={entry.actorId}
+                          actorName={entry.actorName}
+                          actorDeleted={entry.actorDeleted}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={isNegativeEvent(entry.eventType) ? "destructive" : "secondary"}
+                        >
+                          {entry.eventType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <ResourceCell
+                          resource={entry.resource}
+                          resourceName={entry.resourceName}
+                          resourceDeleted={entry.resourceDeleted}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
 
           <div className="flex items-center justify-between">
             <Button variant="outline" onClick={handlePrevious} disabled={page <= 1}>
@@ -308,7 +483,7 @@ export function AuditLogTable() {
             <SheetDescription>Full audit log entry information</SheetDescription>
           </SheetHeader>
           {selectedEntry && (
-            <div className="p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Timestamp</p>
                 <p>{new Date(selectedEntry.timestamp).toLocaleString()}</p>
@@ -316,7 +491,12 @@ export function AuditLogTable() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Actor</p>
                 <p>
-                  {selectedEntry.actorType}: {selectedEntry.actorId}
+                  {selectedEntry.actorType}:{" "}
+                  <ActorCell
+                    actorId={selectedEntry.actorId}
+                    actorName={selectedEntry.actorName}
+                    actorDeleted={selectedEntry.actorDeleted}
+                  />
                 </p>
               </div>
               <div>
@@ -325,12 +505,20 @@ export function AuditLogTable() {
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Resource</p>
-                <p>{selectedEntry.resource ?? "-"}</p>
+                <ResourceCell
+                  resource={selectedEntry.resource}
+                  resourceName={selectedEntry.resourceName}
+                  resourceDeleted={selectedEntry.resourceDeleted}
+                />
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Detail</p>
-                <pre className="mt-1 rounded bg-muted p-3 text-sm overflow-auto">
-                  {JSON.stringify(selectedEntry.detail, null, 2)}
+                <pre className="mt-1 rounded bg-muted p-3 text-sm overflow-auto json-highlight">
+                  <code
+                    dangerouslySetInnerHTML={{
+                      __html: highlightJson(JSON.stringify(selectedEntry.detail, null, 2)),
+                    }}
+                  />
                 </pre>
               </div>
               <div>

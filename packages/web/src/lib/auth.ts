@@ -46,6 +46,17 @@ export const authConfig: NextAuthConfig = {
           return null;
         }
 
+        // Reject deactivated users
+        if (user.deletedAt) {
+          appendAuditLog({
+            actorType: "system",
+            actorId: "system",
+            eventType: "auth.failed",
+            detail: { email: credentials.email as string, reason: "account_deactivated" },
+          }).catch(() => {});
+          return null;
+        }
+
         appendAuditLog({
           actorType: "user",
           actorId: user.id,

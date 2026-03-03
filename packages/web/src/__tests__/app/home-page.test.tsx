@@ -17,7 +17,7 @@ vi.mock("@/lib/require-auth", () => ({
 }));
 
 vi.mock("@/db/schema", () => ({
-  agents: {
+  activeAgents: {
     id: "id",
     isPersonal: "is_personal",
     ownerId: "owner_id",

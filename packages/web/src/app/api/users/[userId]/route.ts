@@ -18,19 +18,22 @@ export async function DELETE(
   const { userId } = await params;
 
   if (userId === session.user.id) {
-    return NextResponse.json({ error: "Cannot delete your own account" }, { status: 400 });
+    return NextResponse.json({ error: "Cannot deactivate your own account" }, { status: 400 });
   }
 
-  // Find user's personal agents to clean up workspaces
+  // Find user's personal agents to soft-delete and clean up workspaces
   const personalAgents = await db
     .select({ id: agents.id })
     .from(agents)
     .where(and(eq(agents.ownerId, userId), eq(agents.isPersonal, true)));
 
-  // Delete user (cascades to personal agents via FK)
-  const deleted = await db.delete(users).where(eq(users.id, userId)).returning();
+  const [deactivated] = await db
+    .update(users)
+    .set({ deletedAt: new Date() })
+    .where(eq(users.id, userId))
+    .returning();
 
-  if (deleted.length === 0) {
+  if (!deactivated) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
@@ -39,12 +42,13 @@ export async function DELETE(
     actorId: session.user.id!,
     eventType: "user.deleted",
     resource: `user:${userId}`,
-    detail: { email: deleted[0].email },
+    detail: { email: deactivated.email },
   }).catch(() => {});
 
-  // Cleanup workspace files for deleted agents
+  // Soft-delete personal agents + cleanup workspaces
   for (const agent of personalAgents) {
-    deleteWorkspace(agent.id);
+    await db.update(agents).set({ deletedAt: new Date() }).where(eq(agents.id, agent.id));
+    deleteWorkspace(agent.id); // synchronous (uses rmSync)
   }
 
   await regenerateOpenClawConfig();

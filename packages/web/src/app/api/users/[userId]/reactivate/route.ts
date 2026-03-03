@@ -1,0 +1,37 @@
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/api-auth";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+import { and, eq, isNotNull } from "drizzle-orm";
+import { appendAuditLog } from "@/lib/audit";
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) {
+  const sessionOrError = await requireAdmin();
+  if (sessionOrError instanceof NextResponse) return sessionOrError;
+  const session = sessionOrError;
+
+  const { userId } = await params;
+
+  const [reactivated] = await db
+    .update(users)
+    .set({ deletedAt: null })
+    .where(and(eq(users.id, userId), isNotNull(users.deletedAt)))
+    .returning();
+
+  if (!reactivated) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  appendAuditLog({
+    actorType: "user",
+    actorId: session.user.id!,
+    eventType: "user.updated",
+    resource: `user:${userId}`,
+    detail: { action: "reactivated" },
+  }).catch(() => {});
+
+  return NextResponse.json({ success: true });
+}

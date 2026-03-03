@@ -152,6 +152,33 @@ describe("auth audit logging", () => {
       });
     });
 
+    it("should reject login for deactivated user", async () => {
+      const mockUser = {
+        id: "user-1",
+        email: "user@test.com",
+        name: "Test User",
+        role: "user",
+        passwordHash: "$2a$10$hashedpassword",
+        deletedAt: new Date(),
+      };
+
+      mockFindFirst.mockResolvedValue(mockUser);
+      mockCompare.mockResolvedValue(true as never);
+
+      const result = await authorize({
+        email: "user@test.com",
+        password: "password",
+      });
+
+      expect(result).toBeNull();
+      expect(mockAppendAuditLog).toHaveBeenCalledWith({
+        actorType: "system",
+        actorId: "system",
+        eventType: "auth.failed",
+        detail: { email: "user@test.com", reason: "account_deactivated" },
+      });
+    });
+
     it("should not break authentication if audit logging fails", async () => {
       const mockUser = {
         id: "user-123",

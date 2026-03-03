@@ -1,0 +1,25 @@
+/* JSON syntax highlighting for PrismJS tokens */
+
+.json-highlight .token.property {
+  color: oklch(0.45 0.18 250);
+}
+
+.json-highlight .token.string {
+  color: oklch(0.45 0.15 145);
+}
+
+.json-highlight .token.number {
+  color: oklch(0.55 0.18 50);
+}
+
+.json-highlight .token.boolean {
+  color: oklch(0.5 0.15 270);
+}
+
+.json-highlight .token.null.keyword {
+  color: oklch(0.55 0 0);
+}
+
+.json-highlight .token.punctuation {
+  color: oklch(0.6 0 0);
+}

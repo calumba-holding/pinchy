@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import { AuditLogTable } from "@/components/audit-log-table";
@@ -13,8 +13,12 @@ describe("AuditLogTable", () => {
       timestamp: "2026-02-21T10:00:00.000Z",
       actorType: "user",
       actorId: "user-1",
+      actorName: "Alice Admin",
+      actorDeleted: false,
       eventType: "auth.login",
       resource: null,
+      resourceName: null,
+      resourceDeleted: false,
       detail: { email: "admin@example.com" },
       rowHmac: "abc123",
     },
@@ -23,8 +27,12 @@ describe("AuditLogTable", () => {
       timestamp: "2026-02-21T11:00:00.000Z",
       actorType: "user",
       actorId: "user-2",
+      actorName: "Bob User",
+      actorDeleted: false,
       eventType: "agent.created",
-      resource: "agent-1",
+      resource: "agent:agent-1",
+      resourceName: "Smithers",
+      resourceDeleted: false,
       detail: { name: "Smithers" },
       rowHmac: "def456",
     },
@@ -33,8 +41,12 @@ describe("AuditLogTable", () => {
       timestamp: "2026-02-21T12:00:00.000Z",
       actorType: "user",
       actorId: "user-3",
+      actorName: null,
+      actorDeleted: false,
       eventType: "auth.failed",
       resource: null,
+      resourceName: null,
+      resourceDeleted: false,
       detail: { reason: "Invalid credentials" },
       rowHmac: "ghi789",
     },
@@ -47,6 +59,10 @@ describe("AuditLogTable", () => {
     limit: 50,
   };
 
+  const mockEventTypesResponse = {
+    eventTypes: ["agent.created", "auth.failed", "auth.login"],
+  };
+
   beforeEach(() => {
     fetchSpy = vi.spyOn(global, "fetch").mockImplementation(vi.fn());
     vi.clearAllMocks();
@@ -56,17 +72,32 @@ describe("AuditLogTable", () => {
     fetchSpy.mockRestore();
   });
 
-  function renderWithEntriesLoaded() {
+  /**
+   * The component makes two fetches on mount, in definition order:
+   *   1. GET /api/audit/event-types  (useEffect with no deps)
+   *   2. GET /api/audit?...          (useEffect depending on fetchEntries)
+   */
+  function mockEventTypesThenEntries(eventTypesOverride?: object, entriesOverride?: object) {
     vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: true,
-      json: async () => mockAuditResponse,
+      json: async () => eventTypesOverride ?? mockEventTypesResponse,
     } as Response);
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => entriesOverride ?? mockAuditResponse,
+    } as Response);
+  }
 
+  function renderWithEntriesLoaded() {
+    mockEventTypesThenEntries();
     render(<AuditLogTable />);
   }
 
   it("should show loading state initially", () => {
-    vi.mocked(global.fetch).mockReturnValueOnce(new Promise(() => {}));
+    // Both fetches stay pending so loading never resolves
+    vi.mocked(global.fetch)
+      .mockReturnValueOnce(new Promise(() => {}))
+      .mockReturnValueOnce(new Promise(() => {}));
 
     render(<AuditLogTable />);
 
@@ -77,20 +108,19 @@ describe("AuditLogTable", () => {
     renderWithEntriesLoaded();
 
     await waitFor(() => {
-      expect(screen.getByText("auth.login")).toBeInTheDocument();
+      // Both mobile and desktop render event types — use getAllByText
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
     });
 
-    expect(screen.getByText("agent.created")).toBeInTheDocument();
-    expect(screen.getByText("auth.failed")).toBeInTheDocument();
-    expect(screen.getByText("user-1")).toBeInTheDocument();
-    expect(screen.getByText("user-2")).toBeInTheDocument();
+    expect(screen.getAllByText("agent.created").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("auth.failed").length).toBeGreaterThan(0);
+    // Actor names are now shown instead of raw IDs
+    expect(screen.getAllByText("Alice Admin").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Bob User").length).toBeGreaterThan(0);
   });
 
   it("should display 'No entries found' when empty", async () => {
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ entries: [], total: 0, page: 1, limit: 50 }),
-    } as Response);
+    mockEventTypesThenEntries(undefined, { entries: [], total: 0, page: 1, limit: 50 });
 
     render(<AuditLogTable />);
 
@@ -103,7 +133,7 @@ describe("AuditLogTable", () => {
     renderWithEntriesLoaded();
 
     await waitFor(() => {
-      expect(screen.getByText("auth.login")).toBeInTheDocument();
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
     });
 
     // Mock the export fetch
@@ -126,7 +156,49 @@ describe("AuditLogTable", () => {
     await user.click(screen.getByRole("button", { name: "Export CSV" }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith("/api/audit/export");
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/api/audit/export"));
+    });
+
+    createObjectURLSpy.mockRestore();
+    revokeObjectURLSpy.mockRestore();
+  });
+
+  it("should pass active filters to export CSV", async () => {
+    renderWithEntriesLoaded();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
+    });
+
+    // Set a date filter
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockAuditResponse,
+    } as Response);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("From"), "2026-02-01");
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("from=2026-02-01"));
+    });
+
+    // Now click Export CSV — it should include the from filter
+    const csvContent = "id,timestamp,eventType\n1,2026-02-21,auth.login";
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      text: async () => csvContent,
+    } as Response);
+
+    const createObjectURLSpy = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:http://localhost/fake");
+    const revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+
+    await user.click(screen.getByRole("button", { name: "Export CSV" }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("from=2026-02-01"));
     });
 
     createObjectURLSpy.mockRestore();
@@ -137,7 +209,7 @@ describe("AuditLogTable", () => {
     renderWithEntriesLoaded();
 
     await waitFor(() => {
-      expect(screen.getByText("auth.login")).toBeInTheDocument();
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
     });
 
     vi.mocked(global.fetch).mockResolvedValueOnce({
@@ -161,7 +233,7 @@ describe("AuditLogTable", () => {
     renderWithEntriesLoaded();
 
     await waitFor(() => {
-      expect(screen.getByText("auth.login")).toBeInTheDocument();
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
     });
 
     vi.mocked(global.fetch).mockResolvedValueOnce({
@@ -181,39 +253,38 @@ describe("AuditLogTable", () => {
     renderWithEntriesLoaded();
 
     await waitFor(() => {
-      expect(screen.getByText("auth.failed")).toBeInTheDocument();
+      expect(screen.getAllByText("auth.failed").length).toBeGreaterThan(0);
     });
 
-    const failedBadge = screen.getByText("auth.failed");
-    expect(failedBadge).toHaveAttribute("data-variant", "destructive");
+    const failedBadges = screen.getAllByText("auth.failed");
+    // At least one badge should have the destructive variant
+    expect(failedBadges.some((el) => el.getAttribute("data-variant") === "destructive")).toBe(true);
   });
 
   it("should show secondary badge for normal events", async () => {
     renderWithEntriesLoaded();
 
     await waitFor(() => {
-      expect(screen.getByText("auth.login")).toBeInTheDocument();
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
     });
 
-    const loginBadge = screen.getByText("auth.login");
-    expect(loginBadge).toHaveAttribute("data-variant", "secondary");
+    const loginBadges = screen.getAllByText("auth.login");
+    // At least one badge should have the secondary variant
+    expect(loginBadges.some((el) => el.getAttribute("data-variant") === "secondary")).toBe(true);
   });
 
   it("should paginate with Previous and Next buttons", async () => {
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        entries: mockEntries,
-        total: 120,
-        page: 1,
-        limit: 50,
-      }),
-    } as Response);
+    mockEventTypesThenEntries(undefined, {
+      entries: mockEntries,
+      total: 120,
+      page: 1,
+      limit: 50,
+    });
 
     render(<AuditLogTable />);
 
     await waitFor(() => {
-      expect(screen.getByText("auth.login")).toBeInTheDocument();
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
     });
 
     expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
@@ -248,7 +319,7 @@ describe("AuditLogTable", () => {
     renderWithEntriesLoaded();
 
     await waitFor(() => {
-      expect(screen.getByText("auth.login")).toBeInTheDocument();
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
     });
 
     // Verify the event type filter exists and is accessible
@@ -261,16 +332,29 @@ describe("AuditLogTable", () => {
     expect(screen.getByText("All Events")).toBeInTheDocument();
   });
 
+  it("should fetch event types from API on mount to populate dropdown", async () => {
+    mockEventTypesThenEntries({ eventTypes: ["tool.bash", "tool.read", "agent.deleted"] });
+    render(<AuditLogTable />);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith("/api/audit/event-types");
+    });
+  });
+
   it("should open sheet with full detail when row is clicked", async () => {
     renderWithEntriesLoaded();
 
     await waitFor(() => {
-      expect(screen.getByText("auth.login")).toBeInTheDocument();
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
     });
 
     const user = userEvent.setup();
-    const firstRow = screen.getByText("auth.login").closest("tr")!;
-    await user.click(firstRow);
+    // Click the first clickable container (mobile card or table row) that contains auth.login
+    const allLoginElements = screen.getAllByText("auth.login");
+    // Find the first one that has a clickable ancestor (tr or div with rounded border)
+    const clickableRow =
+      allLoginElements[0].closest("tr") ?? allLoginElements[0].closest("div.rounded");
+    await user.click(clickableRow!);
 
     await waitFor(() => {
       expect(screen.getByText("Entry Detail")).toBeInTheDocument();
@@ -296,7 +380,7 @@ describe("AuditLogTable", () => {
     renderWithEntriesLoaded();
 
     await waitFor(() => {
-      expect(screen.getByText("auth.login")).toBeInTheDocument();
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
     });
 
     // Mock the next fetch that will be triggered by changing the date inputs
@@ -336,12 +420,250 @@ describe("AuditLogTable", () => {
     renderWithEntriesLoaded();
 
     await waitFor(() => {
-      expect(screen.getByText("auth.login")).toBeInTheDocument();
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
     });
 
     expect(screen.getByLabelText("From")).toBeInTheDocument();
     expect(screen.getByLabelText("To")).toBeInTheDocument();
     expect(screen.getByLabelText("From")).toHaveAttribute("type", "date");
     expect(screen.getByLabelText("To")).toHaveAttribute("type", "date");
+  });
+
+  it("should show 'deactivated' badge for deleted actor", async () => {
+    const entriesWithDeletedActor = [
+      {
+        id: 10,
+        timestamp: "2026-02-21T10:00:00.000Z",
+        actorType: "user",
+        actorId: "user-deleted-1",
+        actorName: "Alice",
+        actorDeleted: true,
+        eventType: "auth.login",
+        resource: null,
+        resourceName: null,
+        resourceDeleted: false,
+        detail: {},
+        rowHmac: "hmac-deleted",
+      },
+    ];
+
+    mockEventTypesThenEntries(undefined, {
+      entries: entriesWithDeletedActor,
+      total: 1,
+      page: 1,
+      limit: 50,
+    });
+
+    render(<AuditLogTable />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("deactivated").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("should show 'deleted' badge for deleted resource", async () => {
+    const entriesWithDeletedResource = [
+      {
+        id: 11,
+        timestamp: "2026-02-21T10:00:00.000Z",
+        actorType: "user",
+        actorId: "user-1",
+        actorName: "Alice Admin",
+        actorDeleted: false,
+        eventType: "agent.deleted",
+        resource: "agent:some-id",
+        resourceName: "Old Agent",
+        resourceDeleted: true,
+        detail: {},
+        rowHmac: "hmac-res-deleted",
+      },
+    ];
+
+    mockEventTypesThenEntries(undefined, {
+      entries: entriesWithDeletedResource,
+      total: 1,
+      page: 1,
+      limit: 50,
+    });
+
+    render(<AuditLogTable />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("deleted").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("should open detail sheet when Enter is pressed on a focused table row", async () => {
+    renderWithEntriesLoaded();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
+    });
+
+    // Desktop TableRow should have tabIndex=0 for keyboard accessibility
+    const rows = screen.getAllByRole("row");
+    // rows[0] is the header; rows[1] is the first data row
+    const firstDataRow = rows[1];
+    fireEvent.keyUp(firstDataRow, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(screen.getByText("Entry Detail")).toBeInTheDocument();
+    });
+  });
+
+  it("should render JSON detail with syntax highlighting tokens", async () => {
+    const user = userEvent.setup();
+    renderWithEntriesLoaded();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
+    });
+
+    const allLoginElements = screen.getAllByText("auth.login");
+    const clickableRow =
+      allLoginElements[0].closest("tr") ?? allLoginElements[0].closest("div.rounded");
+    await user.click(clickableRow!);
+
+    await waitFor(() => {
+      expect(screen.getByText("Entry Detail")).toBeInTheDocument();
+    });
+
+    // Prism.highlight produces <span class="token ..."> inside the code element
+    const codeElement = document.querySelector(".json-highlight code");
+    expect(codeElement).not.toBeNull();
+    expect(codeElement!.innerHTML).toContain('class="token');
+  });
+
+  it("should highlight tampered rows with data attribute after integrity check", async () => {
+    renderWithEntriesLoaded(); // mockEntries have ids 1, 2, 3
+
+    await waitFor(() => {
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
+    });
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ valid: false, totalChecked: 3, invalidIds: [1, 3] }),
+    } as Response);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Verify Integrity" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/2 tampered entries/)).toBeInTheDocument();
+    });
+
+    // Desktop table rows: row 0 is header, rows 1-3 are data rows
+    const rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveAttribute("data-tampered", "true"); // id:1 — tampered
+    expect(rows[2]).not.toHaveAttribute("data-tampered"); // id:2 — clean
+    expect(rows[3]).toHaveAttribute("data-tampered", "true"); // id:3 — tampered
+  });
+
+  it("should show 'highlighted in table' message instead of listing tampered IDs", async () => {
+    renderWithEntriesLoaded();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
+    });
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ valid: false, totalChecked: 3, invalidIds: [1, 3] }),
+    } as Response);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Verify Integrity" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/2 tampered entries/)).toBeInTheDocument();
+    });
+
+    // Should NOT show raw ID list
+    expect(screen.queryByText(/IDs:/)).not.toBeInTheDocument();
+    // Should direct user to the table
+    expect(screen.getByText(/highlighted/i)).toBeInTheDocument();
+  });
+
+  it("should disable verify button and show loading text while verifying", async () => {
+    renderWithEntriesLoaded();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
+    });
+
+    // Keep the verify fetch pending indefinitely
+    vi.mocked(global.fetch).mockReturnValueOnce(new Promise(() => {}));
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Verify Integrity" }));
+
+    // Button should be disabled and show loading text
+    expect(screen.getByRole("button", { name: "Verifying…" })).toBeDisabled();
+  });
+
+  it("should clear result banner and row highlighting when dismiss is clicked", async () => {
+    renderWithEntriesLoaded();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
+    });
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ valid: false, totalChecked: 3, invalidIds: [1, 3] }),
+    } as Response);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Verify Integrity" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/2 tampered entries/)).toBeInTheDocument();
+    });
+
+    // Row highlighting should be active
+    const rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveAttribute("data-tampered", "true");
+
+    // Click dismiss
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+
+    // Banner should be gone
+    expect(screen.queryByText(/2 tampered entries/)).not.toBeInTheDocument();
+    // Row highlighting should be cleared
+    expect(rows[1]).not.toHaveAttribute("data-tampered");
+  });
+
+  it("should show truncated actorId when actorName is null", async () => {
+    const entriesWithNullName = [
+      {
+        id: 12,
+        timestamp: "2026-02-21T10:00:00.000Z",
+        actorType: "user",
+        actorId: "user-abc-123",
+        actorName: null,
+        actorDeleted: false,
+        eventType: "auth.login",
+        resource: null,
+        resourceName: null,
+        resourceDeleted: false,
+        detail: {},
+        rowHmac: "hmac-null-name",
+      },
+    ];
+
+    mockEventTypesThenEntries(undefined, {
+      entries: entriesWithNullName,
+      total: 1,
+      page: 1,
+      limit: 50,
+    });
+
+    render(<AuditLogTable />);
+
+    // actorId.slice(0, 8) = "user-abc", displayed as "user-abc…"
+    await waitFor(() => {
+      expect(screen.getAllByText("user-abc…").length).toBeGreaterThan(0);
+    });
   });
 });

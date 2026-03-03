@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { agents } from "@/db/schema";
+import { activeAgents } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { Chat } from "@/components/chat";
@@ -11,9 +11,11 @@ export default async function ChatPage({ params }: { params: Promise<{ agentId: 
   const { agentId } = await params;
   const session = await requireAuth();
 
-  const agent = await db.query.agents.findFirst({
-    where: eq(agents.id, agentId),
-  });
+  const agent = await db
+    .select()
+    .from(activeAgents)
+    .where(eq(activeAgents.id, agentId))
+    .then((rows) => rows[0]);
 
   if (!agent) notFound();
 
