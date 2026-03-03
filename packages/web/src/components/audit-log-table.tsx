@@ -98,7 +98,7 @@ function ActorCell({
       </span>
     );
   return (
-    <Link href="/settings" className="underline">
+    <Link href="/settings" className="underline" onClick={(e) => e.stopPropagation()}>
       {actorName}
     </Link>
   );
@@ -115,7 +115,11 @@ function ResourceCell({
 }) {
   if (!resource) return <span>-</span>;
   if (!resourceName)
-    return <span className="font-mono text-xs text-muted-foreground">{resource}</span>;
+    return (
+      <span className="font-mono text-xs text-muted-foreground">
+        {resource.length > 30 ? resource.slice(0, 30) + "…" : resource}
+      </span>
+    );
   if (resourceDeleted)
     return (
       <span>
@@ -128,11 +132,16 @@ function ResourceCell({
   const agentId = resource.startsWith("agent:") ? resource.slice(6) : null;
   if (agentId)
     return (
-      <Link href={`/chat/${agentId}`} className="underline">
+      <Link href={`/chat/${agentId}`} className="underline" onClick={(e) => e.stopPropagation()}>
         {resourceName}
       </Link>
     );
   return <span>{resourceName}</span>;
+}
+
+function truncateDetail(detail: Record<string, unknown>): string {
+  const str = JSON.stringify(detail);
+  return str.length > 80 ? str.slice(0, 80) + "..." : str;
 }
 
 export function AuditLogTable() {
@@ -232,11 +241,6 @@ export function AuditLogTable() {
     setPage(1);
   }
 
-  function truncateDetail(detail: Record<string, unknown>): string {
-    const str = JSON.stringify(detail);
-    return str.length > 80 ? str.slice(0, 80) + "..." : str;
-  }
-
   if (loading && entries.length === 0) {
     return <p>Loading...</p>;
   }
@@ -324,8 +328,11 @@ export function AuditLogTable() {
             {entries.map((entry) => (
               <div
                 key={entry.id}
+                role="button"
+                tabIndex={0}
                 className="rounded border p-3 space-y-1 cursor-pointer hover:bg-muted/50"
                 onClick={() => setSelectedEntry(entry)}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setSelectedEntry(entry)}
               >
                 <div className="flex items-center justify-between">
                   <Badge variant={isNegativeEvent(entry.eventType) ? "destructive" : "secondary"}>

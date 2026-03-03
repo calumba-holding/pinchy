@@ -364,4 +364,110 @@ describe("AuditLogTable", () => {
     expect(screen.getByLabelText("From")).toHaveAttribute("type", "date");
     expect(screen.getByLabelText("To")).toHaveAttribute("type", "date");
   });
+
+  it("should show 'deactivated' badge for deleted actor", async () => {
+    const entriesWithDeletedActor = [
+      {
+        id: 10,
+        timestamp: "2026-02-21T10:00:00.000Z",
+        actorType: "user",
+        actorId: "user-deleted-1",
+        actorName: "Alice",
+        actorDeleted: true,
+        eventType: "auth.login",
+        resource: null,
+        resourceName: null,
+        resourceDeleted: false,
+        detail: {},
+        rowHmac: "hmac-deleted",
+      },
+    ];
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        entries: entriesWithDeletedActor,
+        total: 1,
+        page: 1,
+        limit: 50,
+      }),
+    } as Response);
+
+    render(<AuditLogTable />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("deactivated").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("should show 'deleted' badge for deleted resource", async () => {
+    const entriesWithDeletedResource = [
+      {
+        id: 11,
+        timestamp: "2026-02-21T10:00:00.000Z",
+        actorType: "user",
+        actorId: "user-1",
+        actorName: "Alice Admin",
+        actorDeleted: false,
+        eventType: "agent.deleted",
+        resource: "agent:some-id",
+        resourceName: "Old Agent",
+        resourceDeleted: true,
+        detail: {},
+        rowHmac: "hmac-res-deleted",
+      },
+    ];
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        entries: entriesWithDeletedResource,
+        total: 1,
+        page: 1,
+        limit: 50,
+      }),
+    } as Response);
+
+    render(<AuditLogTable />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("deleted").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("should show truncated actorId when actorName is null", async () => {
+    const entriesWithNullName = [
+      {
+        id: 12,
+        timestamp: "2026-02-21T10:00:00.000Z",
+        actorType: "user",
+        actorId: "user-abc-123",
+        actorName: null,
+        actorDeleted: false,
+        eventType: "auth.login",
+        resource: null,
+        resourceName: null,
+        resourceDeleted: false,
+        detail: {},
+        rowHmac: "hmac-null-name",
+      },
+    ];
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        entries: entriesWithNullName,
+        total: 1,
+        page: 1,
+        limit: 50,
+      }),
+    } as Response);
+
+    render(<AuditLogTable />);
+
+    // actorId.slice(0, 8) = "user-abc", displayed as "user-abc…"
+    await waitFor(() => {
+      expect(screen.getAllByText("user-abc…").length).toBeGreaterThan(0);
+    });
+  });
 });
