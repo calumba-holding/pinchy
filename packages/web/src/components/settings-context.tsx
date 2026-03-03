@@ -86,7 +86,7 @@ function ContextSection({
         />
 
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save & restart"}
+          {saving ? "Saving..." : "Save"}
         </Button>
 
         {feedback && (
