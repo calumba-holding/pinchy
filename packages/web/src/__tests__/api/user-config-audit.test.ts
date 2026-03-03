@@ -173,8 +173,9 @@ describe("audit: DELETE /api/users/[userId]", () => {
       }),
     } as never);
 
-    // Mock: delete returns the deleted user with email
-    vi.mocked(db.delete).mockReturnValueOnce({
+    // Mock: update returns the deactivated user with email
+    vi.mocked(db.update).mockReturnValueOnce({
+      set: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([{ id: "user-1", email: "deleted@test.com" }]),
       }),
@@ -204,8 +205,9 @@ describe("audit: DELETE /api/users/[userId]", () => {
       }),
     } as never);
 
-    // Mock: delete returns empty (user not found)
-    vi.mocked(db.delete).mockReturnValueOnce({
+    // Mock: update returns empty (user not found)
+    vi.mocked(db.update).mockReturnValueOnce({
+      set: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([]),
       }),

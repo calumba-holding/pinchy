@@ -15,6 +15,10 @@ vi.mock("@/lib/workspace", () => ({
   deleteWorkspace: vi.fn(),
 }));
 
+vi.mock("@/lib/audit", () => ({
+  appendAuditLog: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/db", () => ({
   db: {
     select: vi.fn().mockReturnValue({
@@ -27,6 +31,12 @@ vi.mock("@/db", () => ({
         returning: vi.fn().mockResolvedValue([]),
       }),
     }),
+    update: vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([]),
+      }),
+    }),
   },
 }));
 
@@ -34,6 +44,7 @@ import { auth } from "@/lib/auth";
 import { regenerateOpenClawConfig } from "@/lib/openclaw-config";
 import { deleteWorkspace } from "@/lib/workspace";
 import { db } from "@/db";
+import { users } from "@/db/schema";
 
 // ── GET /api/users ───────────────────────────────────────────────────────
 
@@ -144,7 +155,7 @@ describe("DELETE /api/users/[userId]", () => {
     expect(body.error).toBe("Forbidden");
   });
 
-  it("returns 400 when admin tries to delete themselves", async () => {
+  it("returns 400 when admin tries to deactivate themselves", async () => {
     vi.mocked(auth).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
@@ -160,7 +171,40 @@ describe("DELETE /api/users/[userId]", () => {
     expect(response.status).toBe(400);
 
     const body = await response.json();
-    expect(body.error).toBe("Cannot delete your own account");
+    expect(body.error).toBe("Cannot deactivate your own account");
+  });
+
+  it("soft-deletes user by setting deletedAt", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: { id: "admin-1", role: "admin" },
+      expires: "",
+    } as never);
+
+    // Mock: select personal agents returns empty
+    vi.mocked(db.select).mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([]),
+      }),
+    } as never);
+
+    // Mock: update returns the deactivated user
+    const mockUpdate = {
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: "user-1", email: "u@test.com" }]),
+      }),
+    };
+    vi.mocked(db.update).mockReturnValueOnce(mockUpdate as never);
+
+    const request = new NextRequest("http://localhost:7777/api/users/user-1", { method: "DELETE" });
+    const response = await DELETE(request, { params: Promise.resolve({ userId: "user-1" }) });
+
+    expect(response.status).toBe(200);
+    expect(db.update).toHaveBeenCalledWith(users);
+    expect(mockUpdate.set).toHaveBeenCalledWith(
+      expect.objectContaining({ deletedAt: expect.any(Date) })
+    );
+    expect(db.delete).not.toHaveBeenCalled();
   });
 
   it("returns 404 when user not found", async () => {
@@ -176,8 +220,9 @@ describe("DELETE /api/users/[userId]", () => {
       }),
     } as never);
 
-    // Mock: delete returns empty (user not found)
-    vi.mocked(db.delete).mockReturnValueOnce({
+    // Mock: update returns empty (user not found)
+    vi.mocked(db.update).mockReturnValueOnce({
+      set: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([]),
       }),
@@ -209,11 +254,18 @@ describe("DELETE /api/users/[userId]", () => {
       }),
     } as never);
 
-    // Mock: delete returns the deleted user
-    vi.mocked(db.delete).mockReturnValueOnce({
+    // Mock: update returns the deactivated user
+    vi.mocked(db.update).mockReturnValueOnce({
+      set: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([{ id: "user-1" }]),
       }),
+    } as never);
+
+    // Mock: update for personal agent soft-delete
+    vi.mocked(db.update).mockReturnValueOnce({
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockResolvedValue(undefined),
     } as never);
 
     const request = new NextRequest("http://localhost:7777/api/users/user-1", {
@@ -242,11 +294,24 @@ describe("DELETE /api/users/[userId]", () => {
       }),
     } as never);
 
-    // Mock: delete returns the deleted user
-    vi.mocked(db.delete).mockReturnValueOnce({
+    // Mock: update returns the deactivated user
+    vi.mocked(db.update).mockReturnValueOnce({
+      set: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([{ id: "user-1" }]),
       }),
+    } as never);
+
+    // Mock: update for personal agent-1 soft-delete
+    vi.mocked(db.update).mockReturnValueOnce({
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockResolvedValue(undefined),
+    } as never);
+
+    // Mock: update for personal agent-2 soft-delete
+    vi.mocked(db.update).mockReturnValueOnce({
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockResolvedValue(undefined),
     } as never);
 
     const request = new NextRequest("http://localhost:7777/api/users/user-1", {
@@ -275,11 +340,18 @@ describe("DELETE /api/users/[userId]", () => {
       }),
     } as never);
 
-    // Mock: delete returns the deleted user
-    vi.mocked(db.delete).mockReturnValueOnce({
+    // Mock: update returns the deactivated user
+    vi.mocked(db.update).mockReturnValueOnce({
+      set: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([{ id: "user-1" }]),
       }),
+    } as never);
+
+    // Mock: update for personal agent soft-delete
+    vi.mocked(db.update).mockReturnValueOnce({
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockResolvedValue(undefined),
     } as never);
 
     const request = new NextRequest("http://localhost:7777/api/users/user-1", {
