@@ -99,3 +99,14 @@ describe("agentRoles removal", () => {
     expect("agentRoles" in schema).toBe(false);
   });
 });
+
+describe("soft-delete columns", () => {
+  it("agents table has deletedAt column", () => {
+    expect(agents.deletedAt).toBeDefined();
+  });
+
+  it("users table has deletedAt column", () => {
+    const { users } = schema;
+    expect(users.deletedAt).toBeDefined();
+  });
+});
