@@ -585,6 +585,55 @@ describe("AuditLogTable", () => {
     expect(screen.getByText(/highlighted/i)).toBeInTheDocument();
   });
 
+  it("should disable verify button and show loading text while verifying", async () => {
+    renderWithEntriesLoaded();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
+    });
+
+    // Keep the verify fetch pending indefinitely
+    vi.mocked(global.fetch).mockReturnValueOnce(new Promise(() => {}));
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Verify Integrity" }));
+
+    // Button should be disabled and show loading text
+    expect(screen.getByRole("button", { name: "Verifying…" })).toBeDisabled();
+  });
+
+  it("should clear result banner and row highlighting when dismiss is clicked", async () => {
+    renderWithEntriesLoaded();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
+    });
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ valid: false, totalChecked: 3, invalidIds: [1, 3] }),
+    } as Response);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Verify Integrity" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/2 tampered entries/)).toBeInTheDocument();
+    });
+
+    // Row highlighting should be active
+    const rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveAttribute("data-tampered", "true");
+
+    // Click dismiss
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+
+    // Banner should be gone
+    expect(screen.queryByText(/2 tampered entries/)).not.toBeInTheDocument();
+    // Row highlighting should be cleared
+    expect(rows[1]).not.toHaveAttribute("data-tampered");
+  });
+
   it("should show truncated actorId when actorName is null", async () => {
     const entriesWithNullName = [
       {

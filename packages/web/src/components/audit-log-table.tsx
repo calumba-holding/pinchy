@@ -153,6 +153,7 @@ export function AuditLogTable() {
   const [dateTo, setDateTo] = useState<string>("");
   const [selectedEntry, setSelectedEntry] = useState<AuditEntry | null>(null);
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
+  const [verifying, setVerifying] = useState(false);
   const [availableEventTypes, setAvailableEventTypes] = useState<string[]>([]);
 
   useEffect(() => {
@@ -217,10 +218,15 @@ export function AuditLogTable() {
 
   async function handleVerifyIntegrity() {
     setVerifyResult(null);
-    const res = await fetch("/api/audit/verify");
-    if (res.ok) {
-      const data: VerifyResult = await res.json();
-      setVerifyResult(data);
+    setVerifying(true);
+    try {
+      const res = await fetch("/api/audit/verify");
+      if (res.ok) {
+        const data: VerifyResult = await res.json();
+        setVerifyResult(data);
+      }
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -261,8 +267,13 @@ export function AuditLogTable() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Audit Trail</h1>
-        <Button variant="outline" onClick={handleVerifyIntegrity} className="shrink-0">
-          Verify Integrity
+        <Button
+          variant="outline"
+          onClick={handleVerifyIntegrity}
+          disabled={verifying}
+          className="shrink-0"
+        >
+          {verifying ? "Verifying…" : "Verify Integrity"}
         </Button>
       </div>
 
@@ -313,7 +324,7 @@ export function AuditLogTable() {
 
       {verifyResult && (
         <div
-          className={`rounded border p-3 text-sm ${
+          className={`rounded border p-3 text-sm flex items-center justify-between gap-3 ${
             verifyResult.valid
               ? "border-green-500 bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
               : "border-red-500 bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
@@ -328,6 +339,15 @@ export function AuditLogTable() {
               below.
             </span>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Dismiss"
+            className="shrink-0 h-6 w-6 p-0 hover:bg-black/10 dark:hover:bg-white/10"
+            onClick={() => setVerifyResult(null)}
+          >
+            ×
+          </Button>
         </div>
       )}
 
