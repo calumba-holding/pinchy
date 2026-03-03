@@ -62,7 +62,9 @@ const PROVIDER_FETCH_CONFIG: Record<ProviderName, ProviderFetchConfig> = {
     headers: (apiKey) => ({ Authorization: `Bearer ${apiKey}` }),
     transform: (data) =>
       (data.data as { id: string }[])
-        .filter((m) => m.id.startsWith("gpt-") || m.id.startsWith("o"))
+        .filter(
+          (m) => (m.id.startsWith("gpt-") && !m.id.endsWith("-instruct")) || /^o\d/.test(m.id)
+        )
         .map((m) => ({
           id: `openai/${m.id}`,
           name: m.id,

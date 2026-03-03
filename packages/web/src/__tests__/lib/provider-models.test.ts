@@ -164,6 +164,8 @@ describe("fetchProviderModels", () => {
             { id: "dall-e-3" },
             { id: "text-embedding-3-large" },
             { id: "whisper-1" },
+            { id: "omni-moderation-latest" },
+            { id: "gpt-3.5-turbo-instruct" },
           ],
         }),
         { status: 200 }
@@ -181,6 +183,8 @@ describe("fetchProviderModels", () => {
     expect(modelIds).not.toContain("openai/dall-e-3");
     expect(modelIds).not.toContain("openai/text-embedding-3-large");
     expect(modelIds).not.toContain("openai/whisper-1");
+    expect(modelIds).not.toContain("openai/omni-moderation-latest");
+    expect(modelIds).not.toContain("openai/gpt-3.5-turbo-instruct");
   });
 
   it("filters Google models to those supporting generateContent", async () => {
