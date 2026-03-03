@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Prism from "prismjs";
+import "prismjs/components/prism-json";
+import "./json-highlight.css";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +57,13 @@ interface VerifyResult {
   valid: boolean;
   totalChecked: number;
   invalidIds: number[];
+}
+
+function highlightJson(json: string): string {
+  if (!Prism.languages.json) {
+    return json.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  return Prism.highlight(json, Prism.languages.json, "json");
 }
 
 function isNegativeEvent(eventType: string): boolean {
@@ -368,7 +378,11 @@ export function AuditLogTable() {
                     <TableRow
                       key={entry.id}
                       className="cursor-pointer hover:bg-muted/50"
+                      tabIndex={0}
                       onClick={() => setSelectedEntry(entry)}
+                      onKeyDown={(e) =>
+                        (e.key === "Enter" || e.key === " ") && setSelectedEntry(entry)
+                      }
                     >
                       <TableCell>{new Date(entry.timestamp).toLocaleString()}</TableCell>
                       <TableCell>
@@ -420,7 +434,7 @@ export function AuditLogTable() {
             <SheetDescription>Full audit log entry information</SheetDescription>
           </SheetHeader>
           {selectedEntry && (
-            <div className="p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Timestamp</p>
                 <p>{new Date(selectedEntry.timestamp).toLocaleString()}</p>
@@ -450,8 +464,12 @@ export function AuditLogTable() {
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Detail</p>
-                <pre className="mt-1 rounded bg-muted p-3 text-sm overflow-auto">
-                  {JSON.stringify(selectedEntry.detail, null, 2)}
+                <pre className="mt-1 rounded bg-muted p-3 text-sm overflow-auto json-highlight">
+                  <code
+                    dangerouslySetInnerHTML={{
+                      __html: highlightJson(JSON.stringify(selectedEntry.detail, null, 2)),
+                    }}
+                  />
                 </pre>
               </div>
               <div>

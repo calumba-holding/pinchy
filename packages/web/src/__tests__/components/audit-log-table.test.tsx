@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import { AuditLogTable } from "@/components/audit-log-table";
@@ -491,6 +491,47 @@ describe("AuditLogTable", () => {
     await waitFor(() => {
       expect(screen.getAllByText("deleted").length).toBeGreaterThan(0);
     });
+  });
+
+  it("should open detail sheet when Enter is pressed on a focused table row", async () => {
+    renderWithEntriesLoaded();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
+    });
+
+    // Desktop TableRow should have tabIndex=0 for keyboard accessibility
+    const rows = screen.getAllByRole("row");
+    // rows[0] is the header; rows[1] is the first data row
+    const firstDataRow = rows[1];
+    fireEvent.keyDown(firstDataRow, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(screen.getByText("Entry Detail")).toBeInTheDocument();
+    });
+  });
+
+  it("should render JSON detail with syntax highlighting tokens", async () => {
+    const user = userEvent.setup();
+    renderWithEntriesLoaded();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("auth.login").length).toBeGreaterThan(0);
+    });
+
+    const allLoginElements = screen.getAllByText("auth.login");
+    const clickableRow =
+      allLoginElements[0].closest("tr") ?? allLoginElements[0].closest("div.rounded");
+    await user.click(clickableRow!);
+
+    await waitFor(() => {
+      expect(screen.getByText("Entry Detail")).toBeInTheDocument();
+    });
+
+    // Prism.highlight produces <span class="token ..."> inside the code element
+    const codeElement = document.querySelector(".json-highlight code");
+    expect(codeElement).not.toBeNull();
+    expect(codeElement!.innerHTML).toContain('class="token');
   });
 
   it("should show truncated actorId when actorName is null", async () => {
