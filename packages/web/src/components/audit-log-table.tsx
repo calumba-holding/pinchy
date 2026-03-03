@@ -59,6 +59,18 @@ interface VerifyResult {
   invalidIds: number[];
 }
 
+// Convert a date-only string (YYYY-MM-DD) to a UTC ISO string at local midnight / end of day,
+// so that filters respect the user's browser timezone rather than UTC.
+function localDateStart(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day).toISOString();
+}
+
+function localDateEnd(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day, 23, 59, 59, 999).toISOString();
+}
+
 function highlightJson(json: string): string {
   if (!Prism.languages.json) {
     return json.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -161,10 +173,10 @@ export function AuditLogTable() {
         params.set("eventType", eventTypeFilter);
       }
       if (dateFrom) {
-        params.set("from", dateFrom);
+        params.set("from", localDateStart(dateFrom));
       }
       if (dateTo) {
-        params.set("to", dateTo);
+        params.set("to", localDateEnd(dateTo));
       }
 
       const res = await fetch(`/api/audit?${params.toString()}`);
@@ -186,8 +198,8 @@ export function AuditLogTable() {
   async function handleExportCsv() {
     const params = new URLSearchParams();
     if (eventTypeFilter) params.set("eventType", eventTypeFilter);
-    if (dateFrom) params.set("from", dateFrom);
-    if (dateTo) params.set("to", dateTo);
+    if (dateFrom) params.set("from", localDateStart(dateFrom));
+    if (dateTo) params.set("to", localDateEnd(dateTo));
     const res = await fetch(`/api/audit/export?${params.toString()}`);
     if (res.ok) {
       const csvText = await res.text();
