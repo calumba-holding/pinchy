@@ -67,7 +67,6 @@ const EVENT_TYPES = [
   "user.updated",
   "user.deleted",
   "config.changed",
-  "tool.execute",
   "tool.denied",
 ];
 
@@ -137,11 +136,6 @@ function ResourceCell({
       </Link>
     );
   return <span>{resourceName}</span>;
-}
-
-function truncateDetail(detail: Record<string, unknown>): string {
-  const str = JSON.stringify(detail);
-  return str.length > 80 ? str.slice(0, 80) + "..." : str;
 }
 
 export function AuditLogTable() {
@@ -324,7 +318,7 @@ export function AuditLogTable() {
       ) : (
         <>
           {/* Mobile card-view */}
-          <div className="block md:hidden space-y-2">
+          <div className="block lg:hidden space-y-2">
             {entries.map((entry) => (
               <div
                 key={entry.id}
@@ -365,53 +359,51 @@ export function AuditLogTable() {
           </div>
 
           {/* Desktop table */}
-          <div className="hidden md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>Actor</TableHead>
-                  <TableHead>Event Type</TableHead>
-                  <TableHead>Resource</TableHead>
-                  <TableHead>Detail</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {entries.map((entry) => (
-                  <TableRow
-                    key={entry.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => setSelectedEntry(entry)}
-                  >
-                    <TableCell>{new Date(entry.timestamp).toLocaleString()}</TableCell>
-                    <TableCell>
-                      <ActorCell
-                        actorId={entry.actorId}
-                        actorName={entry.actorName}
-                        actorDeleted={entry.actorDeleted}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={isNegativeEvent(entry.eventType) ? "destructive" : "secondary"}
-                      >
-                        {entry.eventType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <ResourceCell
-                        resource={entry.resource}
-                        resourceName={entry.resourceName}
-                        resourceDeleted={entry.resourceDeleted}
-                      />
-                    </TableCell>
-                    <TableCell className="max-w-[300px] truncate">
-                      {truncateDetail(entry.detail)}
-                    </TableCell>
+          <div className="hidden lg:block">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Timestamp</TableHead>
+                    <TableHead>Actor</TableHead>
+                    <TableHead>Event Type</TableHead>
+                    <TableHead>Resource</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {entries.map((entry) => (
+                    <TableRow
+                      key={entry.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setSelectedEntry(entry)}
+                    >
+                      <TableCell>{new Date(entry.timestamp).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <ActorCell
+                          actorId={entry.actorId}
+                          actorName={entry.actorName}
+                          actorDeleted={entry.actorDeleted}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={isNegativeEvent(entry.eventType) ? "destructive" : "secondary"}
+                        >
+                          {entry.eventType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <ResourceCell
+                          resource={entry.resource}
+                          resourceName={entry.resourceName}
+                          resourceDeleted={entry.resourceDeleted}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
 
           <div className="flex items-center justify-between">
