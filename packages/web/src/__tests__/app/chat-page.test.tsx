@@ -9,18 +9,21 @@ vi.mock("next/navigation", () => ({
   notFound: () => mockNotFound(),
 }));
 
+const dbSelectMock = {
+  where: vi.fn(),
+  from: vi.fn(),
+};
+
 vi.mock("@/db", () => ({
   db: {
-    query: {
-      agents: {
-        findFirst: vi.fn(),
-      },
-    },
+    select: vi.fn().mockReturnValue({
+      from: (...args: unknown[]) => dbSelectMock.from(...args),
+    }),
   },
 }));
 
 vi.mock("@/db/schema", () => ({
-  agents: { id: "id" },
+  activeAgents: { id: "id" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -55,13 +58,11 @@ vi.mock("@/components/chat", () => ({
   },
 }));
 
-import { db } from "@/db";
 import { requireAuth } from "@/lib/require-auth";
 import { assertAgentAccess } from "@/lib/agent-access";
 import ChatPage from "@/app/(app)/chat/[agentId]/page";
 import { render, screen } from "@testing-library/react";
 
-const mockFindFirst = db.query.agents.findFirst as ReturnType<typeof vi.fn>;
 const mockRequireAuth = requireAuth as ReturnType<typeof vi.fn>;
 const mockAssertAgentAccess = assertAgentAccess as ReturnType<typeof vi.fn>;
 
@@ -69,6 +70,7 @@ describe("ChatPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedChatProps = {};
+    dbSelectMock.from.mockReturnValue({ where: dbSelectMock.where });
   });
 
   it("calls notFound when a non-admin user tries to access another user's personal agent", async () => {
@@ -83,7 +85,7 @@ describe("ChatPage", () => {
       user: { id: "other-user", role: "user" },
     });
 
-    mockFindFirst.mockResolvedValue(personalAgent);
+    dbSelectMock.where.mockResolvedValue([personalAgent]);
 
     mockAssertAgentAccess.mockImplementation(() => {
       throw new Error("Access denied");
@@ -109,7 +111,7 @@ describe("ChatPage", () => {
       user: { id: "user-1", role: "user" },
     });
 
-    mockFindFirst.mockResolvedValue(sharedAgent);
+    dbSelectMock.where.mockResolvedValue([sharedAgent]);
 
     mockAssertAgentAccess.mockImplementation(() => {
       // No throw = access granted
@@ -137,7 +139,7 @@ describe("ChatPage", () => {
       user: { id: "admin-user", role: "admin" },
     });
 
-    mockFindFirst.mockResolvedValue(personalAgent);
+    dbSelectMock.where.mockResolvedValue([personalAgent]);
 
     mockAssertAgentAccess.mockImplementation(() => {
       // No throw = admin access granted
@@ -165,7 +167,7 @@ describe("ChatPage", () => {
       user: { id: "user-1", role: "user" },
     });
 
-    mockFindFirst.mockResolvedValue(sharedAgent);
+    dbSelectMock.where.mockResolvedValue([sharedAgent]);
     mockAssertAgentAccess.mockImplementation(() => {});
 
     const result = await ChatPage({ params: Promise.resolve({ agentId: "agent-shared" }) });
@@ -186,7 +188,7 @@ describe("ChatPage", () => {
       user: { id: "user-1", role: "user" },
     });
 
-    mockFindFirst.mockResolvedValue(personalAgent);
+    dbSelectMock.where.mockResolvedValue([personalAgent]);
     mockAssertAgentAccess.mockImplementation(() => {});
 
     const result = await ChatPage({ params: Promise.resolve({ agentId: "agent-personal" }) });
@@ -208,7 +210,7 @@ describe("ChatPage", () => {
       user: { id: "user-1", role: "user" },
     });
 
-    mockFindFirst.mockResolvedValue(agentWithAvatar);
+    dbSelectMock.where.mockResolvedValue([agentWithAvatar]);
     mockAssertAgentAccess.mockImplementation(() => {});
 
     const result = await ChatPage({ params: Promise.resolve({ agentId: "agent-avatar" }) });

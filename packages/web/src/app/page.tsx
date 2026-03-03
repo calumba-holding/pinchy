@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { isSetupComplete, isProviderConfigured } from "@/lib/setup";
 import { requireAuth } from "@/lib/require-auth";
 import { db } from "@/db";
-import { agents } from "@/db/schema";
+import { activeAgents } from "@/db/schema";
 import { eq, or } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -25,11 +25,11 @@ export default async function Home() {
   const userId = session?.user?.id;
 
   const visibleAgents = isAdmin
-    ? await db.select().from(agents)
+    ? await db.select().from(activeAgents)
     : await db
         .select()
-        .from(agents)
-        .where(or(eq(agents.isPersonal, false), eq(agents.ownerId, userId!)));
+        .from(activeAgents)
+        .where(or(eq(activeAgents.isPersonal, false), eq(activeAgents.ownerId, userId!)));
 
   if (visibleAgents.length > 0) {
     redirect(`/chat/${visibleAgents[0].id}`);

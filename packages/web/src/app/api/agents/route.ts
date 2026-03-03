@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { agents } from "@/db/schema";
+import { agents, activeAgents } from "@/db/schema";
 import { eq, or, and } from "drizzle-orm";
 import { getTemplate } from "@/lib/agent-templates";
 import { getPersonalityPreset, resolveGreetingMessage } from "@/lib/personality-presets";
@@ -30,18 +30,18 @@ export async function GET() {
   const isAdmin = session.user.role === "admin";
 
   if (isAdmin) {
-    const allAgents = await db.select().from(agents);
+    const allAgents = await db.select().from(activeAgents);
     return NextResponse.json(allAgents);
   }
 
   // Non-admins see shared agents + their own personal agents
   const visibleAgents = await db
     .select()
-    .from(agents)
+    .from(activeAgents)
     .where(
       or(
-        eq(agents.isPersonal, false),
-        and(eq(agents.isPersonal, true), eq(agents.ownerId, session.user.id!))
+        eq(activeAgents.isPersonal, false),
+        and(eq(activeAgents.isPersonal, true), eq(activeAgents.ownerId, session.user.id!))
       )
     );
   return NextResponse.json(visibleAgents);
