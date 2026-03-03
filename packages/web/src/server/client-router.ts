@@ -108,15 +108,16 @@ export class ClientRouter {
         chatOptions.attachments = attachments;
       }
 
-      // Build extraSystemPrompt from user context + greeting
+      // Build extraSystemPrompt from user name + context + greeting
       const extraPromptParts: string[] = [];
-      if (!agent.isPersonal) {
-        const user = await db.query.users.findFirst({
-          where: eq(users.id, this.userId),
-        });
-        if (user?.context) {
-          extraPromptParts.push(`## About the current user\n${user.context}`);
-        }
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, this.userId),
+      });
+      if (user?.name) {
+        extraPromptParts.push(`## Current user\nName: ${user.name}`);
+      }
+      if (!agent.isPersonal && user?.context) {
+        extraPromptParts.push(`## About the current user\n${user.context}`);
       }
       if (!this.sessionCache.has(sessionKey) && agent.greetingMessage) {
         extraPromptParts.push(
