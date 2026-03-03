@@ -17,6 +17,18 @@ describe("buildGitHubIssueUrl", () => {
     });
     const params = new URLSearchParams(url.split("?")[1]);
     expect(params.get("title")).toContain("Connection refused");
+    expect(params.get("title")).toMatch(/^Setup error:/);
+  });
+
+  it("should include environment info in the body", () => {
+    const url = buildGitHubIssueUrl({
+      error: "Connection refused",
+      page: "/setup",
+    });
+    const params = new URLSearchParams(url.split("?")[1]);
+    const body = params.get("body")!;
+    expect(body).toContain("Browser:");
+    expect(body).toContain("Pinchy:");
   });
 
   it("should include the error in the body", () => {
