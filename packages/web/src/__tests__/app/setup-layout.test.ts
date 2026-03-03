@@ -22,6 +22,7 @@ vi.mock("@/lib/setup", () => ({
 }));
 
 import SetupLayout from "@/app/setup/layout";
+import * as SetupLayoutModule from "@/app/setup/layout";
 import React from "react";
 
 describe("Setup Layout", () => {
@@ -56,5 +57,9 @@ describe("Setup Layout", () => {
     await SetupLayout({ children: mockChildren });
 
     expect(mockRedirect).not.toHaveBeenCalled();
+  });
+
+  it("should force dynamic rendering to avoid build-time DB queries", () => {
+    expect(SetupLayoutModule.dynamic).toBe("force-dynamic");
   });
 });
