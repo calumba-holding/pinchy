@@ -7,12 +7,16 @@ vi.mock("@/lib/api-auth", () => ({
   requireAdmin: vi.fn(),
 }));
 
-// Build chainable mock for entries query: select().from().where().orderBy().limit().offset()
+// Build chainable mock for entries query:
+// select().from().leftJoin().leftJoin().leftJoin().where().orderBy().limit().offset()
 const mockEntriesOffset = vi.fn();
 const mockEntriesLimit = vi.fn().mockReturnValue({ offset: mockEntriesOffset });
 const mockEntriesOrderBy = vi.fn().mockReturnValue({ limit: mockEntriesLimit });
 const mockEntriesWhere = vi.fn().mockReturnValue({ orderBy: mockEntriesOrderBy });
-const mockEntriesFrom = vi.fn().mockReturnValue({ where: mockEntriesWhere });
+const mockEntriesLeftJoin3 = vi.fn().mockReturnValue({ where: mockEntriesWhere });
+const mockEntriesLeftJoin2 = vi.fn().mockReturnValue({ leftJoin: mockEntriesLeftJoin3 });
+const mockEntriesLeftJoin1 = vi.fn().mockReturnValue({ leftJoin: mockEntriesLeftJoin2 });
+const mockEntriesFrom = vi.fn().mockReturnValue({ leftJoin: mockEntriesLeftJoin1 });
 
 // Build chainable mock for count query: select().from().where()
 const mockCountWhere = vi.fn();
@@ -35,6 +39,16 @@ vi.mock("@/db/schema", () => ({
     detail: "detail",
     rowHmac: "row_hmac",
   },
+  users: {
+    id: "id",
+    name: "name",
+    deletedAt: "deleted_at",
+  },
+  agents: {
+    id: "id",
+    name: "name",
+    deletedAt: "deleted_at",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -44,6 +58,11 @@ vi.mock("drizzle-orm", () => ({
   gte: vi.fn((col, val) => ({ col, val, op: "gte" })),
   lte: vi.fn((col, val) => ({ col, val, op: "lte" })),
   count: vi.fn(() => "count_fn"),
+  sql: vi.fn((strings, ...values) => ({ strings, values })),
+}));
+
+vi.mock("drizzle-orm/pg-core", () => ({
+  alias: vi.fn((table, _name) => table),
 }));
 
 import { requireAdmin } from "@/lib/api-auth";
@@ -64,6 +83,12 @@ describe("GET /api/audit", () => {
       resource: null,
       detail: null,
       rowHmac: "hmac-1",
+      actorName: null,
+      actorDeleted: null,
+      resourceAgentName: null,
+      resourceAgentDeleted: null,
+      resourceUserName: null,
+      resourceUserDeleted: null,
     },
     {
       id: 2,
@@ -74,11 +99,17 @@ describe("GET /api/audit", () => {
       resource: "settings",
       detail: { key: "provider" },
       rowHmac: "hmac-2",
+      actorName: null,
+      actorDeleted: null,
+      resourceAgentName: null,
+      resourceAgentDeleted: null,
+      resourceUserName: null,
+      resourceUserDeleted: null,
     },
   ];
 
   function setupMocks(entries = sampleEntries, total = entries.length) {
-    // First call: entries query
+    // First call: entries query (with leftJoin chain)
     mockSelect.mockReturnValueOnce({ from: mockEntriesFrom });
     mockEntriesOffset.mockResolvedValueOnce(entries);
 
@@ -245,5 +276,135 @@ describe("GET /api/audit", () => {
     const body = await response.json();
     expect(body.entries).toHaveLength(0);
     expect(body.total).toBe(0);
+  });
+
+  it("resolves actorName from users table", async () => {
+    const entriesWithName = [
+      {
+        id: 1,
+        timestamp: new Date("2026-02-21T10:00:00.000Z"),
+        actorType: "user",
+        actorId: "user-1",
+        eventType: "auth.login",
+        resource: null,
+        detail: {},
+        rowHmac: "abc",
+        actorName: "Alice",
+        actorDeleted: null,
+        resourceAgentName: null,
+        resourceAgentDeleted: null,
+        resourceUserName: null,
+        resourceUserDeleted: null,
+      },
+    ];
+
+    // First call: entries query
+    mockSelect.mockReturnValueOnce({ from: mockEntriesFrom });
+    mockEntriesOffset.mockResolvedValueOnce(entriesWithName);
+
+    // Second call: count query
+    mockSelect.mockReturnValueOnce({ from: mockCountFrom });
+    mockCountWhere.mockResolvedValueOnce([{ count: 1 }]);
+
+    const req = new NextRequest("http://localhost/api/audit");
+    const res = await GET(req);
+    const body = await res.json();
+    expect(body.entries[0].actorName).toBe("Alice");
+  });
+
+  it("resolves resourceName from agents table when resource is agent:<id>", async () => {
+    const entriesWithAgentResource = [
+      {
+        id: 2,
+        timestamp: new Date("2026-02-21T10:00:00.000Z"),
+        actorType: "user",
+        actorId: "user-1",
+        eventType: "agent.created",
+        resource: "agent:agent-1",
+        detail: {},
+        rowHmac: "def",
+        actorName: "Alice",
+        actorDeleted: null,
+        resourceAgentName: "Smithers",
+        resourceAgentDeleted: null,
+        resourceUserName: null,
+        resourceUserDeleted: null,
+      },
+    ];
+
+    // First call: entries query
+    mockSelect.mockReturnValueOnce({ from: mockEntriesFrom });
+    mockEntriesOffset.mockResolvedValueOnce(entriesWithAgentResource);
+
+    // Second call: count query
+    mockSelect.mockReturnValueOnce({ from: mockCountFrom });
+    mockCountWhere.mockResolvedValueOnce([{ count: 1 }]);
+
+    const req = new NextRequest("http://localhost/api/audit");
+    const res = await GET(req);
+    const body = await res.json();
+    expect(body.entries[0].resourceName).toBe("Smithers");
+  });
+
+  it("sets actorDeleted to false when actorDeleted is null", async () => {
+    const entries = [
+      {
+        id: 3,
+        timestamp: new Date(),
+        actorType: "user",
+        actorId: "user-1",
+        eventType: "auth.login",
+        resource: null,
+        detail: {},
+        rowHmac: "ghi",
+        actorName: "Bob",
+        actorDeleted: null,
+        resourceAgentName: null,
+        resourceAgentDeleted: null,
+        resourceUserName: null,
+        resourceUserDeleted: null,
+      },
+    ];
+
+    mockSelect.mockReturnValueOnce({ from: mockEntriesFrom });
+    mockEntriesOffset.mockResolvedValueOnce(entries);
+    mockSelect.mockReturnValueOnce({ from: mockCountFrom });
+    mockCountWhere.mockResolvedValueOnce([{ count: 1 }]);
+
+    const req = new NextRequest("http://localhost/api/audit");
+    const res = await GET(req);
+    const body = await res.json();
+    expect(body.entries[0].actorDeleted).toBe(false);
+  });
+
+  it("sets actorDeleted to true when actorDeleted is a timestamp", async () => {
+    const entries = [
+      {
+        id: 4,
+        timestamp: new Date(),
+        actorType: "user",
+        actorId: "user-deleted",
+        eventType: "auth.login",
+        resource: null,
+        detail: {},
+        rowHmac: "jkl",
+        actorName: "Deleted User",
+        actorDeleted: new Date("2026-01-01"),
+        resourceAgentName: null,
+        resourceAgentDeleted: null,
+        resourceUserName: null,
+        resourceUserDeleted: null,
+      },
+    ];
+
+    mockSelect.mockReturnValueOnce({ from: mockEntriesFrom });
+    mockEntriesOffset.mockResolvedValueOnce(entries);
+    mockSelect.mockReturnValueOnce({ from: mockCountFrom });
+    mockCountWhere.mockResolvedValueOnce([{ count: 1 }]);
+
+    const req = new NextRequest("http://localhost/api/audit");
+    const res = await GET(req);
+    const body = await res.json();
+    expect(body.entries[0].actorDeleted).toBe(true);
   });
 });
