@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { buildGitHubIssueUrl } from "@/lib/github-issue";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { buildGitHubIssueUrl, fetchDiagnostics } from "@/lib/github-issue";
 
 describe("buildGitHubIssueUrl", () => {
   it("should return a GitHub new-issue URL", () => {
@@ -119,5 +119,63 @@ describe("buildGitHubIssueUrl", () => {
     const params = new URLSearchParams(url.split("?")[1]);
     const body = params.get("body")!;
     expect(body).toContain("docker compose logs pinchy");
+  });
+});
+
+describe("fetchDiagnostics", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(global, "fetch");
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it("should return diagnostics on successful fetch", async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        database: "connected",
+        openclaw: "connected",
+        version: "0.1.0",
+        nodeEnv: "production",
+      }),
+    } as Response);
+
+    const result = await fetchDiagnostics();
+
+    expect(result).toEqual({
+      database: "connected",
+      openclaw: "connected",
+      version: "0.1.0",
+      nodeEnv: "production",
+    });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/diagnostics",
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      })
+    );
+  });
+
+  it("should return null when fetch fails", async () => {
+    fetchSpy.mockRejectedValueOnce(new Error("Network error"));
+
+    const result = await fetchDiagnostics();
+
+    expect(result).toBeNull();
+  });
+
+  it("should return null when response is not ok", async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({}),
+    } as Response);
+
+    const result = await fetchDiagnostics();
+
+    expect(result).toBeNull();
   });
 });
