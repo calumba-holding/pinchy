@@ -1,7 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
+vi.mock("next/headers", () => ({
+  headers: vi.fn().mockResolvedValue(new Headers()),
+}));
+
+vi.mock("@/lib/auth", () => ({
+  auth: {
+    api: {
+      getSession: vi.fn(),
+    },
+  },
+}));
 vi.mock("@/lib/audit", () => ({ appendAuditLog: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/db", () => ({
   db: {
@@ -24,14 +34,14 @@ describe("POST /api/users/[userId]/reactivate", () => {
   });
 
   it("returns 401 when not authenticated", async () => {
-    vi.mocked(auth).mockResolvedValueOnce(null);
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce(null);
     const req = new NextRequest("http://localhost/api/users/u1/reactivate", { method: "POST" });
     const res = await POST(req, { params: Promise.resolve({ userId: "u1" }) });
     expect(res.status).toBe(401);
   });
 
   it("returns 403 when not admin", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "user-1", role: "user" },
       expires: "",
     } as never);
@@ -41,7 +51,7 @@ describe("POST /api/users/[userId]/reactivate", () => {
   });
 
   it("clears deletedAt for user", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
     } as never);
@@ -59,7 +69,11 @@ describe("POST /api/users/[userId]/reactivate", () => {
 
     expect(res.status).toBe(200);
     expect(db.update).toHaveBeenCalledWith(users);
-    expect(mockUpdate.set).toHaveBeenCalledWith({ deletedAt: null });
+    expect(mockUpdate.set).toHaveBeenCalledWith({
+      banned: false,
+      banReason: null,
+      banExpires: null,
+    });
     expect(appendAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: "user.updated",
@@ -69,7 +83,7 @@ describe("POST /api/users/[userId]/reactivate", () => {
   });
 
   it("returns 404 when user not found", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
     } as never);
@@ -89,7 +103,7 @@ describe("POST /api/users/[userId]/reactivate", () => {
   });
 
   it("returns 404 when user is already active (deletedAt is null)", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
     } as never);

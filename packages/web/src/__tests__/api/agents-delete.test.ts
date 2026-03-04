@@ -3,12 +3,20 @@ import { NextRequest } from "next/server";
 
 // ── Mocks ────────────────────────────────────────────────────────────────
 
+vi.mock("next/headers", () => ({
+  headers: vi.fn().mockResolvedValue(new Headers()),
+}));
+
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
-  auth: vi.fn(),
+  auth: {
+    api: {
+      getSession: vi.fn(),
+    },
+  },
 }));
 
 vi.mock("@/lib/agents", async (importOriginal) => {
@@ -67,7 +75,7 @@ describe("GET /api/agents/[agentId]", () => {
   });
 
   it("returns 401 when not authenticated", async () => {
-    vi.mocked(auth).mockResolvedValueOnce(null);
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce(null);
 
     const request = new NextRequest("http://localhost:7777/api/agents/agent-1");
     const response = await GET(request, {
@@ -77,10 +85,10 @@ describe("GET /api/agents/[agentId]", () => {
   });
 
   it("returns agent when authenticated", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "user-1", role: "user" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent({
       id: "agent-1",
@@ -101,10 +109,10 @@ describe("GET /api/agents/[agentId]", () => {
   });
 
   it("returns 403 when non-owner user tries to access personal agent of another user", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "user-2", role: "user" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent({
       id: "agent-1",
@@ -137,7 +145,7 @@ describe("PATCH /api/agents/[agentId]", () => {
   });
 
   it("returns 401 when not authenticated", async () => {
-    vi.mocked(auth).mockResolvedValueOnce(null);
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce(null);
 
     const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
       method: "PATCH",
@@ -151,10 +159,10 @@ describe("PATCH /api/agents/[agentId]", () => {
   });
 
   it("updates agent when authenticated", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "user-1", role: "user" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent({
       id: "agent-1",
@@ -185,10 +193,10 @@ describe("PATCH /api/agents/[agentId]", () => {
   });
 
   it("returns 403 when non-owner user tries to update personal agent of another user", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "user-2", role: "user" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent({
       id: "agent-1",
@@ -212,10 +220,10 @@ describe("PATCH /api/agents/[agentId]", () => {
   });
 
   it("returns 404 when agent not found for update", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "user-1", role: "user" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent(undefined);
 
@@ -234,10 +242,10 @@ describe("PATCH /api/agents/[agentId]", () => {
   });
 
   it("admin can update allowedTools for shared agent", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent({
       id: "agent-1",
@@ -269,10 +277,10 @@ describe("PATCH /api/agents/[agentId]", () => {
   });
 
   it("returns 403 when non-admin tries to update allowedTools", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "user-1", role: "user" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent({
       id: "agent-1",
@@ -296,10 +304,10 @@ describe("PATCH /api/agents/[agentId]", () => {
   });
 
   it("returns 400 when trying to update allowedTools for personal agent", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent({
       id: "agent-1",
@@ -323,10 +331,10 @@ describe("PATCH /api/agents/[agentId]", () => {
   });
 
   it("does not call regenerateOpenClawConfig directly (updateAgent handles it)", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent({
       id: "agent-1",
@@ -355,10 +363,10 @@ describe("PATCH /api/agents/[agentId]", () => {
   });
 
   it("admin can update pluginConfig for shared agent", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent({
       id: "agent-1",
@@ -390,10 +398,10 @@ describe("PATCH /api/agents/[agentId]", () => {
   });
 
   it("should update greeting message", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "user-1", role: "user" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent({
       id: "agent-1",
@@ -425,10 +433,10 @@ describe("PATCH /api/agents/[agentId]", () => {
   });
 
   it("should allow clearing greeting message with null", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "user-1", role: "user" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent({
       id: "agent-1",
@@ -472,7 +480,7 @@ describe("DELETE /api/agents/[agentId]", () => {
   });
 
   it("returns 401 when not authenticated", async () => {
-    vi.mocked(auth).mockResolvedValueOnce(null);
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce(null);
 
     const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
       method: "DELETE",
@@ -488,10 +496,10 @@ describe("DELETE /api/agents/[agentId]", () => {
   });
 
   it("returns 403 when user is not admin", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "user-1", role: "user" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
       method: "DELETE",
@@ -507,10 +515,10 @@ describe("DELETE /api/agents/[agentId]", () => {
   });
 
   it("returns 400 when agent is a personal agent", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent({
       id: "agent-1",
@@ -532,10 +540,10 @@ describe("DELETE /api/agents/[agentId]", () => {
   });
 
   it("returns 404 when agent not found", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent(undefined);
 
@@ -553,10 +561,10 @@ describe("DELETE /api/agents/[agentId]", () => {
   });
 
   it("returns 200 on successful deletion", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
-    } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    } as any);
 
     mockAgent({
       id: "agent-1",

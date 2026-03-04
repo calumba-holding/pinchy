@@ -1,11 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+vi.mock("next/headers", () => ({
+  headers: vi.fn().mockResolvedValue(new Headers()),
+}));
+
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
-  auth: vi.fn().mockResolvedValue({ user: { id: "1", email: "admin@test.com", role: "admin" } }),
+  auth: {
+    api: {
+      getSession: vi
+        .fn()
+        .mockResolvedValue({ user: { id: "1", email: "admin@test.com", role: "admin" } }),
+    },
+  },
 }));
 
 const { insertValuesMock } = vi.hoisted(() => ({
@@ -101,7 +111,7 @@ describe("POST /api/agents", () => {
   });
 
   it("should return 403 for non-admin users", async () => {
-    vi.mocked(auth).mockResolvedValueOnce({
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "2", email: "user@test.com", role: "user" },
       expires: "",
     });

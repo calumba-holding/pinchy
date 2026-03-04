@@ -1,8 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
+vi.mock("next/headers", () => ({
+  headers: vi.fn().mockResolvedValue(new Headers()),
+}));
+
 vi.mock("@/lib/auth", () => ({
-  auth: vi.fn().mockResolvedValue({ user: { id: "1", email: "admin@test.com" } }),
+  auth: {
+    api: {
+      getSession: vi.fn().mockResolvedValue({ user: { id: "1", email: "admin@test.com" } }),
+    },
+  },
 }));
 
 vi.mock("@/lib/workspace", () => ({
@@ -57,7 +65,9 @@ describe("GET /api/agents/[agentId]/files/[filename]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Restore default mocks
-    vi.mocked(auth).mockResolvedValue({ user: { id: "1", email: "admin@test.com" } } as any);
+    vi.mocked(auth.api.getSession).mockResolvedValue({
+      user: { id: "1", email: "admin@test.com" },
+    } as any);
     vi.mocked(getAgentWithAccess).mockResolvedValue(defaultAgent);
     vi.mocked(readWorkspaceFile).mockReturnValue("# Soul content");
   });
@@ -73,7 +83,7 @@ describe("GET /api/agents/[agentId]/files/[filename]", () => {
   });
 
   it("should return 401 when not authenticated", async () => {
-    vi.mocked(auth).mockResolvedValueOnce(null);
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce(null);
 
     const request = makeGetRequest("agent-1", "SOUL.md");
     const response = await GET(request, makeParams("agent-1", "SOUL.md"));
@@ -175,7 +185,9 @@ describe("GET /api/agents/[agentId]/files/[filename]", () => {
 describe("PUT /api/agents/[agentId]/files/[filename]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(auth).mockResolvedValue({ user: { id: "1", email: "admin@test.com" } } as any);
+    vi.mocked(auth.api.getSession).mockResolvedValue({
+      user: { id: "1", email: "admin@test.com" },
+    } as any);
     vi.mocked(getAgentWithAccess).mockResolvedValue(defaultAgent);
   });
 
@@ -192,7 +204,7 @@ describe("PUT /api/agents/[agentId]/files/[filename]", () => {
   });
 
   it("should return 401 when not authenticated", async () => {
-    vi.mocked(auth).mockResolvedValueOnce(null);
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce(null);
 
     const request = makePutRequest("agent-1", "SOUL.md", {
       content: "# Updated soul",

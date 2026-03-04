@@ -1,7 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+vi.mock("next/headers", () => ({
+  headers: vi.fn().mockResolvedValue(new Headers()),
+}));
+
 vi.mock("@/lib/auth", () => ({
-  auth: vi.fn().mockResolvedValue({ user: { id: "user-1", email: "user@test.com", role: "user" } }),
+  auth: {
+    api: {
+      getSession: vi
+        .fn()
+        .mockResolvedValue({ user: { id: "user-1", email: "user@test.com", role: "user" } }),
+    },
+  },
 }));
 
 const mockFindFirst = vi.fn();
@@ -52,14 +62,14 @@ function makePutRequest(body: Record<string, unknown>) {
 describe("GET /api/users/me/context", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(auth).mockResolvedValue({
+    vi.mocked(auth.api.getSession).mockResolvedValue({
       user: { id: "user-1", email: "user@test.com", role: "user" },
       expires: "",
     });
   });
 
   it("should return 401 when unauthenticated", async () => {
-    vi.mocked(auth).mockResolvedValueOnce(null);
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce(null);
 
     const response = await GET(makeGetRequest());
     expect(response.status).toBe(401);
@@ -87,7 +97,7 @@ describe("GET /api/users/me/context", () => {
 describe("PUT /api/users/me/context", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(auth).mockResolvedValue({
+    vi.mocked(auth.api.getSession).mockResolvedValue({
       user: { id: "user-1", email: "user@test.com", role: "user" },
       expires: "",
     });
@@ -97,7 +107,7 @@ describe("PUT /api/users/me/context", () => {
   });
 
   it("should return 401 when unauthenticated", async () => {
-    vi.mocked(auth).mockResolvedValueOnce(null);
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce(null);
 
     const response = await PUT(makePutRequest({ content: "test" }));
     expect(response.status).toBe(401);
