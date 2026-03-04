@@ -117,21 +117,20 @@ describe("GET /api/users", () => {
     expect(body.users[0]).not.toHaveProperty("passwordHash");
   });
 
-  it("includes deletedAt in user list", async () => {
+  it("includes banned status in user list", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
     } as any);
 
-    const deactivatedDate = new Date("2024-01-15T10:00:00Z");
     const fakeUsers = [
-      { id: "user-1", name: "Alice", email: "alice@test.com", role: "user", deletedAt: null },
+      { id: "user-1", name: "Alice", email: "alice@test.com", role: "user", banned: false },
       {
         id: "user-2",
         name: "Bob",
         email: "bob@test.com",
         role: "admin",
-        deletedAt: deactivatedDate,
+        banned: true,
       },
     ];
 
@@ -143,8 +142,8 @@ describe("GET /api/users", () => {
     expect(response.status).toBe(200);
 
     const body = await response.json();
-    expect(body.users[0].deletedAt).toBeNull();
-    expect(body.users[1].deletedAt).toBeTruthy();
+    expect(body.users[0].banned).toBe(false);
+    expect(body.users[1].banned).toBe(true);
   });
 });
 
@@ -213,7 +212,7 @@ describe("DELETE /api/users/[userId]", () => {
     expect(body.error).toBe("Cannot deactivate your own account");
   });
 
-  it("soft-deletes user by setting deletedAt", async () => {
+  it("bans user by setting banned flag", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",

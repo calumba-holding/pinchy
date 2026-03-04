@@ -50,7 +50,7 @@ describe("POST /api/users/[userId]/reactivate", () => {
     expect(res.status).toBe(403);
   });
 
-  it("clears deletedAt for user", async () => {
+  it("unbans user by clearing banned flag", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
@@ -59,7 +59,7 @@ describe("POST /api/users/[userId]/reactivate", () => {
     const mockUpdate = {
       set: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{ id: "u1", email: "u@test.com", deletedAt: null }]),
+        returning: vi.fn().mockResolvedValue([{ id: "u1", email: "u@test.com", banned: false }]),
       }),
     };
     vi.mocked(db.update).mockReturnValueOnce(mockUpdate as never);
@@ -102,7 +102,7 @@ describe("POST /api/users/[userId]/reactivate", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns 404 when user is already active (deletedAt is null)", async () => {
+  it("returns 404 when user is already active (not banned)", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
