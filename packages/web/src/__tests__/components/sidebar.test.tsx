@@ -329,6 +329,20 @@ describe("AppSidebar", () => {
     });
   });
 
+  it("should render a Report a bug link in the footer", () => {
+    render(
+      <SidebarProvider>
+        <AppSidebar agents={[]} isAdmin={false} />
+      </SidebarProvider>
+    );
+    const link = screen.getByRole("link", { name: /report a bug/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute(
+      "href",
+      expect.stringContaining("github.com/heypinchy/pinchy/issues/new")
+    );
+  });
+
   describe("agent ordering", () => {
     it("should render personal agents before non-personal agents", () => {
       const agents = [

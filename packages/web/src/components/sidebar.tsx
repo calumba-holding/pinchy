@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { ClipboardList, Plus, Settings } from "lucide-react";
+import { Bug, ClipboardList, Plus, Settings } from "lucide-react";
 import { LogoutButton } from "@/components/logout-button";
 import {
   Sidebar,
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { getAgentAvatarSvg } from "@/lib/avatar";
+import { buildBugReportUrl } from "@/lib/github-issue";
 
 interface Agent {
   id: string;
@@ -131,6 +132,14 @@ export function AppSidebar({ agents, isAdmin }: AppSidebarProps) {
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <a href={buildBugReportUrl(pathname)} target="_blank" rel="noopener noreferrer">
+                <Bug className="size-4" />
+                <span>Report a bug</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <LogoutButton />
           </SidebarMenuItem>

@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { buildGitHubIssueUrl, buildIssueBody, fetchDiagnostics } from "@/lib/github-issue";
+import {
+  buildGitHubIssueUrl,
+  buildBugReportUrl,
+  buildIssueBody,
+  fetchDiagnostics,
+} from "@/lib/github-issue";
 
 describe("buildGitHubIssueUrl", () => {
   it("should return a GitHub new-issue URL", () => {
@@ -65,6 +70,36 @@ describe("buildGitHubIssueUrl", () => {
     });
     const parsed = new URL(url);
     expect(parsed.searchParams.get("title")).toContain("key=abc&status=error#hash");
+  });
+});
+
+describe("buildBugReportUrl", () => {
+  it("should return a GitHub new-issue URL", () => {
+    const url = buildBugReportUrl("/chat/abc");
+    expect(url).toMatch(/^https:\/\/github\.com\/heypinchy\/pinchy\/issues\/new\?/);
+  });
+
+  it("should include environment info in the body", () => {
+    const url = buildBugReportUrl("/settings");
+    const params = new URLSearchParams(url.split("?")[1]);
+    const body = params.get("body")!;
+    expect(body).toContain("Pinchy:");
+    expect(body).toContain("Browser:");
+    expect(body).toContain("/settings");
+  });
+
+  it("should include steps to reproduce with hint", () => {
+    const url = buildBugReportUrl("/chat/abc");
+    const params = new URLSearchParams(url.split("?")[1]);
+    const body = params.get("body")!;
+    expect(body).toContain("Steps to reproduce");
+    expect(body).toMatch(/please describe/i);
+  });
+
+  it("should include a bug report label", () => {
+    const url = buildBugReportUrl("/chat/abc");
+    const params = new URLSearchParams(url.split("?")[1]);
+    expect(params.get("labels")).toBe("bug");
   });
 });
 

@@ -35,6 +35,31 @@ export function buildGitHubIssueUrl(context: IssueContext): string {
 }
 
 /**
+ * Returns a GitHub new-issue URL for general bug reports (no specific error).
+ * Environment info and steps-to-reproduce hint are embedded in URL params.
+ */
+export function buildBugReportUrl(page: string): string {
+  const body = [
+    "**Environment:**",
+    `- Browser: ${typeof navigator !== "undefined" ? navigator.userAgent : "unknown"}`,
+    `- Pinchy: ${process.env.NEXT_PUBLIC_PINCHY_VERSION ?? "unknown"}`,
+    `- Page: ${page}`,
+    "",
+    "**Steps to reproduce:** *(please describe what you did before the error occurred)*",
+    "1. ",
+    "",
+    "**What happened:**",
+    "",
+    "",
+    "**What you expected:**",
+    "",
+  ].join("\n");
+
+  const params = new URLSearchParams({ body, labels: "bug" });
+  return `${REPO_URL}?${params.toString()}`;
+}
+
+/**
  * Builds the full issue body text for copying to clipboard.
  * Contains error details, environment info, diagnostics, and log instructions.
  */
