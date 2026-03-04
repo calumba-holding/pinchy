@@ -52,4 +52,7 @@ class LogCapture {
   }
 }
 
-export const logCapture = new LogCapture();
+const GLOBAL_KEY = Symbol.for("pinchy:log-capture");
+const g = globalThis as Record<symbol, LogCapture>;
+
+export const logCapture: LogCapture = g[GLOBAL_KEY] ?? (g[GLOBAL_KEY] = new LogCapture());
