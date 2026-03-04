@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -78,7 +78,7 @@ export default function AgentSettingsPage() {
   const params = useParams();
   const router = useRouter();
   const agentId = params.agentId as string;
-  const { data: session } = useSession();
+  const { data: session } = authClient.useSession();
   const { triggerRestart } = useRestart();
 
   const [agent, setAgent] = useState<Agent | null>(null);
