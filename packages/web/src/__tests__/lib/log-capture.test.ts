@@ -74,6 +74,20 @@ describe("logCapture", () => {
     console.warn = originalWarn;
   });
 
+  it("should not double-wrap console methods on repeated install calls", () => {
+    const originalError = console.error;
+
+    logCapture.install();
+    logCapture.install();
+    console.error("Once only");
+
+    const entries = logCapture.getEntries();
+    expect(entries.filter((e) => e.message === "Once only")).toHaveLength(1);
+
+    // Restore
+    console.error = originalError;
+  });
+
   it("should still call original console methods after install", () => {
     const originalError = console.error;
     const calls: string[] = [];

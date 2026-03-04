@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Check, ExternalLink, Loader2 } from "lucide-react";
 import { buildGitHubIssueUrl, buildIssueBody, fetchDiagnostics } from "@/lib/github-issue";
@@ -41,6 +41,12 @@ export function ReportIssueLink({ error, statusCode }: ReportIssueLinkProps) {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 5000);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
   if (copied) {
     return (

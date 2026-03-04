@@ -10,6 +10,7 @@ const MAX_ENTRIES = 100;
 
 class LogCapture {
   private entries: LogEntry[] = [];
+  private installed = false;
 
   add(level: LogLevel, message: string) {
     this.entries.push({
@@ -34,9 +35,13 @@ class LogCapture {
 
   clear() {
     this.entries = [];
+    this.installed = false;
   }
 
   install() {
+    if (this.installed) return;
+    this.installed = true;
+
     const originalError = console.error;
     const originalWarn = console.warn;
 

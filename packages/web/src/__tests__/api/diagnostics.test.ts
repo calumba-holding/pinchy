@@ -1,14 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockDb, mockSql, mockLogCapture } = vi.hoisted(() => ({
+const { mockDb, mockSql, mockLogCapture, mockAuth } = vi.hoisted(() => ({
   mockDb: { execute: vi.fn() },
   mockSql: vi.fn(),
   mockLogCapture: { formatAsText: vi.fn().mockReturnValue("") },
+  mockAuth: vi.fn(),
 }));
 
 vi.mock("@/db", () => ({ db: mockDb }));
 vi.mock("drizzle-orm", () => ({ sql: mockSql }));
 vi.mock("@/lib/log-capture", () => ({ logCapture: mockLogCapture }));
+vi.mock("@/lib/auth", () => ({ auth: () => mockAuth() }));
 
 import { GET } from "@/app/api/diagnostics/route";
 
@@ -79,7 +81,8 @@ describe("GET /api/diagnostics", () => {
     expect(data.openclaw).toBe("unreachable");
   });
 
-  it("should include captured logs in response", async () => {
+  it("should include captured logs when user is authenticated", async () => {
+    mockAuth.mockResolvedValueOnce({ user: { id: "1" } });
     mockDb.execute.mockResolvedValueOnce([{ "?column?": 1 }]);
     vi.spyOn(global, "fetch").mockResolvedValueOnce({ ok: true } as Response);
     mockLogCapture.formatAsText.mockReturnValueOnce(
@@ -92,13 +95,17 @@ describe("GET /api/diagnostics", () => {
     expect(data.logs).toBe("2026-03-04T08:00:00Z [ERROR] DB connection failed");
   });
 
-  it("should return empty logs when no entries captured", async () => {
+  it("should omit logs when user is not authenticated", async () => {
+    mockAuth.mockResolvedValueOnce(null);
     mockDb.execute.mockResolvedValueOnce([{ "?column?": 1 }]);
     vi.spyOn(global, "fetch").mockResolvedValueOnce({ ok: true } as Response);
+    mockLogCapture.formatAsText.mockReturnValueOnce(
+      "2026-03-04T08:00:00Z [ERROR] DB connection failed"
+    );
 
     const response = await GET();
     const data = await response.json();
 
-    expect(data.logs).toBe("");
+    expect(data).not.toHaveProperty("logs");
   });
 });

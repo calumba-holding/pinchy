@@ -22,7 +22,7 @@ describe("buildGitHubIssueUrl", () => {
     });
     const params = new URLSearchParams(url.split("?")[1]);
     expect(params.get("title")).toContain("Connection refused");
-    expect(params.get("title")).toMatch(/^Setup error:/);
+    expect(params.get("title")).toMatch(/^Error:/);
   });
 
   it("should truncate long error messages in the title", () => {

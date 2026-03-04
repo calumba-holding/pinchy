@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { logCapture } from "@/lib/log-capture";
+import { auth } from "@/lib/auth";
 
 async function checkDatabase(): Promise<"connected" | "unreachable"> {
   try {
@@ -32,13 +33,23 @@ async function checkOpenClaw(): Promise<"connected" | "unreachable"> {
 }
 
 export async function GET() {
-  const [database, openclaw] = await Promise.all([checkDatabase(), checkOpenClaw()]);
+  const [database, openclaw, session] = await Promise.all([
+    checkDatabase(),
+    checkOpenClaw(),
+    auth(),
+  ]);
 
-  return NextResponse.json({
+  const response: Record<string, unknown> = {
     database,
     openclaw,
     version: process.env.NEXT_PUBLIC_PINCHY_VERSION ?? "unknown",
     nodeEnv: process.env.NODE_ENV ?? "unknown",
-    logs: logCapture.formatAsText(),
-  });
+  };
+
+  // Only include server logs for authenticated users
+  if (session?.user) {
+    response.logs = logCapture.formatAsText();
+  }
+
+  return NextResponse.json(response);
 }

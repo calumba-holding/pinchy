@@ -18,7 +18,7 @@ const MAX_TITLE_LENGTH = 80;
 
 function buildTitle(error: string): string {
   const truncatedError = error.length > 60 ? error.slice(0, 57) + "..." : error;
-  return `Setup error: ${truncatedError}`.slice(0, MAX_TITLE_LENGTH);
+  return `Error: ${truncatedError}`.slice(0, MAX_TITLE_LENGTH);
 }
 
 /**

@@ -116,6 +116,27 @@ describe("ReportIssueLink", () => {
     expect(screen.getByRole("button", { name: /report this issue/i })).toBeDisabled();
   });
 
+  it("should reset copied state after timeout and show the report button again", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockFetchDiagnostics.mockResolvedValueOnce(null);
+
+    render(<ReportIssueLink error="Test error" />);
+    await user.click(screen.getByRole("button", { name: /report this issue/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/copied/i)).toBeInTheDocument();
+    });
+
+    await vi.advanceTimersByTimeAsync(5000);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /report this issue/i })).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
   it("should still open GitHub URL when clipboard write fails", async () => {
     const user = userEvent.setup();
     mockFetchDiagnostics.mockResolvedValueOnce(null);
