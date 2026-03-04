@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { activeAgents } from "@/db/schema";
 import { eq, or } from "drizzle-orm";
 import { AppSidebar } from "@/components/sidebar";
+import { AppShell } from "@/components/app-shell";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -29,7 +30,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <SidebarProvider>
       <AppSidebar agents={visibleAgents} isAdmin={isAdmin} />
-      <SidebarInset className="overflow-y-auto">{children}</SidebarInset>
+      <SidebarInset className="overflow-y-auto">
+        <AppShell isAdmin={isAdmin}>{children}</AppShell>
+      </SidebarInset>
     </SidebarProvider>
   );
 }
