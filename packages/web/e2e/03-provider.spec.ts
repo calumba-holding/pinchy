@@ -59,7 +59,7 @@ test.describe("Provider configuration", () => {
     // Should go straight to app (agents page), not provider setup
     await expect(page).toHaveURL(/\/agents/, { timeout: 10000 });
 
-    // Verify Smithers agent is visible
-    await expect(page.getByRole("link", { name: /smithers/i })).toBeVisible();
+    // Verify Smithers agent is visible in the agent list
+    await expect(page.getByRole("main").getByRole("link", { name: /smithers/i })).toBeVisible();
   });
 });

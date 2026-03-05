@@ -118,8 +118,11 @@ test.describe("chat reconnect recovery", () => {
 
     await expect(page).toHaveURL(/\/agents/, { timeout: 10000 });
 
-    // Navigate to Smithers chat
-    await page.getByRole("link", { name: /smithers/i }).click();
+    // Navigate to Smithers chat (scope to main to avoid sidebar duplicate)
+    await page
+      .getByRole("main")
+      .getByRole("link", { name: /smithers/i })
+      .click();
     await expect(page).toHaveURL(/\/chat\//, { timeout: 10000 });
 
     // Ensure the chat thread is ready and connected with initial history.
