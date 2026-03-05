@@ -283,8 +283,15 @@ export default function AgentSettingsPage() {
   }
 
   const isAdmin = session?.user?.role === "admin";
+  const canEdit = isAdmin || agent.isPersonal;
   const canDelete = isAdmin && !agent.isPersonal;
   const showPermissions = isAdmin && !agent.isPersonal;
+
+  // Non-admins cannot edit shared agents — redirect to chat
+  if (!canEdit) {
+    router.replace(`/chat/${agentId}`);
+    return <div className="p-8 text-muted-foreground">Redirecting...</div>;
+  }
 
   return (
     <div className="overflow-y-auto p-8 pb-24 max-w-2xl">

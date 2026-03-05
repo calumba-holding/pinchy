@@ -51,6 +51,11 @@ ALTER TABLE "user" ADD COLUMN "created_at" timestamp DEFAULT now() NOT NULL;--> 
 ALTER TABLE "user" ADD COLUMN "updated_at" timestamp DEFAULT now() NOT NULL;--> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+-- Migrate existing password hashes from user table to Better Auth account table
+INSERT INTO "account" ("id", "user_id", "account_id", "provider_id", "password", "created_at", "updated_at")
+SELECT gen_random_uuid(), "id", "id", 'credential', "password_hash", now(), now()
+FROM "user"
+WHERE "password_hash" IS NOT NULL;--> statement-breakpoint
 ALTER TABLE "user" DROP COLUMN "emailVerified";--> statement-breakpoint
 ALTER TABLE "user" DROP COLUMN "password_hash";--> statement-breakpoint
 ALTER TABLE "user" DROP COLUMN "deleted_at";

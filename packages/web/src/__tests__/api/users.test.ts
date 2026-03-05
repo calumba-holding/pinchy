@@ -93,7 +93,7 @@ describe("GET /api/users", () => {
     expect(body.error).toBe("Forbidden");
   });
 
-  it("returns list of users without passwordHash", async () => {
+  it("returns only selected user fields", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
@@ -117,8 +117,8 @@ describe("GET /api/users", () => {
     expect(body.users[0].name).toBe("Alice");
     expect(body.users[0].email).toBe("alice@test.com");
     expect(body.users[0].role).toBe("user");
-    // Ensure passwordHash is NOT in the response
-    expect(body.users[0]).not.toHaveProperty("passwordHash");
+    // Ensure only selected fields are returned (no sensitive data leaks)
+    expect(Object.keys(body.users[0]).sort()).toEqual(["email", "id", "name", "role"]);
   });
 
   it("includes banned status in user list", async () => {

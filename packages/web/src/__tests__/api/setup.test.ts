@@ -118,9 +118,6 @@ describe("createAdmin", () => {
       id: "1",
       email: "admin@test.com",
       name: "Admin",
-      emailVerified: null,
-      image: null,
-      passwordHash: "hashed",
       role: "admin",
     });
 
@@ -214,9 +211,6 @@ describe("POST /api/setup", () => {
       id: "1",
       email: "admin@test.com",
       name: "Admin",
-      emailVerified: null,
-      image: null,
-      passwordHash: "hashed",
       role: "admin",
     });
 

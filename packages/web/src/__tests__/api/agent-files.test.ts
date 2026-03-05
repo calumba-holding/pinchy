@@ -22,15 +22,12 @@ vi.mock("@/lib/workspace", () => ({
   writeWorkspaceFile: vi.fn(),
 }));
 
-const { mockNotifyRestart } = vi.hoisted(() => ({
-  mockNotifyRestart: vi.fn(),
+const { mockAssertAgentWriteAccess } = vi.hoisted(() => ({
+  mockAssertAgentWriteAccess: vi.fn(),
 }));
-vi.mock("@/server/restart-state", () => ({
-  restartState: { notifyRestart: mockNotifyRestart },
-}));
-
 vi.mock("@/lib/agent-access", () => ({
   getAgentWithAccess: vi.fn(),
+  assertAgentWriteAccess: mockAssertAgentWriteAccess,
 }));
 
 import { auth } from "@/lib/auth";
@@ -312,25 +309,31 @@ describe("PUT /api/agents/[agentId]/files/[filename]", () => {
     expect(writeWorkspaceFile).not.toHaveBeenCalled();
   });
 
-  it("should trigger OpenClaw restart after writing file", async () => {
-    const request = makePutRequest("agent-1", "SOUL.md", {
-      content: "# Updated soul",
+  it("should return 403 when non-admin tries to modify shared agent files", async () => {
+    mockAssertAgentWriteAccess.mockImplementationOnce(() => {
+      throw new Error("Access denied");
     });
-    await PUT(request, makeParams("agent-1", "SOUL.md"));
 
-    expect(mockNotifyRestart).toHaveBeenCalled();
+    const request = makePutRequest("agent-1", "AGENTS.md", {
+      content: "# Hacked instructions",
+    });
+    const response = await PUT(request, makeParams("agent-1", "AGENTS.md"));
+
+    expect(response.status).toBe(403);
+    const data = await response.json();
+    expect(data.error).toBe("Forbidden");
+    expect(writeWorkspaceFile).not.toHaveBeenCalled();
   });
 
-  it("should not trigger restart when file write fails", async () => {
-    vi.mocked(writeWorkspaceFile).mockImplementationOnce(() => {
-      throw new Error("File not allowed: HACK.md");
-    });
+  it("should allow write when assertAgentWriteAccess passes", async () => {
+    mockAssertAgentWriteAccess.mockImplementationOnce(() => {});
 
-    const request = makePutRequest("agent-1", "HACK.md", {
-      content: "malicious content",
+    const request = makePutRequest("agent-1", "AGENTS.md", {
+      content: "# Valid update",
     });
-    await PUT(request, makeParams("agent-1", "HACK.md"));
+    const response = await PUT(request, makeParams("agent-1", "AGENTS.md"));
 
-    expect(mockNotifyRestart).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(writeWorkspaceFile).toHaveBeenCalledWith("agent-1", "AGENTS.md", "# Valid update");
   });
 });

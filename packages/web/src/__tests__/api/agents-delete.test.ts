@@ -162,9 +162,9 @@ describe("PATCH /api/agents/[agentId]", () => {
     expect(response.status).toBe(401);
   });
 
-  it("updates agent when authenticated", async () => {
+  it("updates agent when authenticated as admin", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValueOnce({
-      user: { id: "user-1", role: "user" },
+      user: { id: "admin-1", role: "admin" },
       expires: "",
     } as any);
 
@@ -280,7 +280,7 @@ describe("PATCH /api/agents/[agentId]", () => {
     });
   });
 
-  it("returns 403 when non-admin tries to update allowedTools", async () => {
+  it("returns 403 when non-admin tries to modify shared agent", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "user-1", role: "user" },
       expires: "",
@@ -304,7 +304,7 @@ describe("PATCH /api/agents/[agentId]", () => {
     expect(response.status).toBe(403);
 
     const body = await response.json();
-    expect(body.error).toBe("Only admins can change permissions");
+    expect(body.error).toBe("Forbidden");
   });
 
   it("returns 400 when trying to update allowedTools for personal agent", async () => {
@@ -403,7 +403,7 @@ describe("PATCH /api/agents/[agentId]", () => {
 
   it("should update greeting message", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValueOnce({
-      user: { id: "user-1", role: "user" },
+      user: { id: "admin-1", role: "admin" },
       expires: "",
     } as any);
 
@@ -438,7 +438,7 @@ describe("PATCH /api/agents/[agentId]", () => {
 
   it("should allow clearing greeting message with null", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValueOnce({
-      user: { id: "user-1", role: "user" },
+      user: { id: "user-1", role: "admin" },
       expires: "",
     } as any);
 

@@ -263,9 +263,6 @@ describe("POST /api/invite/claim", () => {
       id: "existing-user-id",
       email: "existing@test.com",
       name: "Existing User",
-      emailVerified: null,
-      image: null,
-      passwordHash: "old_hash",
       role: "user",
     });
 
@@ -305,9 +302,6 @@ describe("POST /api/invite/claim", () => {
       id: "existing-user-id",
       email: "existing@test.com",
       name: "Existing User",
-      emailVerified: null,
-      image: null,
-      passwordHash: "old_hash",
       role: "user",
     });
 

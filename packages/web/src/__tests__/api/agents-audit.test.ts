@@ -429,6 +429,106 @@ describe("PATCH /api/agents/[agentId] name length validation", () => {
   });
 });
 
+// ── PATCH /api/agents/[agentId] — write access control ────────────────
+
+describe("PATCH /api/agents/[agentId] write access control", () => {
+  let PATCH: typeof import("@/app/api/agents/[agentId]/route").PATCH;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const mod = await import("@/app/api/agents/[agentId]/route");
+    PATCH = mod.PATCH;
+  });
+
+  it("should deny non-admin user from modifying shared agent", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
+      user: { id: "user-1", role: "user" },
+      expires: "",
+    } as any);
+
+    mockAgent({
+      id: "agent-1",
+      name: "Shared Agent",
+      isPersonal: false,
+      ownerId: null,
+    });
+
+    const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
+      method: "PATCH",
+      body: JSON.stringify({ name: "Hacked Agent" }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await PATCH(request, {
+      params: Promise.resolve({ agentId: "agent-1" }),
+    });
+    expect(response.status).toBe(403);
+    expect(updateAgent).not.toHaveBeenCalled();
+  });
+
+  it("should allow personal agent owner to modify their agent", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
+      user: { id: "user-1", role: "user" },
+      expires: "",
+    } as any);
+
+    mockAgent({
+      id: "agent-1",
+      name: "My Agent",
+      isPersonal: true,
+      ownerId: "user-1",
+    });
+
+    vi.mocked(updateAgent).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Renamed Agent",
+    } as never);
+
+    const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
+      method: "PATCH",
+      body: JSON.stringify({ name: "Renamed Agent" }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await PATCH(request, {
+      params: Promise.resolve({ agentId: "agent-1" }),
+    });
+    expect(response.status).toBe(200);
+    expect(updateAgent).toHaveBeenCalled();
+  });
+
+  it("should allow admin to modify shared agent", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
+      user: { id: "admin-1", role: "admin" },
+      expires: "",
+    } as any);
+
+    mockAgent({
+      id: "agent-1",
+      name: "Shared Agent",
+      isPersonal: false,
+      ownerId: null,
+    });
+
+    vi.mocked(updateAgent).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Updated Shared Agent",
+    } as never);
+
+    const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
+      method: "PATCH",
+      body: JSON.stringify({ name: "Updated Shared Agent" }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await PATCH(request, {
+      params: Promise.resolve({ agentId: "agent-1" }),
+    });
+    expect(response.status).toBe(200);
+    expect(updateAgent).toHaveBeenCalled();
+  });
+});
+
 // ── PATCH /api/agents/[agentId] — config regeneration ─────────────────
 
 describe("PATCH /api/agents/[agentId] config regeneration", () => {

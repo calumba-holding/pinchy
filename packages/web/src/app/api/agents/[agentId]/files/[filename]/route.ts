@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { getSession } from "@/lib/auth";
 import { readWorkspaceFile, writeWorkspaceFile } from "@/lib/workspace";
-import { getAgentWithAccess } from "@/lib/agent-access";
-import { restartState } from "@/server/restart-state";
+import { getAgentWithAccess, assertAgentWriteAccess } from "@/lib/agent-access";
 
 type Params = { params: Promise<{ agentId: string; filename: string }> };
 
@@ -38,6 +37,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
   const agentOrError = await getAgentWithAccess(agentId, session.user.id!, session.user.role);
   if (agentOrError instanceof NextResponse) return agentOrError;
 
+  // Only admins or personal agent owners can modify agent files
+  try {
+    assertAgentWriteAccess(agentOrError, session.user.id!, session.user.role);
+  } catch {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { content } = await request.json();
 
   if (typeof content !== "string") {
@@ -46,7 +52,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
   try {
     writeWorkspaceFile(agentId, filename, content);
-    restartState.notifyRestart();
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Invalid file";

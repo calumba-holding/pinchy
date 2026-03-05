@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { updateAgent, deleteAgent, AGENT_NAME_MAX_LENGTH } from "@/lib/agents";
 import { getSession } from "@/lib/auth";
-import { getAgentWithAccess } from "@/lib/agent-access";
+import { getAgentWithAccess, assertAgentWriteAccess } from "@/lib/agent-access";
 import { appendAuditLog } from "@/lib/audit";
 import { writeIdentityFile } from "@/lib/workspace";
 
@@ -44,6 +44,13 @@ export async function PATCH(
   if (existingAgentOrError instanceof NextResponse) return existingAgentOrError;
   const existingAgent = existingAgentOrError;
 
+  // Only admins or personal agent owners can modify agents
+  try {
+    assertAgentWriteAccess(existingAgent, session.user.id!, session.user.role);
+  } catch {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const body = await request.json();
 
   if (
@@ -57,7 +64,7 @@ export async function PATCH(
     );
   }
 
-  // Only admins can change permissions
+  // Only admins can change permissions on shared agents
   if (body.allowedTools !== undefined) {
     if (session.user.role !== "admin") {
       return NextResponse.json({ error: "Only admins can change permissions" }, { status: 403 });
