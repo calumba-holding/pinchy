@@ -87,6 +87,21 @@ export function InviteDialog({ open, onOpenChange }: InviteDialogProps) {
     }
   }
 
+  const canShare =
+    typeof navigator !== "undefined" &&
+    typeof navigator.share === "function" &&
+    typeof navigator.canShare === "function";
+
+  async function handleShare() {
+    if (inviteLink && canShare) {
+      try {
+        await navigator.share({ title: "Pinchy Invite", url: inviteLink });
+      } catch {
+        // User cancelled share — ignore
+      }
+    }
+  }
+
   async function handleCopy() {
     if (inviteLink) {
       await navigator.clipboard.writeText(inviteLink);
@@ -111,7 +126,11 @@ export function InviteDialog({ open, onOpenChange }: InviteDialogProps) {
           <div className="space-y-4">
             <p className="text-sm font-medium">Invite link created:</p>
             <p className="text-sm break-all bg-muted p-2 rounded">{inviteLink}</p>
-            <Button onClick={handleCopy}>{copied ? "Copied!" : "Copy"}</Button>
+            {canShare ? (
+              <Button onClick={handleShare}>Share</Button>
+            ) : (
+              <Button onClick={handleCopy}>{copied ? "Copied!" : "Copy"}</Button>
+            )}
           </div>
         ) : (
           <Form {...form}>

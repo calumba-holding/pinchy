@@ -148,6 +148,79 @@ describe("InviteDialog", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it("should show Share button when Web Share API is available", async () => {
+    const user = userEvent.setup();
+
+    // Mock navigator.share as available
+    const shareMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", {
+      value: shareMock,
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "canShare", {
+      value: () => true,
+      writable: true,
+      configurable: true,
+    });
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ token: "share-token" }),
+    } as Response);
+
+    render(<InviteDialog open={true} onOpenChange={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Create Invite" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("http://localhost:7777/invite/share-token")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Share" }));
+
+    expect(shareMock).toHaveBeenCalledWith({
+      title: "Pinchy Invite",
+      url: "http://localhost:7777/invite/share-token",
+    });
+
+    // Cleanup
+    // @ts-expect-error cleaning up mock
+    delete navigator.share;
+    // @ts-expect-error cleaning up mock
+    delete navigator.canShare;
+  });
+
+  it("should show Copy button when Web Share API is not available", async () => {
+    const user = userEvent.setup();
+
+    // Ensure navigator.share is NOT available
+    const originalShare = navigator.share;
+    // @ts-expect-error removing for test
+    delete navigator.share;
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ token: "copy-token" }),
+    } as Response);
+
+    render(<InviteDialog open={true} onOpenChange={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: "Create Invite" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("http://localhost:7777/invite/copy-token")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
+
+    // Restore
+    if (originalShare) navigator.share = originalShare;
+  });
+
   it("should reset form when dialog closes and reopens", async () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
