@@ -17,12 +17,14 @@ const CONFIG_FILES = [
   "docker-compose.dev.yml",
   ".github/workflows/ci.yml",
   "packages/web/server-preload.cjs",
+  "packages/web/playwright.config.ts",
 ];
 
 const LEGACY_PATTERNS = [
   { pattern: /NEXTAUTH_SECRET/g, replacement: "BETTER_AUTH_SECRET" },
   { pattern: /NEXTAUTH_URL/g, replacement: "BETTER_AUTH_URL" },
   { pattern: /AUTH_TRUST_HOST/g, replacement: "N/A (not needed by Better Auth)" },
+  { pattern: /(?<![A-Z_])AUTH_SECRET(?![A-Z_])/g, replacement: "BETTER_AUTH_SECRET" },
 ];
 
 describe("auth config consistency", () => {
