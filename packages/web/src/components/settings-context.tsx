@@ -34,6 +34,11 @@ function ContextSection({
   } | null>(null);
 
   useEffect(() => {
+    setContent(initialContent);
+    setSavedContent(initialContent);
+  }, [initialContent]);
+
+  useEffect(() => {
     onDirtyChange?.(content !== savedContent);
   }, [content, savedContent, onDirtyChange]);
 
