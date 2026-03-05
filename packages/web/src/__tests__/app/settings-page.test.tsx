@@ -167,14 +167,17 @@ describe("Settings Page", () => {
       });
     });
 
-    it("should show Provider tab content by default for admin", async () => {
+    it("should show Context tab content by default for admin", async () => {
       setupAdminFetchMocks();
 
       render(<SettingsPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("LLM Provider")).toBeInTheDocument();
+        expect(screen.getByTestId("mock-settings-context")).toBeInTheDocument();
       });
+
+      const contextTab = screen.getByRole("tab", { name: /context/i });
+      expect(contextTab).toHaveAttribute("data-state", "active");
     });
 
     it("should render LLM Provider section with ProviderKeyForm", async () => {
@@ -238,6 +241,27 @@ describe("Settings Page", () => {
         expect(global.fetch).toHaveBeenCalledWith("/api/settings/providers");
       });
     });
+  });
+
+  it("should default to Context tab for admin even when session loads async", async () => {
+    // Simulate: first render has no session, then session loads
+    const pendingSession = { data: null, isPending: true };
+    mockUseSession.mockReturnValue(pendingSession);
+    setupAdminFetchMocks();
+
+    const { rerender } = render(<SettingsPage />);
+
+    // Session loads → admin
+    mockUseSession.mockReturnValue(adminSession);
+    rerender(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Context" })).toBeInTheDocument();
+    });
+
+    // Context tab should be the active/selected one
+    const contextTab = screen.getByRole("tab", { name: "Context" });
+    expect(contextTab).toHaveAttribute("data-state", "active");
   });
 
   describe("Tab state preservation (keepMounted)", () => {
