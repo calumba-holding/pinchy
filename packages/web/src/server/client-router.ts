@@ -182,30 +182,8 @@ export class ClientRouter {
     try {
       await this.waitForConnection();
 
-      // Check if session exists in OpenClaw (cached)
-      if (this.sessionCache.isStale()) {
-        try {
-          const result = await this.openclawClient.sessions.list();
-          const sessions = (result as { sessions?: { key: string }[] })?.sessions ?? [];
-          this.sessionCache.refresh(sessions);
-        } catch {
-          // If we can't list sessions, fall back to greeting/empty
-          const greeting = await this.getPersonalizedGreeting(agent.greetingMessage);
-          const messages = greeting ? [{ role: "assistant", content: greeting }] : [];
-          this.sendToClient(clientWs, { type: "history", messages });
-          return;
-        }
-      }
-
-      if (!this.sessionCache.has(sessionKey)) {
-        // Session doesn't exist in OpenClaw yet — return greeting or empty
-        const greeting = await this.getPersonalizedGreeting(agent.greetingMessage);
-        const messages = greeting ? [{ role: "assistant", content: greeting }] : [];
-        this.sendToClient(clientWs, { type: "history", messages });
-        return;
-      }
-
-      // Session exists — fetch history from OpenClaw
+      // Always fetch history directly from OpenClaw — the session cache
+      // can miss sessions (e.g. after agent switching or timing gaps)
       const result = (await this.openclawClient.sessions.history(sessionKey)) as {
         messages?: HistoryMessage[];
       };
@@ -237,12 +215,20 @@ export class ClientRouter {
         })
         .filter((msg) => msg.content);
 
-      this.sendToClient(clientWs, { type: "history", messages });
+      if (messages.length > 0) {
+        this.sessionCache.add(sessionKey);
+        this.sendToClient(clientWs, { type: "history", messages });
+      } else {
+        // No history — show greeting for new conversations
+        const greeting = await this.getPersonalizedGreeting(agent.greetingMessage);
+        const greetingMessages = greeting ? [{ role: "assistant", content: greeting }] : [];
+        this.sendToClient(clientWs, { type: "history", messages: greetingMessages });
+      }
     } catch (err) {
-      this.sendToClient(clientWs, {
-        type: "error",
-        message: this.sanitizeError(err),
-      });
+      // If history fetch fails (e.g. session doesn't exist), fall back to greeting
+      const greeting = await this.getPersonalizedGreeting(agent.greetingMessage);
+      const greetingMessages = greeting ? [{ role: "assistant", content: greeting }] : [];
+      this.sendToClient(clientWs, { type: "history", messages: greetingMessages });
     }
   }
 

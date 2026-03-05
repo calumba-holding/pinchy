@@ -116,6 +116,13 @@ test.describe("chat reconnect recovery", () => {
     await page.getByLabel(/password/i).fill("test-password-123");
     await page.getByRole("button", { name: /sign in/i }).click();
 
+    await expect(page).toHaveURL(/\/agents/, { timeout: 10000 });
+
+    // Navigate to Smithers chat (scope to main to avoid sidebar duplicate)
+    await page
+      .getByRole("main")
+      .getByRole("link", { name: /smithers/i })
+      .click();
     await expect(page).toHaveURL(/\/chat\//, { timeout: 10000 });
 
     // Ensure the chat thread is ready and connected with initial history.

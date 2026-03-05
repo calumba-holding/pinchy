@@ -172,6 +172,19 @@ describe("SettingsContext", () => {
     });
   });
 
+  it("updates displayed content when initialContent prop changes (async fetch)", () => {
+    const { rerender } = render(<SettingsContext userContext="" orgContext="" isAdmin={false} />);
+
+    // Initially empty
+    const textarea = screen.getByRole("textbox");
+    expect(textarea).toHaveValue("");
+
+    // Simulate async fetch completing — parent passes new prop
+    rerender(<SettingsContext userContext="Fetched context" orgContext="" isAdmin={false} />);
+
+    expect(textarea).toHaveValue("Fetched context");
+  });
+
   it("shows error feedback on failure", async () => {
     vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: false,

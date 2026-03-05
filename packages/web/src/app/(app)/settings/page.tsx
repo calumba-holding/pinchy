@@ -86,18 +86,34 @@ export default function SettingsPage() {
 
   return (
     <div className="overflow-y-auto">
-      <div className="p-8 max-w-lg">
+      <div className="p-4 md:p-8 max-w-lg">
         <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
-        <Tabs defaultValue={isAdmin ? "provider" : "context"}>
+        <Tabs defaultValue="context">
           <TabsList>
+            <TabsTrigger value="context">Context {contextDirty && <DirtyDot />}</TabsTrigger>
+            <TabsTrigger value="profile">Profile {profileDirty && <DirtyDot />}</TabsTrigger>
             {isAdmin && (
               <TabsTrigger value="provider">Provider {providerDirty && <DirtyDot />}</TabsTrigger>
             )}
             {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
-            <TabsTrigger value="context">Context {contextDirty && <DirtyDot />}</TabsTrigger>
-            <TabsTrigger value="profile">Profile {profileDirty && <DirtyDot />}</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="context" keepMounted>
+            <SettingsContext
+              userContext={userContext}
+              orgContext={orgContext}
+              isAdmin={isAdmin}
+              onDirtyChange={handleContextDirtyChange}
+            />
+          </TabsContent>
+
+          <TabsContent value="profile" keepMounted>
+            <SettingsProfile
+              userName={session?.user?.name ?? ""}
+              onDirtyChange={handleProfileDirtyChange}
+            />
+          </TabsContent>
 
           {isAdmin && (
             <TabsContent value="provider" keepMounted>
@@ -127,22 +143,6 @@ export default function SettingsPage() {
               <SettingsUsers currentUserId={session?.user?.id ?? ""} />
             </TabsContent>
           )}
-
-          <TabsContent value="context" keepMounted>
-            <SettingsContext
-              userContext={userContext}
-              orgContext={orgContext}
-              isAdmin={isAdmin}
-              onDirtyChange={handleContextDirtyChange}
-            />
-          </TabsContent>
-
-          <TabsContent value="profile" keepMounted>
-            <SettingsProfile
-              userName={session?.user?.name ?? ""}
-              onDirtyChange={handleProfileDirtyChange}
-            />
-          </TabsContent>
         </Tabs>
       </div>
     </div>

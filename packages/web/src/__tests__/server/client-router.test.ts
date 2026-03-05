@@ -502,13 +502,20 @@ describe("ClientRouter", () => {
     expect(sent[0].messages[1].role).toBe("assistant");
   });
 
-  it("should return empty history when session not in cache", async () => {
+  it("should fetch history from OpenClaw even when session not in cache", async () => {
     const freshCache = new SessionCache();
     const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
     const clientWs = createMockClientWs();
 
-    // Cache is stale (never refreshed) and sessions.list returns no matching session
+    // Cache is stale and sessions.list returns no matching session
     mockSessionsList.mockResolvedValue({ sessions: [] });
+    // But OpenClaw actually has history for this session
+    mockSessionsHistory.mockResolvedValue({
+      messages: [
+        { role: "user", content: "Hello", timestamp: "2025-01-01T00:00:00Z" },
+        { role: "assistant", content: "Hi there!", timestamp: "2025-01-01T00:00:01Z" },
+      ],
+    });
 
     await freshRouter.handleMessage(clientWs as any, {
       type: "history",
@@ -516,14 +523,16 @@ describe("ClientRouter", () => {
       agentId: "agent-1",
     });
 
-    expect(mockSessionsHistory).not.toHaveBeenCalled();
+    expect(mockSessionsHistory).toHaveBeenCalledWith("agent:agent-1:user-user-1");
     const sent = clientWs.sent.map((s) => JSON.parse(s));
     expect(sent).toHaveLength(1);
     expect(sent[0].type).toBe("history");
-    expect(sent[0].messages).toEqual([]);
+    expect(sent[0].messages).toHaveLength(2);
+    expect(sent[0].messages[0].content).toBe("Hello");
+    expect(sent[0].messages[1].content).toBe("Hi there!");
   });
 
-  it("should return greeting message in history when session not in cache", async () => {
+  it("should return greeting when OpenClaw has no history for session", async () => {
     const freshCache = new SessionCache();
     const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
     const clientWs = createMockClientWs();
@@ -532,8 +541,8 @@ describe("ClientRouter", () => {
       greetingMessage: "Hello! I'm Smithers, your AI assistant. How can I help?",
     });
 
-    // Cache is stale, sessions.list returns no matching session
-    mockSessionsList.mockResolvedValue({ sessions: [] });
+    // OpenClaw returns empty history
+    mockSessionsHistory.mockResolvedValue({ messages: [] });
 
     await freshRouter.handleMessage(clientWs as any, {
       type: "history",
@@ -541,7 +550,7 @@ describe("ClientRouter", () => {
       agentId: "agent-1",
     });
 
-    expect(mockSessionsHistory).not.toHaveBeenCalled();
+    expect(mockSessionsHistory).toHaveBeenCalledWith("agent:agent-1:user-user-1");
     const sent = clientWs.sent.map((s) => JSON.parse(s));
     expect(sent).toHaveLength(1);
     expect(sent[0].type).toBe("history");
@@ -553,7 +562,7 @@ describe("ClientRouter", () => {
     ]);
   });
 
-  it("should return empty history when session not in cache and agent has no greeting", async () => {
+  it("should return empty history when no history and agent has no greeting", async () => {
     const freshCache = new SessionCache();
     const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
     const clientWs = createMockClientWs();
@@ -562,8 +571,8 @@ describe("ClientRouter", () => {
       greetingMessage: null,
     });
 
-    // Cache is stale, sessions.list returns no matching session
-    mockSessionsList.mockResolvedValue({ sessions: [] });
+    // OpenClaw returns empty history
+    mockSessionsHistory.mockResolvedValue({ messages: [] });
 
     await freshRouter.handleMessage(clientWs as any, {
       type: "history",
@@ -571,7 +580,7 @@ describe("ClientRouter", () => {
       agentId: "agent-1",
     });
 
-    expect(mockSessionsHistory).not.toHaveBeenCalled();
+    expect(mockSessionsHistory).toHaveBeenCalledWith("agent:agent-1:user-user-1");
     const sent = clientWs.sent.map((s) => JSON.parse(s));
     expect(sent).toHaveLength(1);
     expect(sent[0].type).toBe("history");
@@ -670,8 +679,12 @@ describe("ClientRouter", () => {
     expect(freshCache.has("agent:agent-1:user-user-1")).toBe(true);
   });
 
-  it("should send error when history fetch fails", async () => {
+  it("should fall back to empty history when history fetch fails and no greeting", async () => {
     const clientWs = createMockClientWs();
+    mockFindFirst.mockResolvedValue({
+      ...defaultAgent,
+      greetingMessage: null,
+    });
     mockSessionsHistory.mockRejectedValue(new Error("Gateway unavailable"));
 
     await router.handleMessage(clientWs as any, {
@@ -682,8 +695,8 @@ describe("ClientRouter", () => {
 
     const sent = clientWs.sent.map((s) => JSON.parse(s));
     expect(sent).toHaveLength(1);
-    expect(sent[0].type).toBe("error");
-    expect(sent[0].message).toBe("Something went wrong. Please try again.");
+    expect(sent[0].type).toBe("history");
+    expect(sent[0].messages).toEqual([]);
   });
 
   it("should sanitize internal error messages before sending to client", async () => {
@@ -705,8 +718,12 @@ describe("ClientRouter", () => {
     expect(messages[0].message).toBe("Something went wrong. Please try again.");
   });
 
-  it("should sanitize history error messages before sending to client", async () => {
+  it("should fall back to greeting when history fetch throws an error", async () => {
     const clientWs = createMockClientWs();
+    mockFindFirst.mockResolvedValue({
+      ...defaultAgent,
+      greetingMessage: "Hello!",
+    });
     mockSessionsHistory.mockRejectedValue(new Error("Internal: /root/.openclaw/config error"));
 
     await router.handleMessage(clientWs as any, {
@@ -716,9 +733,8 @@ describe("ClientRouter", () => {
     });
 
     const sent = clientWs.sent.map((s) => JSON.parse(s));
-    expect(sent[0].type).toBe("error");
-    expect(sent[0].message).not.toContain("/root/");
-    expect(sent[0].message).toBe("Something went wrong. Please try again.");
+    expect(sent[0].type).toBe("history");
+    expect(sent[0].messages).toEqual([{ role: "assistant", content: "Hello!" }]);
   });
 
   it("should wait for reconnect and succeed when OpenClaw reconnects in time", async () => {
@@ -751,7 +767,7 @@ describe("ClientRouter", () => {
     expect(sent[0].type).toBe("history");
   });
 
-  it("should return error after timeout when OpenClaw does not reconnect", async () => {
+  it("should return greeting after timeout when OpenClaw does not reconnect for history", async () => {
     vi.useFakeTimers();
 
     const disconnectedClient = createMockOpenClawClient(false);
@@ -761,8 +777,10 @@ describe("ClientRouter", () => {
       "user",
       sessionCache
     );
-
-    mockSessionsHistory.mockRejectedValue(new Error("Not connected to OpenClaw Gateway"));
+    mockFindFirst.mockResolvedValue({
+      ...defaultAgent,
+      greetingMessage: "Hello!",
+    });
 
     const clientWs = createMockClientWs();
     const messagePromise = disconnectedRouter.handleMessage(clientWs as any, {
@@ -777,8 +795,8 @@ describe("ClientRouter", () => {
 
     const sent = clientWs.sent.map((s) => JSON.parse(s));
     expect(sent).toHaveLength(1);
-    expect(sent[0].type).toBe("error");
-    expect(sent[0].message).toContain("not available");
+    expect(sent[0].type).toBe("history");
+    expect(sent[0].messages).toEqual([{ role: "assistant", content: "Hello!" }]);
 
     vi.useRealTimers();
   });
@@ -901,14 +919,11 @@ describe("ClientRouter", () => {
     expect(messages.some((m: any) => m.type === "chunk")).toBe(true);
   });
 
-  it("should call sessions.list when cache is stale for history", async () => {
+  it("should fetch history directly without calling sessions.list", async () => {
     const freshCache = new SessionCache();
     const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
-    mockSessionsList.mockResolvedValue({
-      sessions: [{ key: "agent:agent-1:user-user-1" }],
-    });
     mockSessionsHistory.mockResolvedValue({
-      messages: [{ role: "user", content: "Hi" }],
+      messages: [{ role: "user", content: "Hi", timestamp: "2025-01-01T00:00:00Z" }],
     });
 
     const clientWs = createMockClientWs();
@@ -918,31 +933,8 @@ describe("ClientRouter", () => {
       agentId: "agent-1",
     });
 
-    expect(mockSessionsList).toHaveBeenCalled();
+    expect(mockSessionsList).not.toHaveBeenCalled();
     expect(mockSessionsHistory).toHaveBeenCalledWith("agent:agent-1:user-user-1");
-  });
-
-  it("should return greeting when sessions.list fails", async () => {
-    const freshCache = new SessionCache();
-    const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
-
-    mockFindFirst.mockResolvedValue({
-      ...defaultAgent,
-      greetingMessage: "Hello!",
-    });
-    mockSessionsList.mockRejectedValue(new Error("Gateway timeout"));
-
-    const clientWs = createMockClientWs();
-    await freshRouter.handleMessage(clientWs as any, {
-      type: "history",
-      content: "",
-      agentId: "agent-1",
-    });
-
-    const sent = clientWs.sent.map((s) => JSON.parse(s));
-    expect(sent).toHaveLength(1);
-    expect(sent[0].type).toBe("history");
-    expect(sent[0].messages).toEqual([{ role: "assistant", content: "Hello!" }]);
   });
 
   it("should use session key format agent:<agentId>:user-<userId> for per-user scoping", async () => {
@@ -1029,7 +1021,7 @@ describe("ClientRouter", () => {
     consoleSpy.mockRestore();
   });
 
-  it("should return empty history when sessions.list fails and no greeting", async () => {
+  it("should return empty history when history fetch fails and no greeting", async () => {
     const freshCache = new SessionCache();
     const freshRouter = new ClientRouter(mockOpenClawClient as any, "user-1", "user", freshCache);
 
@@ -1037,7 +1029,7 @@ describe("ClientRouter", () => {
       ...defaultAgent,
       greetingMessage: null,
     });
-    mockSessionsList.mockRejectedValue(new Error("Gateway timeout"));
+    mockSessionsHistory.mockRejectedValue(new Error("Gateway timeout"));
 
     const clientWs = createMockClientWs();
     await freshRouter.handleMessage(clientWs as any, {
