@@ -154,7 +154,10 @@ export function SettingsUsers({ currentUserId }: SettingsUsersProps) {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium truncate max-w-[180px]">
+                    <span
+                      className="font-medium truncate max-w-[180px]"
+                      title={item.kind === "user" ? item.name : item.email || undefined}
+                    >
                       {item.kind === "user" ? item.name : item.email || "No email provided"}
                     </span>
                     <Badge variant="outline" className="text-xs">
@@ -163,7 +166,10 @@ export function SettingsUsers({ currentUserId }: SettingsUsersProps) {
                     <StatusBadge status={item.status} />
                   </div>
                 </div>
-                <div className="text-sm text-muted-foreground truncate">
+                <div
+                  className="text-sm text-muted-foreground truncate"
+                  title={item.kind === "user" ? item.email : item.email || undefined}
+                >
                   {item.kind === "user" ? item.email : item.email || "\u2014"}
                 </div>
                 <div className="flex gap-2">
@@ -221,10 +227,16 @@ export function SettingsUsers({ currentUserId }: SettingsUsersProps) {
                     key={`${item.kind}-${item.id}`}
                     className={item.status === "deactivated" ? "opacity-50" : ""}
                   >
-                    <TableCell className="max-w-[150px] truncate">
+                    <TableCell
+                      className="max-w-[150px] truncate"
+                      title={item.kind === "user" ? item.name : item.email || undefined}
+                    >
                       {item.kind === "user" ? item.name : item.email || "No email provided"}
                     </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
+                    <TableCell
+                      className="max-w-[200px] truncate"
+                      title={item.kind === "user" ? item.email : item.email || undefined}
+                    >
                       {item.kind === "user" ? item.email : item.email || "\u2014"}
                     </TableCell>
                     <TableCell>{item.role}</TableCell>
