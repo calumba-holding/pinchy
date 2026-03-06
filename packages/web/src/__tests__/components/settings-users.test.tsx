@@ -410,36 +410,40 @@ describe("SettingsUsers", () => {
       expect(within(inviteRow).getByRole("button", { name: "Resend" })).toBeInTheDocument();
     });
 
-    it("should display email as the name for an invite row", async () => {
+    it("should show dash for invite name column", async () => {
       mockFetchForUsers(mockUsers, [pendingInvite]);
       render(<SettingsUsers currentUserId="user-1" />);
 
       await waitFor(() => {
-        expect(screen.getAllByText("pending@example.com").length).toBeGreaterThanOrEqual(1);
+        expect(screen.getByRole("table")).toBeInTheDocument();
       });
 
       const table = screen.getByRole("table");
       const rows = table.querySelectorAll("tbody tr");
-      // Find the invite row — the Name cell should show the email
       const inviteRow = Array.from(rows).find((row) =>
         within(row as HTMLElement).queryByRole("button", { name: "Revoke" })
       )!;
       const cells = inviteRow.querySelectorAll("td");
-      // First cell is the Name column
-      expect(cells[0].textContent).toBe("pending@example.com");
+      // Name column shows dash for invites (email is in Email column)
+      expect(cells[0].textContent).toBe("\u2014");
     });
 
-    it("should show 'No email provided' for an invite without email", async () => {
+    it("should show dash for invite name even without email", async () => {
       const noEmailInvite = { ...pendingInvite, id: "inv-3", email: null };
       mockFetchForUsers(mockUsers, [noEmailInvite]);
       render(<SettingsUsers currentUserId="user-1" />);
 
       await waitFor(() => {
-        expect(screen.getAllByText("No email provided").length).toBeGreaterThanOrEqual(1);
+        expect(screen.getByRole("table")).toBeInTheDocument();
       });
 
       const table = screen.getByRole("table");
-      expect(within(table).getByText("No email provided")).toBeInTheDocument();
+      const rows = table.querySelectorAll("tbody tr");
+      const inviteRow = Array.from(rows).find((row) =>
+        within(row as HTMLElement).queryByRole("button", { name: "Revoke" })
+      )!;
+      const cells = inviteRow.querySelectorAll("td");
+      expect(cells[0].textContent).toBe("\u2014");
     });
 
     it("should call DELETE /api/users/invites/:id when Revoke is clicked", async () => {

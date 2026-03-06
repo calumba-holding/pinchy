@@ -156,9 +156,9 @@ export function SettingsUsers({ currentUserId }: SettingsUsersProps) {
                   <div className="flex items-center gap-2">
                     <span
                       className="font-medium truncate max-w-[180px]"
-                      title={item.kind === "user" ? item.name : item.email || undefined}
+                      title={item.kind === "user" ? item.name : undefined}
                     >
-                      {item.kind === "user" ? item.name : item.email || "No email provided"}
+                      {item.kind === "user" ? item.name : "\u2014"}
                     </span>
                     <Badge variant="outline" className="text-xs">
                       {item.role}
@@ -229,9 +229,9 @@ export function SettingsUsers({ currentUserId }: SettingsUsersProps) {
                   >
                     <TableCell
                       className="max-w-[150px] truncate"
-                      title={item.kind === "user" ? item.name : item.email || undefined}
+                      title={item.kind === "user" ? item.name : undefined}
                     >
-                      {item.kind === "user" ? item.name : item.email || "No email provided"}
+                      {item.kind === "user" ? item.name : "\u2014"}
                     </TableCell>
                     <TableCell
                       className="max-w-[200px] truncate"
