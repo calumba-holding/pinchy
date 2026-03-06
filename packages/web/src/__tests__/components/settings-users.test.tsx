@@ -19,11 +19,13 @@ describe("SettingsUsers", () => {
       name: "Alice Admin",
       email: "alice@example.com",
       role: "admin",
-      deletedAt: null,
+      banned: false,
     },
-    { id: "user-2", name: "Bob User", email: "bob@example.com", role: "user", deletedAt: null },
-    { id: "user-3", name: "Carol User", email: "carol@example.com", role: "user", deletedAt: null },
+    { id: "user-2", name: "Bob User", email: "bob@example.com", role: "user", banned: false },
+    { id: "user-3", name: "Carol User", email: "carol@example.com", role: "user", banned: false },
   ];
+
+  const mockInvites: unknown[] = [];
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(global, "fetch").mockImplementation(vi.fn());
@@ -34,12 +36,20 @@ describe("SettingsUsers", () => {
     fetchSpy.mockRestore();
   });
 
-  function renderWithUsersLoaded() {
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ users: mockUsers }),
-    } as Response);
+  function mockFetchForUsers(users: unknown[], invites: unknown[] = mockInvites) {
+    vi.mocked(global.fetch).mockImplementation(async (url) => {
+      if (String(url) === "/api/users") {
+        return { ok: true, json: async () => ({ users }) } as Response;
+      }
+      if (String(url) === "/api/users/invites") {
+        return { ok: true, json: async () => ({ invites }) } as Response;
+      }
+      return { ok: false } as Response;
+    });
+  }
 
+  function renderWithUsersLoaded() {
+    mockFetchForUsers(mockUsers);
     render(<SettingsUsers currentUserId="user-1" />);
   }
 
@@ -119,7 +129,7 @@ describe("SettingsUsers", () => {
     expect(within(bobRow).getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
   });
 
-  it("should show Reset button per user (not for current user)", async () => {
+  it("should show Reset Password button per user (not for current user)", async () => {
     renderWithUsersLoaded();
 
     await waitFor(() => {
@@ -130,10 +140,12 @@ describe("SettingsUsers", () => {
     const tableView = within(table);
 
     const aliceRow = tableView.getByText("Alice Admin").closest("tr")!;
-    expect(within(aliceRow).queryByRole("button", { name: "Reset" })).not.toBeInTheDocument();
+    expect(
+      within(aliceRow).queryByRole("button", { name: "Reset Password" })
+    ).not.toBeInTheDocument();
 
     const bobRow = tableView.getByText("Bob User").closest("tr")!;
-    expect(within(bobRow).getByRole("button", { name: "Reset" })).toBeInTheDocument();
+    expect(within(bobRow).getByRole("button", { name: "Reset Password" })).toBeInTheDocument();
   });
 
   it("should call DELETE /api/users/:id when delete is confirmed", async () => {
@@ -153,16 +165,22 @@ describe("SettingsUsers", () => {
       expect(screen.getByText("Deactivate User")).toBeInTheDocument();
     });
 
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true }),
-    } as Response);
-
-    // Also mock the re-fetch of user list
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ users: [mockUsers[0], mockUsers[2]] }),
-    } as Response);
+    // Reset fetch mock: DELETE call + re-fetch of both endpoints
+    vi.mocked(global.fetch).mockImplementation(async (url, init) => {
+      if (String(url) === "/api/users/user-2" && init?.method === "DELETE") {
+        return { ok: true, json: async () => ({ success: true }) } as Response;
+      }
+      if (String(url) === "/api/users") {
+        return {
+          ok: true,
+          json: async () => ({ users: [mockUsers[0], mockUsers[2]] }),
+        } as Response;
+      }
+      if (String(url) === "/api/users/invites") {
+        return { ok: true, json: async () => ({ invites: [] }) } as Response;
+      }
+      return { ok: false } as Response;
+    });
 
     await user.click(screen.getByRole("button", { name: "Confirm Deactivate" }));
 
@@ -173,7 +191,7 @@ describe("SettingsUsers", () => {
     });
   });
 
-  it("should call POST /api/users/:id/reset and show reset link", async () => {
+  it("should call POST /api/users/:id/reset and show invite link", async () => {
     const user = userEvent.setup();
     renderWithUsersLoaded();
 
@@ -184,12 +202,20 @@ describe("SettingsUsers", () => {
     const table = screen.getByRole("table");
     const bobRow = within(table).getByText("Bob User").closest("tr")!;
 
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ token: "reset-token-123" }),
-    } as Response);
+    vi.mocked(global.fetch).mockImplementation(async (url, init) => {
+      if (String(url) === "/api/users/user-2/reset" && init?.method === "POST") {
+        return { ok: true, json: async () => ({ token: "reset-token-123" }) } as Response;
+      }
+      if (String(url) === "/api/users") {
+        return { ok: true, json: async () => ({ users: mockUsers }) } as Response;
+      }
+      if (String(url) === "/api/users/invites") {
+        return { ok: true, json: async () => ({ invites: [] }) } as Response;
+      }
+      return { ok: false } as Response;
+    });
 
-    await user.click(within(bobRow).getByRole("button", { name: "Reset" }));
+    await user.click(within(bobRow).getByRole("button", { name: "Reset Password" }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith("/api/users/user-2/reset", {
@@ -239,7 +265,7 @@ describe("SettingsUsers", () => {
   });
 
   it("should show loading state while fetching users", () => {
-    vi.mocked(global.fetch).mockReturnValueOnce(new Promise(() => {}));
+    vi.mocked(global.fetch).mockImplementation(() => new Promise(() => {}));
 
     render(<SettingsUsers currentUserId="user-1" />);
 
@@ -252,15 +278,11 @@ describe("SettingsUsers", () => {
       name: "Dave Deactivated",
       email: "dave@example.com",
       role: "user",
-      deletedAt: "2024-01-15T10:00:00.000Z",
+      banned: true,
     };
 
     function renderWithDeactivatedUser() {
-      vi.mocked(global.fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ users: [...mockUsers, deactivatedUser] }),
-      } as Response);
-
+      mockFetchForUsers([...mockUsers, deactivatedUser]);
       render(<SettingsUsers currentUserId="user-1" />);
     }
 
@@ -309,16 +331,22 @@ describe("SettingsUsers", () => {
         expect(screen.getAllByText("Dave Deactivated").length).toBeGreaterThanOrEqual(1);
       });
 
-      vi.mocked(global.fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true }),
-      } as Response);
-
-      // Also mock the re-fetch of user list after reactivation
-      vi.mocked(global.fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ users: [...mockUsers, { ...deactivatedUser, deletedAt: null }] }),
-      } as Response);
+      // Reset fetch mock: reactivate call + re-fetch of both endpoints
+      vi.mocked(global.fetch).mockImplementation(async (url, init) => {
+        if (String(url) === "/api/users/user-4/reactivate" && init?.method === "POST") {
+          return { ok: true, json: async () => ({ success: true }) } as Response;
+        }
+        if (String(url) === "/api/users") {
+          return {
+            ok: true,
+            json: async () => ({ users: [...mockUsers, { ...deactivatedUser, banned: false }] }),
+          } as Response;
+        }
+        if (String(url) === "/api/users/invites") {
+          return { ok: true, json: async () => ({ invites: [] }) } as Response;
+        }
+        return { ok: false } as Response;
+      });
 
       const table = screen.getByRole("table");
       const daveRow = within(table).getByText("Dave Deactivated").closest("tr")!;
