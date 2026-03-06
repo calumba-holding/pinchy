@@ -294,7 +294,7 @@ export default function AgentSettingsPage() {
   }
 
   return (
-    <div className="overflow-y-auto p-4 md:p-8 pb-24 max-w-2xl">
+    <div className="h-full overflow-y-auto p-4 md:p-8 pb-24 max-w-2xl">
       <div className="flex items-center justify-between mb-6">
         <button
           onClick={() => {
