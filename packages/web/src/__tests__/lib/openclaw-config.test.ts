@@ -71,7 +71,7 @@ describe("writeOpenClawConfig", () => {
     expect(mockedWriteFileSync).toHaveBeenCalledWith(
       expect.stringContaining("openclaw.json"),
       expect.stringContaining('"ANTHROPIC_API_KEY": "sk-ant-secret"'),
-      { encoding: "utf-8", mode: 0o600 }
+      { encoding: "utf-8", mode: 0o644 }
     );
   });
 
@@ -198,7 +198,7 @@ describe("writeOpenClawConfig", () => {
 
     expect(mockedWriteFileSync).toHaveBeenCalledWith(expect.any(String), expect.any(String), {
       encoding: "utf-8",
-      mode: 0o600,
+      mode: 0o644,
     });
   });
 
@@ -244,7 +244,7 @@ describe("regenerateOpenClawConfig", () => {
 
     expect(mockedWriteFileSync).toHaveBeenCalledWith(expect.any(String), expect.any(String), {
       encoding: "utf-8",
-      mode: 0o600,
+      mode: 0o644,
     });
   });
 
