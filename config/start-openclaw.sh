@@ -9,7 +9,14 @@ node /ensure-gateway-token.js
 
 # Write gateway token to a separate world-readable file for Pinchy (non-root).
 # The main openclaw.json may have restrictive permissions managed by OpenClaw.
-node -e "try{const t=JSON.parse(require('fs').readFileSync('/root/.openclaw/openclaw.json','utf8')).gateway.auth.token;require('fs').writeFileSync('/root/.openclaw/gateway-token',t,{mode:0o644})}catch{}"
+node -e "
+  const fs = require('fs');
+  try {
+    const config = JSON.parse(fs.readFileSync('/root/.openclaw/openclaw.json', 'utf8'));
+    const token = config.gateway.auth.token;
+    fs.writeFileSync('/root/.openclaw/gateway-token', token, { mode: 0o644 });
+  } catch {}
+"
 
 # Scan /data/ for available directories and write to shared config
 # so Pinchy can read them without needing a /data mount
