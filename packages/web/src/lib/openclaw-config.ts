@@ -212,10 +212,14 @@ export async function regenerateOpenClawConfig() {
   };
 
   // Note: pinchy-files is only included when agents use it (via pluginConfigs loop above).
-  // Omitting disabled plugins avoids OpenClaw's "disabled in config but config is present" spam.
+
+  // Set plugins.allow to only the enabled plugin IDs. This prevents OpenClaw from
+  // auto-discovering unused plugins from the extensions directory, which would cause
+  // either a restart loop (invalid config) or "disabled but config present" warning spam.
+  const allowedPlugins = Object.keys(entries);
 
   if (Object.keys(entries).length > 0) {
-    config.plugins = { entries };
+    config.plugins = { allow: allowedPlugins, entries };
   }
 
   const dir = dirname(CONFIG_PATH);

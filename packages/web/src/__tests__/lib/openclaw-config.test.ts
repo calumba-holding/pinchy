@@ -662,12 +662,15 @@ describe("regenerateOpenClawConfig", () => {
     const written = mockedWriteFileSync.mock.calls[0][1] as string;
     const config = JSON.parse(written);
 
-    // Unused plugins are omitted entirely to avoid OpenClaw's
-    // "disabled in config but config is present" warning spam
+    // Unused plugins are omitted from entries AND allow list to prevent
+    // auto-discovery (restart loop) and "disabled but config present" spam
     expect(config.plugins.entries["pinchy-context"]).toBeUndefined();
     expect(config.plugins.entries["pinchy-files"]).toBeUndefined();
+    expect(config.plugins.allow).not.toContain("pinchy-context");
+    expect(config.plugins.allow).not.toContain("pinchy-files");
     // pinchy-audit is always enabled to capture tool usage at source
     expect(config.plugins.entries["pinchy-audit"].enabled).toBe(true);
+    expect(config.plugins.allow).toContain("pinchy-audit");
   });
 });
 
