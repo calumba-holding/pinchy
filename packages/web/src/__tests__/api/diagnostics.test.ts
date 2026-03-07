@@ -74,14 +74,14 @@ describe("GET /api/diagnostics", () => {
     expect(data).toHaveProperty("nodeEnv");
   });
 
-  it("should return openclaw as unreachable when OPENCLAW_WS_URL is not set", async () => {
+  it("should return openclaw as connected when OPENCLAW_WS_URL is not set", async () => {
     delete process.env.OPENCLAW_WS_URL;
     mockDb.execute.mockResolvedValueOnce([{ "?column?": 1 }]);
 
     const response = await GET();
     const data = await response.json();
 
-    expect(data.openclaw).toBe("unreachable");
+    expect(data.openclaw).toBe("connected");
   });
 
   it("should include captured logs when user is authenticated", async () => {

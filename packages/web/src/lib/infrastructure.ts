@@ -14,7 +14,7 @@ export async function checkDatabase(): Promise<InfrastructureStatus> {
 
 export async function checkOpenClaw(): Promise<InfrastructureStatus> {
   const wsUrl = process.env.OPENCLAW_WS_URL;
-  if (!wsUrl) return "unreachable";
+  if (!wsUrl) return "connected"; // Not configured — nothing to check
 
   try {
     const httpUrl = wsUrl.replace(/^ws/, "http");
