@@ -7,8 +7,9 @@ echo "OpenClaw Gateway starting..."
 # when no token is configured yet, e.g. on first startup before setup wizard)
 node /ensure-gateway-token.js
 
-# Ensure config is world-readable so Pinchy (non-root) can read the gateway token
-chmod 644 /root/.openclaw/openclaw.json
+# Write gateway token to a separate world-readable file for Pinchy (non-root).
+# The main openclaw.json may have restrictive permissions managed by OpenClaw.
+node -e "try{const t=JSON.parse(require('fs').readFileSync('/root/.openclaw/openclaw.json','utf8')).gateway.auth.token;require('fs').writeFileSync('/root/.openclaw/gateway-token',t,{mode:0o644})}catch{}"
 
 # Scan /data/ for available directories and write to shared config
 # so Pinchy can read them without needing a /data mount
