@@ -94,6 +94,6 @@ describe("ensure-gateway-token", () => {
 
     const stats = statSync(configPath);
     const mode = (stats.mode & 0o777).toString(8);
-    expect(mode).toBe("600");
+    expect(mode).toBe("644");
   });
 });

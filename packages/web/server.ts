@@ -18,14 +18,34 @@ const handle = app.getRequestHandler();
 
 const OPENCLAW_WS_URL = process.env.OPENCLAW_WS_URL;
 const OPENCLAW_CONFIG_PATH = process.env.OPENCLAW_CONFIG_PATH || "/openclaw-config/openclaw.json";
+const GATEWAY_TOKEN_PATH = process.env.GATEWAY_TOKEN_PATH || "/openclaw-config/gateway-token";
 
 function readGatewayToken(): string {
+  // Try dedicated token file first (world-readable, written by OpenClaw startup)
+  try {
+    const token = readFileSync(GATEWAY_TOKEN_PATH, "utf-8").trim();
+    if (token) return token;
+  } catch {
+    // Fall through to config file
+  }
+  // Fall back to reading from main config (works when running as same user)
   try {
     const config = JSON.parse(readFileSync(OPENCLAW_CONFIG_PATH, "utf-8"));
     return config.gateway?.auth?.token ?? "";
   } catch {
     return "";
   }
+}
+
+async function waitForGatewayToken(maxWaitMs = 30000): Promise<string> {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    const token = readGatewayToken();
+    if (token) return token;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  console.warn("[pinchy] Gateway token not available after waiting, connecting without token");
+  return "";
 }
 
 if (process.env.NODE_ENV === "production") {
@@ -59,41 +79,6 @@ app.prepare().then(async () => {
   });
 
   let openclawClient: OpenClawClient | null = null;
-
-  if (OPENCLAW_WS_URL) {
-    openclawClient = new OpenClawClient({
-      url: OPENCLAW_WS_URL,
-      token: readGatewayToken(),
-      clientId: "gateway-client",
-      clientVersion: "0.1.0",
-      scopes: ["operator.admin"],
-      deviceIdentityPath: process.env.DEVICE_IDENTITY_PATH || "/app/secrets/device-identity.json",
-      autoReconnect: true,
-      reconnectIntervalMs: 1000,
-      maxReconnectAttempts: Infinity,
-    });
-
-    openclawClient.connect().catch((err) => {
-      console.error("OpenClaw initial connection failed, will retry:", err.message);
-    });
-
-    openclawClient.on("connected", () => {
-      console.log("Connected to OpenClaw Gateway");
-      if (restartState.isRestarting) {
-        restartState.notifyReady();
-      }
-    });
-
-    openclawClient.on("disconnected", () => {
-      console.log("Disconnected from OpenClaw Gateway, reconnecting...");
-    });
-
-    openclawClient.on("error", (err) => {
-      console.error("OpenClaw client error:", err.message);
-    });
-  } else {
-    console.log("OPENCLAW_WS_URL not set — skipping OpenClaw connection");
-  }
 
   const sessionCache = new SessionCache();
 
@@ -165,4 +150,42 @@ app.prepare().then(async () => {
   server.listen(port, () => {
     console.log(`Pinchy ready on http://localhost:${port}`);
   });
+
+  // Connect to OpenClaw AFTER the server is listening so health checks pass
+  // immediately and the setup wizard is available without waiting for OpenClaw.
+  if (OPENCLAW_WS_URL) {
+    const gatewayToken = await waitForGatewayToken();
+    openclawClient = new OpenClawClient({
+      url: OPENCLAW_WS_URL,
+      token: gatewayToken,
+      clientId: "gateway-client",
+      clientVersion: "0.1.0",
+      scopes: ["operator.admin"],
+      deviceIdentityPath: process.env.DEVICE_IDENTITY_PATH || "/app/secrets/device-identity.json",
+      autoReconnect: true,
+      reconnectIntervalMs: 1000,
+      maxReconnectAttempts: Infinity,
+    });
+
+    openclawClient.connect().catch((err) => {
+      console.error("OpenClaw initial connection failed, will retry:", err.message);
+    });
+
+    openclawClient.on("connected", () => {
+      console.log("Connected to OpenClaw Gateway");
+      if (restartState.isRestarting) {
+        restartState.notifyReady();
+      }
+    });
+
+    openclawClient.on("disconnected", () => {
+      console.log("Disconnected from OpenClaw Gateway, reconnecting...");
+    });
+
+    openclawClient.on("error", (err) => {
+      console.error("OpenClaw client error:", err.message);
+    });
+  } else {
+    console.log("OPENCLAW_WS_URL not set — skipping OpenClaw connection");
+  }
 });
