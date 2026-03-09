@@ -141,7 +141,7 @@ describe("PATCH /api/agents/[agentId] visibility", () => {
     expect(updateAgent).toHaveBeenCalledWith("agent-1", { visibility: "all" });
   });
 
-  it("admin can set visibility to 'groups' with groupIds", async () => {
+  it("admin can set visibility to 'restricted' with groupIds", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
@@ -152,12 +152,12 @@ describe("PATCH /api/agents/[agentId] visibility", () => {
     vi.mocked(updateAgent).mockResolvedValueOnce({
       id: "agent-1",
       name: "Test Agent",
-      visibility: "groups",
+      visibility: "restricted",
     } as never);
 
     const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
       method: "PATCH",
-      body: JSON.stringify({ visibility: "groups", groupIds: ["group-1", "group-2"] }),
+      body: JSON.stringify({ visibility: "restricted", groupIds: ["group-1", "group-2"] }),
       headers: { "Content-Type": "application/json" },
     });
 
@@ -169,33 +169,6 @@ describe("PATCH /api/agents/[agentId] visibility", () => {
     // Should delete old group assignments and insert new ones
     expect(db.delete).toHaveBeenCalled();
     expect(db.insert).toHaveBeenCalled();
-  });
-
-  it("admin can set visibility to 'admin_only'", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
-      user: { id: "admin-1", role: "admin" },
-      expires: "",
-    } as any);
-
-    mockAgent({ id: "agent-1", name: "Test Agent", isPersonal: false, ownerId: null });
-
-    vi.mocked(updateAgent).mockResolvedValueOnce({
-      id: "agent-1",
-      name: "Test Agent",
-      visibility: "admin_only",
-    } as never);
-
-    const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
-      method: "PATCH",
-      body: JSON.stringify({ visibility: "admin_only" }),
-      headers: { "Content-Type": "application/json" },
-    });
-
-    const response = await PATCH(request, {
-      params: Promise.resolve({ agentId: "agent-1" }),
-    });
-    expect(response.status).toBe(200);
-    expect(updateAgent).toHaveBeenCalledWith("agent-1", { visibility: "admin_only" });
   });
 
   it("non-admin cannot change visibility (403)", async () => {

@@ -20,14 +20,14 @@ export async function getVisibleAgents(userId: string, userRole: string) {
       case "all":
         visible.push(agent);
         break;
-      case "groups": {
+      case "restricted": {
         const agentGroupIds = await getAgentGroupIds(agent.id);
         if (userGroupIds.some((gId) => agentGroupIds.includes(gId))) {
           visible.push(agent);
         }
         break;
       }
-      // "admin_only" — skip
+      // unknown visibility — skip (admins-only by default)
     }
   }
   return visible;

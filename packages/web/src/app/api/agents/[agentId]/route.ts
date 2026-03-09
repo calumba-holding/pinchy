@@ -91,7 +91,7 @@ export async function PATCH(
     if (!(await isEnterprise())) {
       return NextResponse.json({ error: "Enterprise feature" }, { status: 403 });
     }
-    if (!["admin_only", "all", "groups"].includes(body.visibility)) {
+    if (!["all", "restricted"].includes(body.visibility)) {
       return NextResponse.json({ error: "Invalid visibility value" }, { status: 400 });
     }
     if (existingAgent.isPersonal) {

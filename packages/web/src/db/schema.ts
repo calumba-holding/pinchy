@@ -92,7 +92,7 @@ export const agents = pgTable(
     allowedTools: jsonb("allowed_tools").$type<string[]>().notNull().default([]),
     ownerId: text("owner_id").references(() => users.id, { onDelete: "cascade" }),
     isPersonal: boolean("is_personal").notNull().default(false),
-    visibility: text("visibility").notNull().default("admin_only"),
+    visibility: text("visibility").notNull().default("restricted"),
     greetingMessage: text("greeting_message"),
     tagline: text("tagline"),
     avatarSeed: text("avatar_seed"),

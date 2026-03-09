@@ -17,8 +17,8 @@ interface AgentForAccess {
  * Rules:
  * - Admin can access everything
  * - Personal agents are only accessible to their owner
- * - Shared agents check visibility: "all" (everyone), "admin_only" (admins only),
- *   "groups" (only users who share a group with the agent)
+ * - Shared agents check visibility: "all" (everyone), "restricted" (only users
+ *   who share a group with the agent; if no groups assigned, admins only)
  */
 export function assertAgentAccess(
   agent: AgentForAccess,
@@ -38,9 +38,7 @@ export function assertAgentAccess(
   switch (visibility) {
     case "all":
       return;
-    case "admin_only":
-      throw new Error("Access denied");
-    case "groups":
+    case "restricted":
       if (userGroupIds.some((gId) => agentGroupIds.includes(gId))) return;
       throw new Error("Access denied");
     default:
@@ -78,7 +76,7 @@ export async function getAgentWithAccess(agentId: string, userId: string, userRo
   // Load group data for visibility check (skip for admins — they always have access)
   const [userGroupIds, agentGroupIds] = await Promise.all([
     userRole !== "admin" ? getUserGroupIds(userId) : Promise.resolve([]),
-    userRole !== "admin" && agent.visibility === "groups"
+    userRole !== "admin" && agent.visibility === "restricted"
       ? getAgentGroupIds(agentId)
       : Promise.resolve([]),
   ]);

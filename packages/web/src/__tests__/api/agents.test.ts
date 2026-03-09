@@ -107,7 +107,7 @@ describe("updateAgent", () => {
     const { regenerateOpenClawConfig } = await import("@/lib/openclaw-config");
     vi.mocked(regenerateOpenClawConfig).mockClear();
 
-    await updateAgent("1", { visibility: "groups" });
+    await updateAgent("1", { visibility: "restricted" });
 
     expect(regenerateOpenClawConfig).not.toHaveBeenCalled();
   });
@@ -116,7 +116,7 @@ describe("updateAgent", () => {
     const { regenerateOpenClawConfig } = await import("@/lib/openclaw-config");
     vi.mocked(regenerateOpenClawConfig).mockClear();
 
-    await updateAgent("1", { visibility: "groups", model: "anthropic/claude-sonnet-4-6" });
+    await updateAgent("1", { visibility: "restricted", model: "anthropic/claude-sonnet-4-6" });
 
     expect(regenerateOpenClawConfig).toHaveBeenCalled();
   });

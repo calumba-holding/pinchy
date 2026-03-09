@@ -35,17 +35,11 @@ const sharedAgentAll = {
   isPersonal: false,
   visibility: "all",
 };
-const sharedAgentAdminOnly = {
-  id: "shared-admin",
+const sharedAgentRestricted = {
+  id: "shared-restricted",
   ownerId: null,
   isPersonal: false,
-  visibility: "admin_only",
-};
-const sharedAgentGroups = {
-  id: "shared-groups",
-  ownerId: null,
-  isPersonal: false,
-  visibility: "groups",
+  visibility: "restricted",
 };
 const personalAgentOwned = {
   id: "personal-mine",
@@ -60,13 +54,7 @@ const personalAgentOther = {
   visibility: "all",
 };
 
-const allAgents = [
-  sharedAgentAll,
-  sharedAgentAdminOnly,
-  sharedAgentGroups,
-  personalAgentOwned,
-  personalAgentOther,
-];
+const allAgents = [sharedAgentAll, sharedAgentRestricted, personalAgentOwned, personalAgentOther];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -91,34 +79,24 @@ describe("getVisibleAgents", () => {
     expect(result).toContainEqual(sharedAgentAll);
   });
 
-  it("member does NOT see agents with visibility 'admin_only'", async () => {
-    vi.mocked(getUserGroupIds).mockResolvedValue([]);
-    mockSelectChain(allAgents);
-    vi.mocked(getAgentGroupIds).mockResolvedValue([]);
-
-    const result = await getVisibleAgents("user-1", "member");
-
-    expect(result).not.toContainEqual(sharedAgentAdminOnly);
-  });
-
-  it("member sees 'groups' agents when in matching group", async () => {
+  it("member sees 'restricted' agents when in matching group", async () => {
     vi.mocked(getUserGroupIds).mockResolvedValue(["g1", "g2"]);
     mockSelectChain(allAgents);
     vi.mocked(getAgentGroupIds).mockResolvedValue(["g2", "g3"]);
 
     const result = await getVisibleAgents("user-1", "member");
 
-    expect(result).toContainEqual(sharedAgentGroups);
+    expect(result).toContainEqual(sharedAgentRestricted);
   });
 
-  it("member does NOT see 'groups' agents when not in matching group", async () => {
+  it("member does NOT see 'restricted' agents when not in matching group", async () => {
     vi.mocked(getUserGroupIds).mockResolvedValue(["g1"]);
     mockSelectChain(allAgents);
     vi.mocked(getAgentGroupIds).mockResolvedValue(["g2"]);
 
     const result = await getVisibleAgents("user-1", "member");
 
-    expect(result).not.toContainEqual(sharedAgentGroups);
+    expect(result).not.toContainEqual(sharedAgentRestricted);
   });
 
   it("member sees own personal agents", async () => {

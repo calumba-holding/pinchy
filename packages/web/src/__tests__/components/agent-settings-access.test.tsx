@@ -42,12 +42,12 @@ describe("AgentSettingsAccess", () => {
     });
   });
 
-  it("should show group checkboxes when 'Specific groups' is selected", async () => {
+  it("should show group checkboxes when 'Restricted' is selected", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(
       <AgentSettingsAccess
-        agent={{ visibility: "groups" }}
+        agent={{ visibility: "restricted" }}
         currentGroupIds={["g1"]}
         onChange={onChange}
       />
@@ -70,19 +70,19 @@ describe("AgentSettingsAccess", () => {
     const onChange = vi.fn();
     render(
       <AgentSettingsAccess
-        agent={{ visibility: "admin_only" }}
+        agent={{ visibility: "restricted" }}
         currentGroupIds={[]}
         onChange={onChange}
       />
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Admins only")).toBeInTheDocument();
+      expect(screen.getByText("Restricted")).toBeInTheDocument();
     });
 
     // Initial render calls onChange with isDirty=false
     await waitFor(() => {
-      expect(onChange).toHaveBeenCalledWith({ visibility: "admin_only", groupIds: [] }, false);
+      expect(onChange).toHaveBeenCalledWith({ visibility: "restricted", groupIds: [] }, false);
     });
   });
 
@@ -91,7 +91,7 @@ describe("AgentSettingsAccess", () => {
     const onChange = vi.fn();
     render(
       <AgentSettingsAccess
-        agent={{ visibility: "groups" }}
+        agent={{ visibility: "restricted" }}
         currentGroupIds={[]}
         onChange={onChange}
       />
@@ -104,7 +104,7 @@ describe("AgentSettingsAccess", () => {
     await user.click(screen.getByRole("checkbox", { name: "Design" }));
 
     await waitFor(() => {
-      expect(onChange).toHaveBeenCalledWith({ visibility: "groups", groupIds: ["g2"] }, true);
+      expect(onChange).toHaveBeenCalledWith({ visibility: "restricted", groupIds: ["g2"] }, true);
     });
   });
 
@@ -119,7 +119,7 @@ describe("AgentSettingsAccess", () => {
     const onChange = vi.fn();
     render(
       <AgentSettingsAccess
-        agent={{ visibility: "admin_only" }}
+        agent={{ visibility: "restricted" }}
         currentGroupIds={[]}
         onChange={onChange}
       />

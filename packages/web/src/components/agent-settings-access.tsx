@@ -33,12 +33,12 @@ export function AgentSettingsAccess({
   currentGroupIds,
   onChange,
 }: AgentSettingsAccessProps) {
-  const [visibility, setVisibility] = useState(agent.visibility || "admin_only");
+  const [visibility, setVisibility] = useState(agent.visibility || "restricted");
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(currentGroupIds);
   const [groups, setGroups] = useState<Group[]>([]);
   const [isEnterprise, setIsEnterprise] = useState<boolean | null>(null);
 
-  const initialVisibility = useRef(agent.visibility || "admin_only");
+  const initialVisibility = useRef(agent.visibility || "restricted");
   const initialGroupIds = useRef(currentGroupIds);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export function AgentSettingsAccess({
 
   function handleVisibilityChange(value: string) {
     setVisibility(value);
-    if (value !== "groups") {
+    if (value !== "restricted") {
       setSelectedGroupIds([]);
     }
   }
@@ -104,15 +104,14 @@ export function AgentSettingsAccess({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="admin_only">Admins only</SelectItem>
               <SelectItem value="all">All users</SelectItem>
-              <SelectItem value="groups">Specific groups</SelectItem>
+              <SelectItem value="restricted">Restricted</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </section>
 
-      {visibility === "groups" && (
+      {visibility === "restricted" && (
         <section className="space-y-4">
           <h3 className="text-lg font-semibold">Allowed Groups</h3>
           <p className="text-sm text-muted-foreground">

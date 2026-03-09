@@ -511,7 +511,7 @@ describe("POST /api/agents", () => {
     await POST(request);
 
     // The POST handler does not explicitly set visibility, so Drizzle uses the
-    // schema default ("admin_only"). Verify the insert call does NOT include a
+    // schema default ("restricted"). Verify the insert call does NOT include a
     // visibility field — the DB default takes care of it.
     const insertedValues = insertValuesMock.mock.calls[0][0];
     expect(insertedValues).not.toHaveProperty("visibility");

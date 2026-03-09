@@ -88,12 +88,12 @@ describe("assertAgentWriteAccess", () => {
 
 describe("assertAgentAccess with visibility", () => {
   it("allows admin access regardless of visibility", () => {
-    const agent = { id: "a1", ownerId: "other", isPersonal: false, visibility: "admin_only" };
+    const agent = { id: "a1", ownerId: "other", isPersonal: false, visibility: "restricted" };
     expect(() => assertAgentAccess(agent, "admin-user", "admin")).not.toThrow();
   });
 
-  it("denies member access to admin_only agents", () => {
-    const agent = { id: "a1", ownerId: "other", isPersonal: false, visibility: "admin_only" };
+  it("denies member access to restricted agents with no matching groups", () => {
+    const agent = { id: "a1", ownerId: "other", isPersonal: false, visibility: "restricted" };
     expect(() => assertAgentAccess(agent, "user-1", "member", [], [])).toThrow("Access denied");
   });
 
@@ -102,27 +102,27 @@ describe("assertAgentAccess with visibility", () => {
     expect(() => assertAgentAccess(agent, "user-1", "member", [], [])).not.toThrow();
   });
 
-  it("allows member access to 'groups' agent when in matching group", () => {
-    const agent = { id: "a1", ownerId: "other", isPersonal: false, visibility: "groups" };
+  it("allows member access to 'restricted' agent when in matching group", () => {
+    const agent = { id: "a1", ownerId: "other", isPersonal: false, visibility: "restricted" };
     expect(() =>
       assertAgentAccess(agent, "user-1", "member", ["g1", "g2"], ["g2", "g3"])
     ).not.toThrow();
   });
 
-  it("denies member access to 'groups' agent when NOT in matching group", () => {
-    const agent = { id: "a1", ownerId: "other", isPersonal: false, visibility: "groups" };
+  it("denies member access to 'restricted' agent when NOT in matching group", () => {
+    const agent = { id: "a1", ownerId: "other", isPersonal: false, visibility: "restricted" };
     expect(() => assertAgentAccess(agent, "user-1", "member", ["g1"], ["g2"])).toThrow(
       "Access denied"
     );
   });
 
   it("personal agent access is unchanged — owner can access", () => {
-    const agent = { id: "a1", ownerId: "user-1", isPersonal: true, visibility: "admin_only" };
+    const agent = { id: "a1", ownerId: "user-1", isPersonal: true, visibility: "restricted" };
     expect(() => assertAgentAccess(agent, "user-1", "member", [], [])).not.toThrow();
   });
 
   it("personal agent access is unchanged — non-owner denied", () => {
-    const agent = { id: "a1", ownerId: "other", isPersonal: true, visibility: "admin_only" };
+    const agent = { id: "a1", ownerId: "other", isPersonal: true, visibility: "restricted" };
     expect(() => assertAgentAccess(agent, "user-1", "member", [], [])).toThrow("Access denied");
   });
 
@@ -165,8 +165,8 @@ describe("getAgentWithAccess", () => {
     expect(result).toEqual(sharedAgent);
   });
 
-  it("returns agent when member is in matching group for 'groups' visibility", async () => {
-    const groupsAgent = { id: "a1", ownerId: null, isPersonal: false, visibility: "groups" };
+  it("returns agent when member is in matching group for 'restricted' visibility", async () => {
+    const groupsAgent = { id: "a1", ownerId: null, isPersonal: false, visibility: "restricted" };
     mockSelectChain([groupsAgent]);
     vi.mocked(getUserGroupIds).mockResolvedValueOnce(["g1", "g2"]);
     vi.mocked(getAgentGroupIds).mockResolvedValueOnce(["g2", "g3"]);
@@ -177,8 +177,8 @@ describe("getAgentWithAccess", () => {
     expect(result).toEqual(groupsAgent);
   });
 
-  it("returns 403 when member is NOT in matching group for 'groups' visibility", async () => {
-    const groupsAgent = { id: "a1", ownerId: null, isPersonal: false, visibility: "groups" };
+  it("returns 403 when member is NOT in matching group for 'restricted' visibility", async () => {
+    const groupsAgent = { id: "a1", ownerId: null, isPersonal: false, visibility: "restricted" };
     mockSelectChain([groupsAgent]);
     vi.mocked(getUserGroupIds).mockResolvedValueOnce(["g1"]);
     vi.mocked(getAgentGroupIds).mockResolvedValueOnce(["g2"]);
@@ -189,8 +189,8 @@ describe("getAgentWithAccess", () => {
     expect((result as NextResponse).status).toBe(403);
   });
 
-  it("returns 403 for member accessing admin_only agent", async () => {
-    const adminOnlyAgent = { id: "a1", ownerId: null, isPersonal: false, visibility: "admin_only" };
+  it("returns 403 for member accessing restricted agent with no groups", async () => {
+    const adminOnlyAgent = { id: "a1", ownerId: null, isPersonal: false, visibility: "restricted" };
     mockSelectChain([adminOnlyAgent]);
 
     const result = await getAgentWithAccess("a1", "user-1", "member");
@@ -199,8 +199,8 @@ describe("getAgentWithAccess", () => {
     expect((result as NextResponse).status).toBe(403);
   });
 
-  it("admin bypasses group checks for 'groups' visibility", async () => {
-    const groupsAgent = { id: "a1", ownerId: null, isPersonal: false, visibility: "groups" };
+  it("admin bypasses group checks for 'restricted' visibility", async () => {
+    const groupsAgent = { id: "a1", ownerId: null, isPersonal: false, visibility: "restricted" };
     mockSelectChain([groupsAgent]);
 
     const result = await getAgentWithAccess("a1", "admin-user", "admin");
