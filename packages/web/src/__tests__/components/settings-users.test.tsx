@@ -20,9 +20,27 @@ describe("SettingsUsers", () => {
       email: "alice@example.com",
       role: "admin",
       banned: false,
+      groups: [{ id: "g1", name: "Engineering" }],
     },
-    { id: "user-2", name: "Bob User", email: "bob@example.com", role: "member", banned: false },
-    { id: "user-3", name: "Carol User", email: "carol@example.com", role: "member", banned: false },
+    {
+      id: "user-2",
+      name: "Bob User",
+      email: "bob@example.com",
+      role: "member",
+      banned: false,
+      groups: [
+        { id: "g1", name: "Engineering" },
+        { id: "g2", name: "Design" },
+      ],
+    },
+    {
+      id: "user-3",
+      name: "Carol User",
+      email: "carol@example.com",
+      role: "member",
+      banned: false,
+      groups: [],
+    },
   ];
 
   const mockInvites: unknown[] = [];
@@ -262,6 +280,27 @@ describe("SettingsUsers", () => {
     });
 
     expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
+  });
+
+  it("should render group badges for users", async () => {
+    renderWithUsersLoaded();
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Alice Admin").length).toBeGreaterThanOrEqual(1);
+    });
+
+    const table = screen.getByRole("table");
+    const tableView = within(table);
+
+    // Bob has two groups
+    const bobRow = tableView.getByText("Bob User").closest("tr")!;
+    expect(within(bobRow).getByText("Engineering")).toBeInTheDocument();
+    expect(within(bobRow).getByText("Design")).toBeInTheDocument();
+
+    // Carol has no groups
+    const carolRow = tableView.getByText("Carol User").closest("tr")!;
+    expect(within(carolRow).queryByText("Engineering")).not.toBeInTheDocument();
+    expect(within(carolRow).queryByText("Design")).not.toBeInTheDocument();
   });
 
   it("should show loading state while fetching users", () => {

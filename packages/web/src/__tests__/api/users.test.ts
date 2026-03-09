@@ -36,6 +36,7 @@ vi.mock("@/db", () => ({
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue([]),
+        innerJoin: vi.fn().mockResolvedValue([]),
       }),
     }),
     delete: vi.fn().mockReturnValue({
@@ -104,8 +105,16 @@ describe("GET /api/users", () => {
       { id: "admin-1", name: "Bob", email: "bob@test.com", role: "admin" },
     ];
 
+    // First select: users
     vi.mocked(db.select).mockReturnValueOnce({
       from: vi.fn().mockResolvedValueOnce(fakeUsers),
+    } as never);
+
+    // Second select: userGroups join groups
+    vi.mocked(db.select).mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        innerJoin: vi.fn().mockResolvedValue([]),
+      }),
     } as never);
 
     const response = await GET();
@@ -118,7 +127,7 @@ describe("GET /api/users", () => {
     expect(body.users[0].email).toBe("alice@test.com");
     expect(body.users[0].role).toBe("member");
     // Ensure only selected fields are returned (no sensitive data leaks)
-    expect(Object.keys(body.users[0]).sort()).toEqual(["email", "id", "name", "role"]);
+    expect(Object.keys(body.users[0]).sort()).toEqual(["email", "groups", "id", "name", "role"]);
   });
 
   it("includes banned status in user list", async () => {
@@ -138,8 +147,16 @@ describe("GET /api/users", () => {
       },
     ];
 
+    // First select: users
     vi.mocked(db.select).mockReturnValueOnce({
       from: vi.fn().mockResolvedValueOnce(fakeUsers),
+    } as never);
+
+    // Second select: userGroups join groups
+    vi.mocked(db.select).mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        innerJoin: vi.fn().mockResolvedValue([]),
+      }),
     } as never);
 
     const response = await GET();

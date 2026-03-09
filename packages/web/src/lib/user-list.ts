@@ -1,3 +1,8 @@
+export interface UserGroup {
+  id: string;
+  name: string;
+}
+
 export type UserListItem =
   | {
       kind: "user";
@@ -6,6 +11,7 @@ export type UserListItem =
       email: string;
       role: string;
       status: "active" | "deactivated";
+      groups: UserGroup[];
     }
   | {
       kind: "invite";
@@ -22,6 +28,7 @@ interface ApiUser {
   email: string;
   role: string;
   banned: boolean;
+  groups?: UserGroup[];
 }
 
 interface ApiInvite {
@@ -53,6 +60,7 @@ export function mergeUserList(
     email: u.email,
     role: u.role,
     status: u.banned ? "deactivated" : "active",
+    groups: u.groups || [],
   }));
 
   const inviteItems: UserListItem[] = invites

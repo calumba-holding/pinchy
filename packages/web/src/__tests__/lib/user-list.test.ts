@@ -18,6 +18,7 @@ describe("mergeUserList", () => {
         email: "alice@test.com",
         role: "member",
         status: "active",
+        groups: [],
       },
     ]);
   });

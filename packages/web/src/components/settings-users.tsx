@@ -149,7 +149,7 @@ export function SettingsUsers({ currentUserId }: SettingsUsersProps) {
                 className={`rounded border p-3 space-y-2 ${item.status === "deactivated" ? "opacity-50" : ""}`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span
                       className="font-medium truncate max-w-[180px]"
                       title={item.kind === "user" ? item.name : undefined}
@@ -160,6 +160,12 @@ export function SettingsUsers({ currentUserId }: SettingsUsersProps) {
                       {item.role}
                     </Badge>
                     <StatusBadge status={item.status} />
+                    {item.kind === "user" &&
+                      item.groups?.map((g) => (
+                        <Badge key={g.id} variant="secondary" className="text-xs">
+                          {g.name}
+                        </Badge>
+                      ))}
                   </div>
                 </div>
                 <div
@@ -213,6 +219,7 @@ export function SettingsUsers({ currentUserId }: SettingsUsersProps) {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Groups</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -236,6 +243,14 @@ export function SettingsUsers({ currentUserId }: SettingsUsersProps) {
                       {item.kind === "user" ? item.email : item.email || "\u2014"}
                     </TableCell>
                     <TableCell>{item.role}</TableCell>
+                    <TableCell>
+                      {item.kind === "user" &&
+                        item.groups?.map((g) => (
+                          <Badge key={g.id} variant="secondary" className="mr-1 text-xs">
+                            {g.name}
+                          </Badge>
+                        ))}
+                    </TableCell>
                     <TableCell>
                       <StatusBadge status={item.status} />
                     </TableCell>
