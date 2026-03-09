@@ -5,6 +5,22 @@ import { userGroups } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { appendAuditLog } from "@/lib/audit";
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ groupId: string }> }
+) {
+  const sessionOrError = await requireAdmin();
+  if (sessionOrError instanceof NextResponse) return sessionOrError;
+  const { groupId } = await params;
+
+  const members = await db
+    .select({ userId: userGroups.userId, groupId: userGroups.groupId })
+    .from(userGroups)
+    .where(eq(userGroups.groupId, groupId));
+
+  return NextResponse.json(members);
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }

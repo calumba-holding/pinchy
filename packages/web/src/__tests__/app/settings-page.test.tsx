@@ -39,6 +39,10 @@ vi.mock("@/components/settings-users", () => ({
   ),
 }));
 
+vi.mock("@/components/settings-groups", () => ({
+  SettingsGroups: () => <div data-testid="mock-settings-groups">Groups</div>,
+}));
+
 vi.mock("@/components/settings-context", () => ({
   SettingsContext: ({
     userContext,
