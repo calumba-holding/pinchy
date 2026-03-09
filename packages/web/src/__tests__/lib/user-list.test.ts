@@ -56,6 +56,7 @@ describe("mergeUserList", () => {
         role: "member",
         status: "pending",
         createdAt: "2026-03-05T00:00:00Z",
+        groups: [],
       },
     ]);
   });
@@ -146,6 +147,51 @@ describe("mergeUserList", () => {
       now
     );
     expect(result.map((r) => r.status)).toEqual(["active", "pending", "expired", "deactivated"]);
+  });
+
+  it("includes groups on invites when provided", () => {
+    const result = mergeUserList(
+      [],
+      [
+        {
+          id: "inv1",
+          email: "bob@test.com",
+          role: "member",
+          type: "invite",
+          createdAt: "2026-03-05T00:00:00Z",
+          expiresAt: "2026-03-12T00:00:00Z",
+          claimedAt: null,
+          groups: [{ id: "g1", name: "HR" }],
+        },
+      ],
+      now
+    );
+    expect(result[0]).toMatchObject({
+      kind: "invite",
+      groups: [{ id: "g1", name: "HR" }],
+    });
+  });
+
+  it("defaults invite groups to empty array when not provided", () => {
+    const result = mergeUserList(
+      [],
+      [
+        {
+          id: "inv1",
+          email: "bob@test.com",
+          role: "member",
+          type: "invite",
+          createdAt: "2026-03-05T00:00:00Z",
+          expiresAt: "2026-03-12T00:00:00Z",
+          claimedAt: null,
+        },
+      ],
+      now
+    );
+    expect(result[0]).toMatchObject({
+      kind: "invite",
+      groups: [],
+    });
   });
 
   it("handles invites without email", () => {

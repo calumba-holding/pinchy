@@ -20,6 +20,7 @@ export type UserListItem =
       role: string;
       status: "pending" | "expired";
       createdAt: string;
+      groups: UserGroup[];
     };
 
 interface ApiUser {
@@ -39,6 +40,7 @@ interface ApiInvite {
   createdAt: string;
   expiresAt: string;
   claimedAt: string | null;
+  groups?: UserGroup[];
 }
 
 const STATUS_ORDER: Record<UserListItem["status"], number> = {
@@ -72,6 +74,7 @@ export function mergeUserList(
       role: inv.role,
       status: new Date(inv.expiresAt) > now ? "pending" : "expired",
       createdAt: inv.createdAt,
+      groups: inv.groups || [],
     }));
 
   return [...userItems, ...inviteItems].sort(

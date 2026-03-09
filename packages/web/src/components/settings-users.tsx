@@ -160,12 +160,11 @@ export function SettingsUsers({ currentUserId }: SettingsUsersProps) {
                       {item.role}
                     </Badge>
                     <StatusBadge status={item.status} />
-                    {item.kind === "user" &&
-                      item.groups?.map((g) => (
-                        <Badge key={g.id} variant="secondary" className="text-xs">
-                          {g.name}
-                        </Badge>
-                      ))}
+                    {item.groups?.map((g) => (
+                      <Badge key={g.id} variant="secondary" className="text-xs">
+                        {g.name}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
                 <div
@@ -244,12 +243,11 @@ export function SettingsUsers({ currentUserId }: SettingsUsersProps) {
                     </TableCell>
                     <TableCell>{item.role}</TableCell>
                     <TableCell>
-                      {item.kind === "user" &&
-                        item.groups?.map((g) => (
-                          <Badge key={g.id} variant="secondary" className="mr-1 text-xs">
-                            {g.name}
-                          </Badge>
-                        ))}
+                      {item.groups?.map((g) => (
+                        <Badge key={g.id} variant="secondary" className="mr-1 text-xs">
+                          {g.name}
+                        </Badge>
+                      ))}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={item.status} />

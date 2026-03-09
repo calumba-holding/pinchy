@@ -23,18 +23,25 @@ vi.mock("@/lib/invites", () => ({
   createInvite: vi.fn(),
 }));
 
-vi.mock("@/db", () => ({
-  db: {
-    select: vi.fn().mockReturnValue({
-      from: vi.fn().mockResolvedValue([]),
-    }),
-    delete: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([]),
+vi.mock("@/db", () => {
+  const mockFrom = vi.fn().mockImplementation(() => {
+    const result = Promise.resolve([]);
+    (result as any).innerJoin = vi.fn().mockResolvedValue([]);
+    return result;
+  });
+  return {
+    db: {
+      select: vi.fn().mockReturnValue({
+        from: mockFrom,
       }),
-    }),
-  },
-}));
+      delete: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    },
+  };
+});
 
 import { auth } from "@/lib/auth";
 import { createInvite } from "@/lib/invites";
@@ -290,9 +297,15 @@ describe("GET /api/users/invites", () => {
       },
     ];
 
-    vi.mocked(db.select).mockReturnValueOnce({
-      from: vi.fn().mockResolvedValueOnce(fakeInvites),
-    } as never);
+    vi.mocked(db.select)
+      .mockReturnValueOnce({
+        from: vi.fn().mockResolvedValueOnce(fakeInvites),
+      } as never)
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockResolvedValue([]),
+        }),
+      } as never);
 
     const response = await GET();
     expect(response.status).toBe(200);
