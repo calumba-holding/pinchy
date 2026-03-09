@@ -31,7 +31,7 @@ function mockFetchForInvite(
     if (urlStr.includes("/api/groups")) {
       return Promise.resolve({
         ok: true,
-        json: async () => ({ groups }),
+        json: async () => groups,
       } as Response);
     }
     return Promise.resolve(inviteResponse as Response);
@@ -266,12 +266,10 @@ describe("InviteDialog", () => {
       if (urlStr.includes("/api/groups")) {
         return Promise.resolve({
           ok: true,
-          json: async () => ({
-            groups: [
-              { id: "g1", name: "HR" },
-              { id: "g2", name: "Engineering" },
-            ],
-          }),
+          json: async () => [
+            { id: "g1", name: "HR" },
+            { id: "g2", name: "Engineering" },
+          ],
         } as Response);
       }
       return Promise.resolve({
@@ -328,12 +326,10 @@ describe("InviteDialog", () => {
       if (urlStr.includes("/api/groups")) {
         return Promise.resolve({
           ok: true,
-          json: async () => ({
-            groups: [
-              { id: "g1", name: "HR" },
-              { id: "g2", name: "Engineering" },
-            ],
-          }),
+          json: async () => [
+            { id: "g1", name: "HR" },
+            { id: "g2", name: "Engineering" },
+          ],
         } as Response);
       }
       return Promise.resolve({

@@ -80,7 +80,7 @@ export function InviteDialog({ open, onOpenChange }: InviteDialogProps) {
     if (!isEnterprise) return;
     fetch("/api/groups")
       .then((r) => r.json())
-      .then((d) => setGroups(d.groups));
+      .then((data) => setGroups(Array.isArray(data) ? data : []));
   }, [isEnterprise]);
 
   async function onSubmit(values: InviteFormValues) {
