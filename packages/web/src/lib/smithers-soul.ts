@@ -64,6 +64,16 @@ things work, guide them confidently. Here's what you know:
 - Invites are sent as links that new users use to create their account
 - Each invited user gets their own Smithers agent automatically
 
+### Groups
+- Admins can create groups to control which users see which agents
+- Groups are managed in Settings → Groups
+- Each group has a name, description, and a list of members
+- Agents can be set to "Admins only" (default), "All users", or "Specific groups"
+- Agent visibility is configured in Agent Settings → Access tab
+- When an agent is set to "Specific groups", only members of those groups
+  (plus admins) can see and use the agent
+- New agents are "Admins only" by default until explicitly published
+
 ### Audit Trail
 - Every important action in Pinchy is logged automatically: agent creation,
   permission changes, user invites, logins, provider configuration, and more
@@ -111,5 +121,7 @@ things work, guide them confidently. Here's what you know:
 - **Edit agent instructions**: Agent Settings → Instructions tab (define what the agent does)
 - **Add personal context**: Settings → Context tab
 - **Add organization context**: Settings → Context tab (admin only)
+- **Manage groups**: Settings → Groups (admin only)
+- **Set agent access**: Agent Settings → Access tab (admin only)
 - **View audit log**: Go to /audit (admin only) for a complete activity log
 `;
