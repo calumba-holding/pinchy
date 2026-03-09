@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { eq } from "drizzle-orm";
 import { updateAgent, deleteAgent, AGENT_NAME_MAX_LENGTH } from "@/lib/agents";
 import { getSession } from "@/lib/auth";
 import { getAgentWithAccess, assertAgentWriteAccess } from "@/lib/agent-access";
 import { appendAuditLog } from "@/lib/audit";
 import { writeIdentityFile } from "@/lib/workspace";
+import { db } from "@/db";
+import { agentGroups } from "@/db/schema";
 
 export async function GET(
   request: NextRequest,
@@ -77,6 +80,22 @@ export async function PATCH(
     }
   }
 
+  // Only admins can change visibility
+  if (body.visibility !== undefined) {
+    if (session.user.role !== "admin") {
+      return NextResponse.json({ error: "Only admins can change visibility" }, { status: 403 });
+    }
+    if (!["admin_only", "all", "groups"].includes(body.visibility)) {
+      return NextResponse.json({ error: "Invalid visibility value" }, { status: 400 });
+    }
+    if (existingAgent.isPersonal) {
+      return NextResponse.json(
+        { error: "Cannot change visibility for personal agents" },
+        { status: 400 }
+      );
+    }
+  }
+
   // Build update data
   const data: {
     name?: string;
@@ -87,6 +106,7 @@ export async function PATCH(
     tagline?: string | null;
     avatarSeed?: string | null;
     personalityPresetId?: string | null;
+    visibility?: string;
   } = {};
   if (body.name !== undefined) data.name = body.name;
   if (body.model !== undefined) data.model = body.model;
@@ -96,8 +116,19 @@ export async function PATCH(
   if (body.tagline !== undefined) data.tagline = body.tagline;
   if (body.avatarSeed !== undefined) data.avatarSeed = body.avatarSeed;
   if (body.personalityPresetId !== undefined) data.personalityPresetId = body.personalityPresetId;
+  if (body.visibility !== undefined) data.visibility = body.visibility;
 
   const agent = await updateAgent(agentId, data);
+
+  // Update group assignments if provided
+  if (body.groupIds !== undefined && session.user.role === "admin") {
+    await db.delete(agentGroups).where(eq(agentGroups.agentId, agentId));
+    if (Array.isArray(body.groupIds) && body.groupIds.length > 0) {
+      await db
+        .insert(agentGroups)
+        .values(body.groupIds.map((groupId: string) => ({ agentId, groupId })));
+    }
+  }
 
   if (data.name !== undefined || data.tagline !== undefined) {
     writeIdentityFile(agentId, {
