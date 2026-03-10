@@ -5,6 +5,7 @@ import { isSetupComplete, isProviderConfigured } from "@/lib/setup";
 import { getVisibleAgents } from "@/lib/visible-agents";
 import { AppSidebar } from "@/components/sidebar";
 import { AppShell } from "@/components/app-shell";
+import { AgentsProvider } from "@/components/agents-provider";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -23,11 +24,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const isAdmin = session?.user?.role === "admin";
 
   return (
-    <SidebarProvider>
-      <AppSidebar agents={visibleAgents} isAdmin={isAdmin} />
-      <SidebarInset className="h-dvh overflow-hidden">
-        <AppShell isAdmin={isAdmin}>{children}</AppShell>
-      </SidebarInset>
-    </SidebarProvider>
+    <AgentsProvider initialAgents={visibleAgents}>
+      <SidebarProvider>
+        <AppSidebar isAdmin={isAdmin} />
+        <SidebarInset className="h-dvh overflow-hidden">
+          <AppShell isAdmin={isAdmin}>{children}</AppShell>
+        </SidebarInset>
+      </SidebarProvider>
+    </AgentsProvider>
   );
 }

@@ -4,23 +4,22 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import { AppSidebar } from "@/components/sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import type { Agent } from "@/components/agent-list";
+import { sortAgents } from "@/components/agent-list";
 
-const { mockSignOut, mockRouterPush, mockUsePathname, mockToast, mockUseAgents } = vi.hoisted(
-  () => ({
-    mockSignOut: vi.fn().mockResolvedValue(undefined),
-    mockRouterPush: vi.fn(),
-    mockUsePathname: vi.fn().mockReturnValue("/chat/1"),
-    mockToast: vi.fn(),
-    mockUseAgents: vi.fn((agents: unknown[]) => agents),
-  })
-);
-
-vi.mock("sonner", () => ({
-  toast: mockToast,
+const { mockSignOut, mockRouterPush, mockUsePathname, mockAgentsContextValue } = vi.hoisted(() => ({
+  mockSignOut: vi.fn().mockResolvedValue(undefined),
+  mockRouterPush: vi.fn(),
+  mockUsePathname: vi.fn().mockReturnValue("/chat/1"),
+  mockAgentsContextValue: {
+    agents: [] as Agent[],
+    sortedAgents: [] as Agent[],
+    getAgent: vi.fn(),
+  },
 }));
 
-vi.mock("@/hooks/use-agents", () => ({
-  useAgents: (agents: unknown[]) => mockUseAgents(agents),
+vi.mock("@/components/agents-provider", () => ({
+  useAgentsContext: () => mockAgentsContextValue,
 }));
 
 vi.mock("@/lib/auth-client", () => ({
@@ -51,16 +50,23 @@ vi.mock("@/lib/avatar", () => ({
   }),
 }));
 
+function setAgents(agents: Agent[]) {
+  mockAgentsContextValue.agents = agents;
+  mockAgentsContextValue.sortedAgents = sortAgents(agents);
+  mockAgentsContextValue.getAgent = vi.fn((id: string) => agents.find((a) => a.id === id));
+}
+
 describe("AppSidebar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUsePathname.mockReturnValue("/chat/1");
-    mockUseAgents.mockImplementation((agents: unknown[]) => agents);
+    setAgents([]);
   });
+
   it("should render Pinchy branding", () => {
     render(
       <SidebarProvider>
-        <AppSidebar agents={[]} isAdmin={false} />
+        <AppSidebar isAdmin={false} />
       </SidebarProvider>
     );
     expect(screen.getByText("Pinchy")).toBeInTheDocument();
@@ -69,7 +75,7 @@ describe("AppSidebar", () => {
   it("should render the Pinchy logo in the header", () => {
     render(
       <SidebarProvider>
-        <AppSidebar agents={[]} isAdmin={false} />
+        <AppSidebar isAdmin={false} />
       </SidebarProvider>
     );
     const logo = screen.getByAltText("Pinchy");
@@ -78,7 +84,7 @@ describe("AppSidebar", () => {
   });
 
   it("should render agent names", () => {
-    const agents = [
+    setAgents([
       {
         id: "1",
         name: "Smithers",
@@ -87,10 +93,10 @@ describe("AppSidebar", () => {
         tagline: null,
         avatarSeed: null,
       },
-    ];
+    ]);
     render(
       <SidebarProvider>
-        <AppSidebar agents={agents} isAdmin={false} />
+        <AppSidebar isAdmin={false} />
       </SidebarProvider>
     );
     expect(screen.getByText("Smithers")).toBeInTheDocument();
@@ -99,7 +105,7 @@ describe("AppSidebar", () => {
   it("should render settings link", () => {
     render(
       <SidebarProvider>
-        <AppSidebar agents={[]} isAdmin={false} />
+        <AppSidebar isAdmin={false} />
       </SidebarProvider>
     );
     expect(screen.getByRole("link", { name: /settings/i })).toBeInTheDocument();
@@ -109,7 +115,7 @@ describe("AppSidebar", () => {
     it("should render New Agent link when isAdmin is true", () => {
       render(
         <SidebarProvider>
-          <AppSidebar agents={[]} isAdmin={true} />
+          <AppSidebar isAdmin={true} />
         </SidebarProvider>
       );
       const newAgentLink = screen.getByRole("link", { name: /new agent/i });
@@ -120,7 +126,7 @@ describe("AppSidebar", () => {
     it("should NOT render New Agent link when isAdmin is false", () => {
       render(
         <SidebarProvider>
-          <AppSidebar agents={[]} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       expect(screen.queryByRole("link", { name: /new agent/i })).not.toBeInTheDocument();
@@ -129,7 +135,7 @@ describe("AppSidebar", () => {
 
   describe("avatar rendering", () => {
     it("should render avatar image for agents", () => {
-      const agents = [
+      setAgents([
         {
           id: "1",
           name: "Test Agent",
@@ -138,10 +144,10 @@ describe("AppSidebar", () => {
           tagline: null,
           avatarSeed: "my-seed",
         },
-      ];
+      ]);
       const { container } = render(
         <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       const avatar = container.querySelector('img[src="data:image/svg+xml;utf8,mock-my-seed"]');
@@ -149,7 +155,7 @@ describe("AppSidebar", () => {
     });
 
     it("should render Smithers avatar for __smithers__ seed", () => {
-      const agents = [
+      setAgents([
         {
           id: "1",
           name: "Smithers",
@@ -158,10 +164,10 @@ describe("AppSidebar", () => {
           tagline: null,
           avatarSeed: "__smithers__",
         },
-      ];
+      ]);
       const { container } = render(
         <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       const avatar = container.querySelector('img[src="/images/smithers-avatar.png"]');
@@ -171,7 +177,7 @@ describe("AppSidebar", () => {
 
   describe("tagline rendering", () => {
     it("should render tagline when present", () => {
-      const agents = [
+      setAgents([
         {
           id: "1",
           name: "HR Bot",
@@ -180,17 +186,17 @@ describe("AppSidebar", () => {
           tagline: "Answers HR questions",
           avatarSeed: null,
         },
-      ];
+      ]);
       render(
         <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       expect(screen.getByText("Answers HR questions")).toBeInTheDocument();
     });
 
     it("should show title tooltip on tagline for hover", () => {
-      const agents = [
+      setAgents([
         {
           id: "1",
           name: "HR Bot",
@@ -199,10 +205,10 @@ describe("AppSidebar", () => {
           tagline: "Answers HR questions from your documents",
           avatarSeed: null,
         },
-      ];
+      ]);
       render(
         <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       const tagline = screen.getByText("Answers HR questions from your documents");
@@ -210,7 +216,7 @@ describe("AppSidebar", () => {
     });
 
     it("should show title tooltip on agent name for hover", () => {
-      const agents = [
+      setAgents([
         {
           id: "1",
           name: "A Very Long Agent Name That Gets Truncated",
@@ -219,10 +225,10 @@ describe("AppSidebar", () => {
           tagline: null,
           avatarSeed: null,
         },
-      ];
+      ]);
       render(
         <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       const name = screen.getByText("A Very Long Agent Name That Gets Truncated");
@@ -230,7 +236,7 @@ describe("AppSidebar", () => {
     });
 
     it("should not render tagline when null", () => {
-      const agents = [
+      setAgents([
         {
           id: "1",
           name: "HR Bot",
@@ -239,13 +245,12 @@ describe("AppSidebar", () => {
           tagline: null,
           avatarSeed: null,
         },
-      ];
+      ]);
       render(
         <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
-      // Only the agent name should be rendered, no additional text
       const link = screen.getByRole("link", { name: /hr bot/i });
       expect(link).toBeInTheDocument();
       expect(link.textContent).toBe("HR Bot");
@@ -256,7 +261,7 @@ describe("AppSidebar", () => {
     it("should render a logout button in the sidebar footer", () => {
       render(
         <SidebarProvider>
-          <AppSidebar agents={[]} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       expect(screen.getByRole("button", { name: /log out/i })).toBeInTheDocument();
@@ -266,7 +271,7 @@ describe("AppSidebar", () => {
       const user = userEvent.setup();
       render(
         <SidebarProvider>
-          <AppSidebar agents={[]} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       await user.click(screen.getByRole("button", { name: /log out/i }));
@@ -278,7 +283,7 @@ describe("AppSidebar", () => {
   });
 
   describe("active agent highlighting", () => {
-    const agents = [
+    const agents: Agent[] = [
       {
         id: "agent-1",
         name: "Alpha",
@@ -299,9 +304,10 @@ describe("AppSidebar", () => {
 
     it("should mark the current agent's menu button as active", () => {
       mockUsePathname.mockReturnValue("/chat/agent-1");
+      setAgents(agents);
       render(
         <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       const activeButton = screen.getByRole("link", { name: /alpha/i }).closest("[data-active]");
@@ -310,22 +316,23 @@ describe("AppSidebar", () => {
 
     it("should not mark other agents as active", () => {
       mockUsePathname.mockReturnValue("/chat/agent-1");
+      setAgents(agents);
       render(
         <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       const betaLink = screen.getByRole("link", { name: /beta/i });
       const betaButton = betaLink.closest("[data-active]");
-      // Either no data-active attribute or data-active="false"
       expect(betaButton === null || betaButton.getAttribute("data-active") === "false").toBe(true);
     });
 
     it("should apply custom active background on the active agent", () => {
       mockUsePathname.mockReturnValue("/chat/agent-1");
+      setAgents(agents);
       render(
         <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       const activeLink = screen.getByRole("link", { name: /alpha/i });
@@ -334,9 +341,10 @@ describe("AppSidebar", () => {
 
     it("should not apply custom active background on inactive agents", () => {
       mockUsePathname.mockReturnValue("/chat/agent-1");
+      setAgents(agents);
       render(
         <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       const inactiveLink = screen.getByRole("link", { name: /beta/i });
@@ -345,9 +353,10 @@ describe("AppSidebar", () => {
 
     it("should update active state for settings subpages", () => {
       mockUsePathname.mockReturnValue("/chat/agent-2/settings");
+      setAgents(agents);
       render(
         <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       const activeButton = screen.getByRole("link", { name: /beta/i }).closest("[data-active]");
@@ -358,7 +367,7 @@ describe("AppSidebar", () => {
   it("should render a Report a bug button in the footer", () => {
     render(
       <SidebarProvider>
-        <AppSidebar agents={[]} isAdmin={false} />
+        <AppSidebar isAdmin={false} />
       </SidebarProvider>
     );
     expect(screen.getByRole("button", { name: /report a bug/i })).toBeInTheDocument();
@@ -369,7 +378,7 @@ describe("AppSidebar", () => {
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
     render(
       <SidebarProvider>
-        <AppSidebar agents={[]} isAdmin={false} />
+        <AppSidebar isAdmin={false} />
       </SidebarProvider>
     );
     await user.click(screen.getByRole("button", { name: /report a bug/i }));
@@ -381,73 +390,9 @@ describe("AppSidebar", () => {
     openSpy.mockRestore();
   });
 
-  describe("agent access guard", () => {
-    const agents = [
-      {
-        id: "agent-1",
-        name: "Alpha",
-        model: "gpt-4",
-        isPersonal: false,
-        tagline: null,
-        avatarSeed: null,
-      },
-      {
-        id: "agent-2",
-        name: "Beta",
-        model: "gpt-4",
-        isPersonal: false,
-        tagline: null,
-        avatarSeed: null,
-      },
-    ];
-
-    it("should show toast and redirect when current agent is removed from list", () => {
-      mockUsePathname.mockReturnValue("/chat/agent-2");
-      // useAgents returns a list without agent-2
-      mockUseAgents.mockReturnValue([agents[0]]);
-
-      render(
-        <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
-        </SidebarProvider>
-      );
-
-      expect(mockToast).toHaveBeenCalledWith("You no longer have access to this agent");
-      expect(mockRouterPush).toHaveBeenCalledWith("/chat/agent-1");
-    });
-
-    it("should not redirect when current agent is still in list", () => {
-      mockUsePathname.mockReturnValue("/chat/agent-1");
-      mockUseAgents.mockReturnValue(agents);
-
-      render(
-        <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
-        </SidebarProvider>
-      );
-
-      expect(mockToast).not.toHaveBeenCalled();
-      expect(mockRouterPush).not.toHaveBeenCalled();
-    });
-
-    it("should not redirect when not on a chat page", () => {
-      mockUsePathname.mockReturnValue("/settings");
-      mockUseAgents.mockReturnValue([]);
-
-      render(
-        <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
-        </SidebarProvider>
-      );
-
-      expect(mockToast).not.toHaveBeenCalled();
-      expect(mockRouterPush).not.toHaveBeenCalled();
-    });
-  });
-
   describe("agent ordering", () => {
     it("should render personal agents before non-personal agents", () => {
-      const agents = [
+      setAgents([
         {
           id: "1",
           name: "Shared Agent",
@@ -464,10 +409,10 @@ describe("AppSidebar", () => {
           tagline: null,
           avatarSeed: null,
         },
-      ];
+      ]);
       render(
         <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       const links = screen.getAllByRole("link").filter((link) => {
@@ -480,7 +425,7 @@ describe("AppSidebar", () => {
     });
 
     it("should sort non-personal agents alphabetically by name", () => {
-      const agents = [
+      setAgents([
         {
           id: "1",
           name: "Smithers",
@@ -513,10 +458,10 @@ describe("AppSidebar", () => {
           tagline: null,
           avatarSeed: null,
         },
-      ];
+      ]);
       render(
         <SidebarProvider>
-          <AppSidebar agents={agents} isAdmin={false} />
+          <AppSidebar isAdmin={false} />
         </SidebarProvider>
       );
       const links = screen.getAllByRole("link").filter((link) => {
