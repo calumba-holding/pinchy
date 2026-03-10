@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bug, ClipboardList, Plus, Settings } from "lucide-react";
+import { toast } from "sonner";
 import { LogoutButton } from "@/components/logout-button";
+import { useAgents } from "@/hooks/use-agents";
 import {
   Sidebar,
   SidebarContent,
@@ -27,9 +30,27 @@ interface AppSidebarProps {
   isAdmin: boolean;
 }
 
-export function AppSidebar({ agents, isAdmin }: AppSidebarProps) {
+export function AppSidebar({ agents: initialAgents, isAdmin }: AppSidebarProps) {
   const pathname = usePathname();
-  const sortedAgents = sortAgents(agents);
+  const router = useRouter();
+  const liveAgents = useAgents(initialAgents);
+  const sortedAgents = sortAgents(liveAgents);
+
+  // Detect when the current agent becomes inaccessible
+  const hasRedirected = useRef(false);
+  useEffect(() => {
+    const chatMatch = pathname.match(/^\/chat\/([^/]+)/);
+    if (!chatMatch) return;
+
+    const currentAgentId = chatMatch[1];
+    const stillVisible = liveAgents.some((a) => a.id === currentAgentId);
+
+    if (!stillVisible && liveAgents.length > 0 && !hasRedirected.current) {
+      hasRedirected.current = true;
+      toast("You no longer have access to this agent");
+      router.push(`/chat/${liveAgents[0].id}`);
+    }
+  }, [liveAgents, pathname, router]);
 
   return (
     <Sidebar>

@@ -1,14 +1,26 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import { AppSidebar } from "@/components/sidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
-const { mockSignOut, mockRouterPush, mockUsePathname } = vi.hoisted(() => ({
-  mockSignOut: vi.fn().mockResolvedValue(undefined),
-  mockRouterPush: vi.fn(),
-  mockUsePathname: vi.fn().mockReturnValue("/chat/1"),
+const { mockSignOut, mockRouterPush, mockUsePathname, mockToast, mockUseAgents } = vi.hoisted(
+  () => ({
+    mockSignOut: vi.fn().mockResolvedValue(undefined),
+    mockRouterPush: vi.fn(),
+    mockUsePathname: vi.fn().mockReturnValue("/chat/1"),
+    mockToast: vi.fn(),
+    mockUseAgents: vi.fn((agents: unknown[]) => agents),
+  })
+);
+
+vi.mock("sonner", () => ({
+  toast: mockToast,
+}));
+
+vi.mock("@/hooks/use-agents", () => ({
+  useAgents: (agents: unknown[]) => mockUseAgents(agents),
 }));
 
 vi.mock("@/lib/auth-client", () => ({
@@ -40,6 +52,11 @@ vi.mock("@/lib/avatar", () => ({
 }));
 
 describe("AppSidebar", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUsePathname.mockReturnValue("/chat/1");
+    mockUseAgents.mockImplementation((agents: unknown[]) => agents);
+  });
   it("should render Pinchy branding", () => {
     render(
       <SidebarProvider>
@@ -362,6 +379,70 @@ describe("AppSidebar", () => {
       "noopener,noreferrer"
     );
     openSpy.mockRestore();
+  });
+
+  describe("agent access guard", () => {
+    const agents = [
+      {
+        id: "agent-1",
+        name: "Alpha",
+        model: "gpt-4",
+        isPersonal: false,
+        tagline: null,
+        avatarSeed: null,
+      },
+      {
+        id: "agent-2",
+        name: "Beta",
+        model: "gpt-4",
+        isPersonal: false,
+        tagline: null,
+        avatarSeed: null,
+      },
+    ];
+
+    it("should show toast and redirect when current agent is removed from list", () => {
+      mockUsePathname.mockReturnValue("/chat/agent-2");
+      // useAgents returns a list without agent-2
+      mockUseAgents.mockReturnValue([agents[0]]);
+
+      render(
+        <SidebarProvider>
+          <AppSidebar agents={agents} isAdmin={false} />
+        </SidebarProvider>
+      );
+
+      expect(mockToast).toHaveBeenCalledWith("You no longer have access to this agent");
+      expect(mockRouterPush).toHaveBeenCalledWith("/chat/agent-1");
+    });
+
+    it("should not redirect when current agent is still in list", () => {
+      mockUsePathname.mockReturnValue("/chat/agent-1");
+      mockUseAgents.mockReturnValue(agents);
+
+      render(
+        <SidebarProvider>
+          <AppSidebar agents={agents} isAdmin={false} />
+        </SidebarProvider>
+      );
+
+      expect(mockToast).not.toHaveBeenCalled();
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    });
+
+    it("should not redirect when not on a chat page", () => {
+      mockUsePathname.mockReturnValue("/settings");
+      mockUseAgents.mockReturnValue([]);
+
+      render(
+        <SidebarProvider>
+          <AppSidebar agents={agents} isAdmin={false} />
+        </SidebarProvider>
+      );
+
+      expect(mockToast).not.toHaveBeenCalled();
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    });
   });
 
   describe("agent ordering", () => {
