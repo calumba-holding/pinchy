@@ -62,12 +62,31 @@ beforeEach(() => {
 });
 
 describe("getVisibleAgents", () => {
-  it("admin sees all agents", async () => {
+  it("admin sees all shared agents and own personal agents", async () => {
+    vi.mocked(getAllAgentGroupIds).mockResolvedValue(new Map());
     mockSelectChain(allAgents);
 
     const result = await getVisibleAgents("admin-user", "admin");
 
-    expect(result).toEqual(allAgents);
+    expect(result).toContainEqual(sharedAgentAll);
+    expect(result).toContainEqual(sharedAgentRestricted);
+    expect(result).not.toContainEqual(personalAgentOwned); // owned by user-1, not admin-user
+    expect(result).not.toContainEqual(personalAgentOther); // owned by other-user
+  });
+
+  it("admin sees own personal agent", async () => {
+    const adminPersonal = {
+      id: "admin-smithers",
+      ownerId: "admin-user",
+      isPersonal: true,
+      visibility: "all",
+    };
+    vi.mocked(getAllAgentGroupIds).mockResolvedValue(new Map());
+    mockSelectChain([...allAgents, adminPersonal]);
+
+    const result = await getVisibleAgents("admin-user", "admin");
+
+    expect(result).toContainEqual(adminPersonal);
   });
 
   it("member sees agents with visibility 'all'", async () => {

@@ -3,20 +3,24 @@ import { activeAgents } from "@/db/schema";
 import { getUserGroupIds, getAllAgentGroupIds } from "@/lib/groups";
 
 export async function getVisibleAgents(userId: string, userRole: string) {
-  if (userRole === "admin") {
-    return db.select().from(activeAgents);
-  }
+  const isAdmin = userRole === "admin";
 
   const [userGroupIds, allAgents, agentGroupMap] = await Promise.all([
-    getUserGroupIds(userId),
+    isAdmin ? Promise.resolve([]) : getUserGroupIds(userId),
     db.select().from(activeAgents),
-    getAllAgentGroupIds(),
+    isAdmin ? Promise.resolve(new Map<string, string[]>()) : getAllAgentGroupIds(),
   ]);
 
   const visible: typeof allAgents = [];
   for (const agent of allAgents) {
+    // Personal agents are only visible to their owner, regardless of role
     if (agent.isPersonal) {
       if (agent.ownerId === userId) visible.push(agent);
+      continue;
+    }
+    // Admins see all shared agents
+    if (isAdmin) {
+      visible.push(agent);
       continue;
     }
     switch (agent.visibility) {
