@@ -47,7 +47,7 @@ Pinchy wraps OpenClaw into something enterprises can trust:
 
 ## Get Started
 
-See the **[Installation Guide](https://docs.heypinchy.com/guides/installation/)** for setup instructions, configuration, and development setup.
+See the **[Installation Guide](https://docs.heypinchy.com/installation/)** for setup instructions, configuration, and development setup.
 
 ## Status
 
