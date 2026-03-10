@@ -24,7 +24,13 @@ export async function PATCH(
   const data: { name?: string; description?: string | null; updatedAt?: Date } = {
     updatedAt: new Date(),
   };
-  if (name !== undefined) data.name = name.trim();
+  if (name !== undefined) {
+    const trimmed = name.trim();
+    if (trimmed === "") {
+      return NextResponse.json({ error: "Name cannot be empty" }, { status: 400 });
+    }
+    data.name = trimmed;
+  }
   if (description !== undefined) data.description = description?.trim() || null;
 
   const [updated] = await db.update(groups).set(data).where(eq(groups.id, groupId)).returning();

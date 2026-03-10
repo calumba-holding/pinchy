@@ -33,7 +33,10 @@ const mockInsert = vi.fn().mockReturnValue({ values: mockValues });
 
 const mockSelectGroupBy = vi.fn();
 const mockSelectLeftJoin = vi.fn().mockReturnValue({ groupBy: mockSelectGroupBy });
-const mockSelectFrom = vi.fn().mockReturnValue({ leftJoin: mockSelectLeftJoin });
+const mockSelectWhere = vi.fn();
+const mockSelectFrom = vi
+  .fn()
+  .mockReturnValue({ leftJoin: mockSelectLeftJoin, where: mockSelectWhere });
 const mockSelectFields = vi.fn().mockReturnValue({ from: mockSelectFrom });
 
 const mockUpdateReturning = vi.fn();
@@ -260,6 +263,25 @@ describe("PATCH /api/groups/[groupId]", () => {
     );
   });
 
+  it("rejects empty name", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
+      user: { id: "admin-1", role: "admin" },
+      expires: "",
+    } as any);
+
+    const request = new NextRequest("http://localhost:7777/api/groups/group-1", {
+      method: "PATCH",
+      body: JSON.stringify({ name: "   " }),
+    });
+
+    const response = await PATCH(request, {
+      params: Promise.resolve({ groupId: "group-1" }),
+    });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("Name cannot be empty");
+  });
+
   it("returns 404 for unknown group", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
@@ -385,6 +407,8 @@ describe("PUT /api/groups/[groupId]/members", () => {
     // Reset delete mock for members route (it doesn't use returning)
     mockDeleteWhere.mockResolvedValue(undefined);
     mockReturning.mockResolvedValue([]);
+    // Default: group exists
+    mockSelectWhere.mockResolvedValue([{ id: "group-1" }]);
     const mod = await import("@/app/api/groups/[groupId]/members/route");
     PUT = mod.PUT;
   });
@@ -423,6 +447,47 @@ describe("PUT /api/groups/[groupId]/members", () => {
         detail: { memberCount: 2 },
       })
     );
+  });
+
+  it("rejects userIds with non-string elements", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
+      user: { id: "admin-1", role: "admin" },
+      expires: "",
+    } as any);
+
+    const request = new NextRequest("http://localhost:7777/api/groups/group-1/members", {
+      method: "PUT",
+      body: JSON.stringify({ userIds: [123, null] }),
+    });
+
+    const response = await PUT(request, {
+      params: Promise.resolve({ groupId: "group-1" }),
+    });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("userIds must be an array of strings");
+  });
+
+  it("returns 404 when group does not exist", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
+      user: { id: "admin-1", role: "admin" },
+      expires: "",
+    } as any);
+
+    // Mock the group lookup to return empty (group does not exist)
+    mockSelectWhere.mockResolvedValueOnce([]);
+
+    const request = new NextRequest("http://localhost:7777/api/groups/nonexistent/members", {
+      method: "PUT",
+      body: JSON.stringify({ userIds: ["user-1"] }),
+    });
+
+    const response = await PUT(request, {
+      params: Promise.resolve({ groupId: "nonexistent" }),
+    });
+    expect(response.status).toBe(404);
+    const body = await response.json();
+    expect(body.error).toBe("Group not found");
   });
 
   it("rejects non-array userIds", async () => {

@@ -28,6 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 const inviteSchema = z.object({
   email: z.string().email("Invalid email").optional().or(z.literal("")),
@@ -194,22 +196,24 @@ export function InviteDialog({ open, onOpenChange }: InviteDialogProps) {
               />
               {isEnterprise && groups.length > 0 && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Groups</label>
+                  <Label className="text-sm font-medium">Groups</Label>
                   {groups.map((group) => (
-                    <label key={group.id} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
+                    <div key={group.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`group-${group.id}`}
                         checked={selectedGroupIds.includes(group.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
+                        onCheckedChange={(checked) => {
+                          if (checked) {
                             setSelectedGroupIds([...selectedGroupIds, group.id]);
                           } else {
                             setSelectedGroupIds(selectedGroupIds.filter((id) => id !== group.id));
                           }
                         }}
                       />
-                      {group.name}
-                    </label>
+                      <Label htmlFor={`group-${group.id}`} className="text-sm font-normal">
+                        {group.name}
+                      </Label>
+                    </div>
                   ))}
                 </div>
               )}

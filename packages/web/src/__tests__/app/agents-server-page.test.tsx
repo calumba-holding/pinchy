@@ -36,6 +36,7 @@ vi.mock("drizzle-orm", () => ({
 vi.mock("@/lib/groups", () => ({
   getUserGroupIds: vi.fn().mockResolvedValue([]),
   getAgentGroupIds: vi.fn().mockResolvedValue([]),
+  getAllAgentGroupIds: vi.fn().mockResolvedValue(new Map()),
 }));
 
 import { requireAuth } from "@/lib/require-auth";

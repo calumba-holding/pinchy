@@ -12,12 +12,14 @@ const findFirstMock = vi.fn();
 const selectWhereMock = vi.fn();
 const selectFromMock = vi.fn().mockReturnValue({ where: selectWhereMock });
 const selectMock = vi.fn().mockReturnValue({ from: selectFromMock });
+const transactionMock = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
     insert: (...args: unknown[]) => insertMock(...args),
     update: (...args: unknown[]) => updateMock(...args),
     select: (...args: unknown[]) => selectMock(...args),
+    transaction: (...args: unknown[]) => transactionMock(...args),
     query: {
       invites: {
         findFirst: (...args: unknown[]) => findFirstMock(...args),
@@ -68,6 +70,11 @@ describe("generateInviteToken", () => {
 describe("createInvite", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Set up transaction mock to call the callback with a tx that has the same API
+    transactionMock.mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
+      const txInsertMock = vi.fn().mockReturnValue({ values: valuesMock });
+      return cb({ insert: txInsertMock });
+    });
   });
 
   it("inserts an invite and returns it with the plaintext token", async () => {
@@ -99,6 +106,27 @@ describe("createInvite", () => {
     expect(result.email).toBe("user@example.com");
   });
 
+  it("uses a transaction for invite creation", async () => {
+    const fakeInvite = {
+      id: "inv-tx",
+      tokenHash: "hash",
+      email: null,
+      role: "member",
+      type: "invite",
+      createdBy: "admin-1",
+      expiresAt: new Date(),
+      claimedAt: null,
+      claimedByUserId: null,
+      createdAt: new Date(),
+    };
+    returningMock.mockResolvedValue([fakeInvite]);
+
+    const { createInvite } = await import("@/lib/invites");
+    await createInvite({ role: "member", createdBy: "admin-1" });
+
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+  });
+
   it("passes correct values to db.insert", async () => {
     const fakeInvite = {
       id: "inv-2",
@@ -121,7 +149,6 @@ describe("createInvite", () => {
       createdBy: "admin-1",
     });
 
-    expect(insertMock).toHaveBeenCalled();
     expect(valuesMock).toHaveBeenCalledWith(
       expect.objectContaining({
         email: "user@test.com",
@@ -340,11 +367,20 @@ describe("claimInvite", () => {
 // ── createInvite with groupIds ──────────────────────────────────────────────
 
 describe("createInvite with groupIds", () => {
+  let txInsertMock: ReturnType<typeof vi.fn>;
+  const groupValuesMock = vi.fn().mockResolvedValue(undefined);
+
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset the default insert mock chain for the invite insert
-    insertMock.mockReturnValue({ values: valuesMock });
-    valuesMock.mockReturnValue({ returning: returningMock });
+    txInsertMock = vi.fn();
+    // Transaction mock: the callback receives a tx object with insert
+    transactionMock.mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
+      txInsertMock
+        .mockReturnValueOnce({ values: valuesMock }) // first call: invites table
+        .mockReturnValueOnce({ values: groupValuesMock }); // second call: inviteGroups table
+      valuesMock.mockReturnValue({ returning: returningMock });
+      return cb({ insert: txInsertMock });
+    });
   });
 
   it("inserts invite group associations when groupIds are provided", async () => {
@@ -362,12 +398,6 @@ describe("createInvite with groupIds", () => {
     };
     returningMock.mockResolvedValue([fakeInvite]);
 
-    const groupValuesMock = vi.fn().mockResolvedValue(undefined);
-    // On the second call to insert (for inviteGroups), return a different chain
-    insertMock
-      .mockReturnValueOnce({ values: valuesMock }) // first call: invites table
-      .mockReturnValueOnce({ values: groupValuesMock }); // second call: inviteGroups table
-
     const { createInvite } = await import("@/lib/invites");
     await createInvite({
       email: "user@example.com",
@@ -376,7 +406,7 @@ describe("createInvite with groupIds", () => {
       groupIds: ["g1", "g2"],
     });
 
-    expect(insertMock).toHaveBeenCalledTimes(2);
+    expect(txInsertMock).toHaveBeenCalledTimes(2);
     expect(groupValuesMock).toHaveBeenCalledWith([
       { inviteId: "inv-grp-1", groupId: "g1" },
       { inviteId: "inv-grp-1", groupId: "g2" },
@@ -405,7 +435,7 @@ describe("createInvite with groupIds", () => {
       groupIds: [],
     });
 
-    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(txInsertMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not insert invite groups when groupIds is not provided", async () => {
@@ -429,7 +459,7 @@ describe("createInvite with groupIds", () => {
       createdBy: "admin-1",
     });
 
-    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(txInsertMock).toHaveBeenCalledTimes(1);
   });
 });
 

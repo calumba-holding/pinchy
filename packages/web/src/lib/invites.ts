@@ -28,16 +28,20 @@ export async function createInvite({
   const { token, tokenHash } = generateInviteToken();
   const expiresAt = new Date(Date.now() + EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
-  const [invite] = await db
-    .insert(invites)
-    .values({ tokenHash, email, role, type, createdBy, expiresAt })
-    .returning();
+  const invite = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(invites)
+      .values({ tokenHash, email, role, type, createdBy, expiresAt })
+      .returning();
 
-  if (groupIds && groupIds.length > 0) {
-    await db
-      .insert(inviteGroups)
-      .values(groupIds.map((groupId) => ({ inviteId: invite.id, groupId })));
-  }
+    if (groupIds && groupIds.length > 0) {
+      await tx
+        .insert(inviteGroups)
+        .values(groupIds.map((groupId) => ({ inviteId: created.id, groupId })));
+    }
+
+    return created;
+  });
 
   return { ...invite, token };
 }

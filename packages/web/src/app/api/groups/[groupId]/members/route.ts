@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { isEnterprise } from "@/lib/enterprise";
 import { db } from "@/db";
-import { userGroups } from "@/db/schema";
+import { groups, userGroups } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { appendAuditLog } from "@/lib/audit";
+
+async function groupExists(groupId: string): Promise<boolean> {
+  const rows = await db.select({ id: groups.id }).from(groups).where(eq(groups.id, groupId));
+  return rows.length > 0;
+}
 
 export async function GET(
   request: NextRequest,
@@ -18,6 +23,10 @@ export async function GET(
   }
 
   const { groupId } = await params;
+
+  if (!(await groupExists(groupId))) {
+    return NextResponse.json({ error: "Group not found" }, { status: 404 });
+  }
 
   const members = await db
     .select({ userId: userGroups.userId, groupId: userGroups.groupId })
@@ -44,6 +53,14 @@ export async function PUT(
 
   if (!Array.isArray(userIds)) {
     return NextResponse.json({ error: "userIds must be an array" }, { status: 400 });
+  }
+
+  if (!userIds.every((id) => typeof id === "string")) {
+    return NextResponse.json({ error: "userIds must be an array of strings" }, { status: 400 });
+  }
+
+  if (!(await groupExists(groupId))) {
+    return NextResponse.json({ error: "Group not found" }, { status: 404 });
   }
 
   await db.delete(userGroups).where(eq(userGroups.groupId, groupId));

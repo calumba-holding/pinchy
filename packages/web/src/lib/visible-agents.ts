@@ -1,14 +1,17 @@
 import { db } from "@/db";
 import { activeAgents } from "@/db/schema";
-import { getUserGroupIds, getAgentGroupIds } from "@/lib/groups";
+import { getUserGroupIds, getAllAgentGroupIds } from "@/lib/groups";
 
 export async function getVisibleAgents(userId: string, userRole: string) {
   if (userRole === "admin") {
     return db.select().from(activeAgents);
   }
 
-  const userGroupIds = await getUserGroupIds(userId);
-  const allAgents = await db.select().from(activeAgents);
+  const [userGroupIds, allAgents, agentGroupMap] = await Promise.all([
+    getUserGroupIds(userId),
+    db.select().from(activeAgents),
+    getAllAgentGroupIds(),
+  ]);
 
   const visible: typeof allAgents = [];
   for (const agent of allAgents) {
@@ -21,7 +24,7 @@ export async function getVisibleAgents(userId: string, userRole: string) {
         visible.push(agent);
         break;
       case "restricted": {
-        const agentGroupIds = await getAgentGroupIds(agent.id);
+        const agentGroupIds = agentGroupMap.get(agent.id) || [];
         if (userGroupIds.some((gId) => agentGroupIds.includes(gId))) {
           visible.push(agent);
         }
