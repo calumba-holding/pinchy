@@ -266,6 +266,20 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v
 
+  links:
+    name: Check links
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: "--no-progress '**/*.md' '**/*.mdx' --exclude-path node_modules --exclude-path .git"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   audit:
     name: Security audit
     runs-on: ubuntu-latest
