@@ -152,20 +152,30 @@ export function UserDetailSheet({
     if (res.ok) {
       const data = await res.json();
       setResetLink(`${window.location.origin}/invite/${data.token}`);
+    } else {
+      toast.error("Failed to reset password");
     }
   }
 
   async function handleDeactivate() {
-    await fetch(`/api/users/${user.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/users/${user.id}`, { method: "DELETE" });
     setShowDeactivateConfirm(false);
-    onSaved();
-    onOpenChange(false);
+    if (res.ok) {
+      onSaved();
+      onOpenChange(false);
+    } else {
+      toast.error("Failed to deactivate user");
+    }
   }
 
   async function handleReactivate() {
-    await fetch(`/api/users/${user.id}/reactivate`, { method: "POST" });
-    onSaved();
-    onOpenChange(false);
+    const res = await fetch(`/api/users/${user.id}/reactivate`, { method: "POST" });
+    if (res.ok) {
+      onSaved();
+      onOpenChange(false);
+    } else {
+      toast.error("Failed to reactivate user");
+    }
   }
 
   return (
