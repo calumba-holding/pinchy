@@ -15,24 +15,12 @@ import {
 } from "@/components/ui/table";
 import { InviteDialog } from "@/components/invite-dialog";
 import { UserDetailSheet } from "@/components/user-detail-sheet";
+import { StatusBadge } from "@/components/status-badge";
+import { toast } from "sonner";
 import { mergeUserList, type UserListItem, type UserGroup } from "@/lib/user-list";
 
 interface SettingsUsersProps {
   currentUserId: string;
-}
-
-function StatusBadge({ status }: { status: UserListItem["status"] }) {
-  const variants: Record<string, string> = {
-    active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-    pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-    expired: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-    deactivated: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
-  };
-  return (
-    <Badge variant="outline" className={`text-xs ${variants[status]}`}>
-      {status}
-    </Badge>
-  );
 }
 
 function GroupBadges({ groups }: { groups: UserGroup[] }) {
@@ -144,6 +132,7 @@ export function SettingsUsers({ currentUserId }: SettingsUsersProps) {
                 className="mt-2"
                 onClick={() => {
                   navigator.clipboard.writeText(resetLink);
+                  toast("Link copied to clipboard");
                 }}
               >
                 Copy

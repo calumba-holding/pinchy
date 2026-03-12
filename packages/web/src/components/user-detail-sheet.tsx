@@ -27,9 +27,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { StatusBadge } from "@/components/status-badge";
 import { toast } from "sonner";
 import type { UserListItem, UserGroup } from "@/lib/user-list";
 
@@ -41,20 +41,6 @@ interface UserDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const variants: Record<string, string> = {
-    active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-    pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-    expired: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-    deactivated: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200",
-  };
-  return (
-    <Badge variant="outline" className={`text-xs ${variants[status] || ""}`}>
-      {status}
-    </Badge>
-  );
 }
 
 export function UserDetailSheet({

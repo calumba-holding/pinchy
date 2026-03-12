@@ -128,8 +128,14 @@ export async function PATCH(
 
   // Update group assignments if provided
   if (body.groupIds !== undefined && session.user.role === "admin") {
+    if (
+      !Array.isArray(body.groupIds) ||
+      !body.groupIds.every((id: unknown) => typeof id === "string")
+    ) {
+      return NextResponse.json({ error: "groupIds must be an array of strings" }, { status: 400 });
+    }
     await db.delete(agentGroups).where(eq(agentGroups.agentId, agentId));
-    if (Array.isArray(body.groupIds) && body.groupIds.length > 0) {
+    if (body.groupIds.length > 0) {
       await db
         .insert(agentGroups)
         .values(body.groupIds.map((groupId: string) => ({ agentId, groupId })));
