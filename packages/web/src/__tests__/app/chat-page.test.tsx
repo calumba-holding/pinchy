@@ -34,13 +34,21 @@ vi.mock("@/lib/require-auth", () => ({
   requireAuth: vi.fn(),
 }));
 
-vi.mock("@/lib/agent-access", () => ({
-  assertAgentAccess: vi.fn(),
-}));
+vi.mock("@/lib/agent-access", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/agent-access")>();
+  return {
+    ...actual,
+    assertAgentAccess: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/groups", () => ({
   getUserGroupIds: vi.fn().mockResolvedValue([]),
   getAgentGroupIds: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("@/lib/enterprise", () => ({
+  isEnterprise: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("@/lib/avatar", () => ({
@@ -110,7 +118,8 @@ describe("ChatPage", () => {
       "other-user",
       "member",
       [],
-      []
+      [],
+      true
     );
     expect(mockNotFound).toHaveBeenCalled();
   });
@@ -141,7 +150,8 @@ describe("ChatPage", () => {
       "user-1",
       "member",
       ["g1", "g2"],
-      ["g2", "g3"]
+      ["g2", "g3"],
+      true
     );
   });
 
@@ -170,7 +180,14 @@ describe("ChatPage", () => {
     expect(screen.getByTestId("mock-chat")).toBeInTheDocument();
     expect(screen.getByText("Shared Agent (agent-2)")).toBeInTheDocument();
     expect(mockNotFound).not.toHaveBeenCalled();
-    expect(mockAssertAgentAccess).toHaveBeenCalledWith(sharedAgent, "user-1", "member", [], []);
+    expect(mockAssertAgentAccess).toHaveBeenCalledWith(
+      sharedAgent,
+      "user-1",
+      "member",
+      [],
+      [],
+      true
+    );
   });
 
   it("renders the chat when an admin accesses another user's personal agent", async () => {
@@ -203,7 +220,8 @@ describe("ChatPage", () => {
       "admin-user",
       "admin",
       [],
-      []
+      [],
+      true
     );
   });
 

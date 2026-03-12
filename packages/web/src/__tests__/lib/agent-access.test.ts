@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
-import { assertAgentAccess, assertAgentWriteAccess, getAgentWithAccess } from "@/lib/agent-access";
+import {
+  assertAgentAccess,
+  assertAgentWriteAccess,
+  getAgentWithAccess,
+  effectiveVisibility,
+} from "@/lib/agent-access";
 
 vi.mock("@/db", () => ({
   db: {
@@ -21,8 +26,13 @@ vi.mock("@/lib/groups", () => ({
   getAgentGroupIds: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock("@/lib/enterprise", () => ({
+  isEnterprise: vi.fn().mockResolvedValue(true),
+}));
+
 import { db } from "@/db";
 import { getUserGroupIds, getAgentGroupIds } from "@/lib/groups";
+import { isEnterprise } from "@/lib/enterprise";
 
 function mockSelectChain(resolvedValue: unknown) {
   vi.mocked(db.select).mockReturnValueOnce({
@@ -223,5 +233,66 @@ describe("getAgentWithAccess", () => {
     expect(result).toBeInstanceOf(NextResponse);
     const res = result as NextResponse;
     expect(res.status).toBe(404);
+  });
+
+  it("treats restricted as all when enterprise is false", async () => {
+    vi.mocked(isEnterprise).mockResolvedValueOnce(false);
+    const agent = { id: "a1", ownerId: null, isPersonal: false, visibility: "restricted" };
+    mockSelectChain([agent]);
+
+    const result = await getAgentWithAccess("a1", "user-1", "member");
+
+    expect(result).not.toBeInstanceOf(NextResponse);
+    expect(result).toEqual(agent);
+  });
+
+  it("skips group loading when enterprise is false", async () => {
+    vi.mocked(isEnterprise).mockResolvedValueOnce(false);
+    const agent = { id: "a1", ownerId: null, isPersonal: false, visibility: "restricted" };
+    mockSelectChain([agent]);
+
+    await getAgentWithAccess("a1", "user-1", "member");
+
+    expect(getUserGroupIds).not.toHaveBeenCalled();
+    expect(getAgentGroupIds).not.toHaveBeenCalled();
+  });
+});
+
+describe("effectiveVisibility", () => {
+  it("returns 'all' when not enterprise and visibility is 'restricted'", () => {
+    expect(effectiveVisibility("restricted", false)).toBe("all");
+  });
+
+  it("returns 'restricted' when enterprise and visibility is 'restricted'", () => {
+    expect(effectiveVisibility("restricted", true)).toBe("restricted");
+  });
+
+  it("returns 'all' when visibility is 'all' regardless of enterprise", () => {
+    expect(effectiveVisibility("all", false)).toBe("all");
+    expect(effectiveVisibility("all", true)).toBe("all");
+  });
+
+  it("defaults to 'all' when visibility undefined", () => {
+    expect(effectiveVisibility(undefined, true)).toBe("all");
+    expect(effectiveVisibility(undefined, false)).toBe("all");
+  });
+});
+
+describe("assertAgentAccess with enterprise=false", () => {
+  it("treats restricted as all when enterprise is false", () => {
+    const agent = { id: "a1", ownerId: null, isPersonal: false, visibility: "restricted" };
+    expect(() => assertAgentAccess(agent, "user-1", "member", [], [], false)).not.toThrow();
+  });
+
+  it("still restricts when enterprise is true", () => {
+    const agent = { id: "a1", ownerId: null, isPersonal: false, visibility: "restricted" };
+    expect(() => assertAgentAccess(agent, "user-1", "member", [], [], true)).toThrow(
+      "Access denied"
+    );
+  });
+
+  it("defaults enterprise to true (backward compat)", () => {
+    const agent = { id: "a1", ownerId: null, isPersonal: false, visibility: "restricted" };
+    expect(() => assertAgentAccess(agent, "user-1", "member", [], [])).toThrow("Access denied");
   });
 });

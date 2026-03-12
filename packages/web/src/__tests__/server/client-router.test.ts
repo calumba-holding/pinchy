@@ -21,20 +21,36 @@ const {
   mockGetAgentGroupIds: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("@/lib/agent-access", () => ({
-  assertAgentAccess: vi.fn(
-    (agent, userId, userRole, userGroupIds: string[] = [], agentGroupIds: string[] = []) => {
-      if (userRole === "admin") return;
-      if (agent.isPersonal) {
-        if (agent.ownerId === userId) return;
-        throw new Error("Access denied");
+vi.mock("@/lib/agent-access", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/agent-access")>();
+  return {
+    ...actual,
+    assertAgentAccess: vi.fn(
+      (
+        agent: { isPersonal?: boolean; ownerId?: string; visibility?: string },
+        userId: string,
+        userRole: string,
+        userGroupIds: string[] = [],
+        agentGroupIds: string[] = [],
+        enterprise: boolean = true
+      ) => {
+        if (userRole === "admin") return;
+        if (agent.isPersonal) {
+          if (agent.ownerId === userId) return;
+          throw new Error("Access denied");
+        }
+        const vis = actual.effectiveVisibility(agent.visibility, enterprise);
+        if (vis === "restricted") {
+          if (userGroupIds.some((gId: string) => agentGroupIds.includes(gId))) return;
+          throw new Error("Access denied");
+        }
       }
-      if (agent.visibility === "restricted") {
-        if (userGroupIds.some((gId: string) => agentGroupIds.includes(gId))) return;
-        throw new Error("Access denied");
-      }
-    }
-  ),
+    ),
+  };
+});
+
+vi.mock("@/lib/enterprise", () => ({
+  isEnterprise: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("@/db", () => ({

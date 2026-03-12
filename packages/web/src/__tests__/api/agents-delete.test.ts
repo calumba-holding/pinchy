@@ -16,6 +16,10 @@ vi.mock("@/lib/groups", () => ({
   getAgentGroupIds: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock("@/lib/enterprise", () => ({
+  isEnterprise: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock("@/lib/auth", () => {
   const mockGetSession = vi.fn();
   return {

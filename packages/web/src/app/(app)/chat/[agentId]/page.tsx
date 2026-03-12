@@ -4,8 +4,9 @@ import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { Chat } from "@/components/chat";
 import { requireAuth } from "@/lib/require-auth";
-import { assertAgentAccess } from "@/lib/agent-access";
+import { assertAgentAccess, effectiveVisibility } from "@/lib/agent-access";
 import { getUserGroupIds, getAgentGroupIds } from "@/lib/groups";
+import { isEnterprise } from "@/lib/enterprise";
 import { getAgentAvatarSvg } from "@/lib/avatar";
 
 export default async function ChatPage({ params }: { params: Promise<{ agentId: string }> }) {
@@ -22,15 +23,17 @@ export default async function ChatPage({ params }: { params: Promise<{ agentId: 
 
   if (!agent) notFound();
 
+  const enterprise = await isEnterprise();
+  const effVis = effectiveVisibility(agent.visibility, enterprise);
+  const needsGroups = userRole !== "admin" && effVis === "restricted";
+
   const [userGroupIds, agentGroupIds] = await Promise.all([
-    userRole !== "admin" ? getUserGroupIds(userId) : Promise.resolve([]),
-    userRole !== "admin" && agent.visibility === "restricted"
-      ? getAgentGroupIds(agentId)
-      : Promise.resolve([]),
+    needsGroups ? getUserGroupIds(userId) : Promise.resolve([]),
+    needsGroups ? getAgentGroupIds(agentId) : Promise.resolve([]),
   ]);
 
   try {
-    assertAgentAccess(agent, userId, userRole, userGroupIds, agentGroupIds);
+    assertAgentAccess(agent, userId, userRole, userGroupIds, agentGroupIds, enterprise);
   } catch {
     notFound();
   }

@@ -1,7 +1,8 @@
 import type { OpenClawClient, ChatAttachment } from "openclaw-node";
 import type { WebSocket } from "ws";
-import { assertAgentAccess } from "@/lib/agent-access";
+import { assertAgentAccess, effectiveVisibility } from "@/lib/agent-access";
 import { getUserGroupIds, getAgentGroupIds } from "@/lib/groups";
+import { isEnterprise } from "@/lib/enterprise";
 import { appendAuditLog } from "@/lib/audit";
 import { SessionCache } from "@/server/session-cache";
 import { db } from "@/db";
@@ -52,15 +53,17 @@ export class ClientRouter {
       return;
     }
 
+    const enterprise = await isEnterprise();
+    const effVis = effectiveVisibility(agent.visibility, enterprise);
+    const needsGroups = this.userRole !== "admin" && effVis === "restricted";
+
     const [userGroupIds, agentGroupIds] = await Promise.all([
-      this.userRole !== "admin" ? getUserGroupIds(this.userId) : Promise.resolve([]),
-      this.userRole !== "admin" && agent.visibility === "restricted"
-        ? getAgentGroupIds(message.agentId)
-        : Promise.resolve([]),
+      needsGroups ? getUserGroupIds(this.userId) : Promise.resolve([]),
+      needsGroups ? getAgentGroupIds(message.agentId) : Promise.resolve([]),
     ]);
 
     try {
-      assertAgentAccess(agent, this.userId, this.userRole, userGroupIds, agentGroupIds);
+      assertAgentAccess(agent, this.userId, this.userRole, userGroupIds, agentGroupIds, enterprise);
     } catch {
       appendAuditLog({
         actorType: "user",

@@ -21,8 +21,13 @@ vi.mock("@/lib/groups", () => ({
   getAllAgentGroupIds: vi.fn(),
 }));
 
+vi.mock("@/lib/enterprise", () => ({
+  isEnterprise: vi.fn().mockResolvedValue(true),
+}));
+
 import { db } from "@/db";
 import { getUserGroupIds, getAgentGroupIds, getAllAgentGroupIds } from "@/lib/groups";
+import { isEnterprise } from "@/lib/enterprise";
 
 function mockSelectChain(resolvedValue: unknown) {
   vi.mocked(db.select).mockReturnValueOnce({
@@ -150,5 +155,28 @@ describe("getVisibleAgents", () => {
 
     expect(getAllAgentGroupIds).toHaveBeenCalledTimes(1);
     expect(getAgentGroupIds).not.toHaveBeenCalled();
+  });
+
+  it("member sees restricted agents when enterprise is false (graceful degradation)", async () => {
+    vi.mocked(isEnterprise).mockResolvedValueOnce(false);
+    vi.mocked(getUserGroupIds).mockResolvedValue([]);
+    vi.mocked(getAllAgentGroupIds).mockResolvedValue(new Map());
+    mockSelectChain(allAgents);
+
+    const result = await getVisibleAgents("user-1", "member");
+
+    expect(result).toContainEqual(sharedAgentRestricted);
+  });
+
+  it("skips group loading for member when enterprise is false", async () => {
+    vi.mocked(isEnterprise).mockResolvedValueOnce(false);
+    vi.mocked(getUserGroupIds).mockResolvedValue([]);
+    vi.mocked(getAllAgentGroupIds).mockResolvedValue(new Map());
+    mockSelectChain(allAgents);
+
+    await getVisibleAgents("user-1", "member");
+
+    expect(getUserGroupIds).not.toHaveBeenCalled();
+    expect(getAllAgentGroupIds).not.toHaveBeenCalled();
   });
 });

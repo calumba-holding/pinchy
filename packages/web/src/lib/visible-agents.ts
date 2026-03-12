@@ -1,14 +1,18 @@
 import { db } from "@/db";
 import { activeAgents } from "@/db/schema";
 import { getUserGroupIds, getAllAgentGroupIds } from "@/lib/groups";
+import { isEnterprise } from "@/lib/enterprise";
+import { effectiveVisibility } from "@/lib/agent-access";
 
 export async function getVisibleAgents(userId: string, userRole: string) {
   const isAdmin = userRole === "admin";
+  const enterprise = await isEnterprise();
+  const needsGroups = !isAdmin && enterprise;
 
   const [userGroupIds, allAgents, agentGroupMap] = await Promise.all([
-    isAdmin ? Promise.resolve([]) : getUserGroupIds(userId),
+    needsGroups ? getUserGroupIds(userId) : Promise.resolve([]),
     db.select().from(activeAgents),
-    isAdmin ? Promise.resolve(new Map<string, string[]>()) : getAllAgentGroupIds(),
+    needsGroups ? getAllAgentGroupIds() : Promise.resolve(new Map<string, string[]>()),
   ]);
 
   const visible: typeof allAgents = [];
@@ -23,7 +27,7 @@ export async function getVisibleAgents(userId: string, userRole: string) {
       visible.push(agent);
       continue;
     }
-    switch (agent.visibility) {
+    switch (effectiveVisibility(agent.visibility, enterprise)) {
       case "all":
         visible.push(agent);
         break;
