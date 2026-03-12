@@ -15,11 +15,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 import type { UserListItem, UserGroup } from "@/lib/user-list";
 
 interface UserDetailSheetProps {
@@ -60,6 +71,8 @@ export function UserDetailSheet({
     () => new Set(user.groups.map((g) => g.id))
   );
   const [saving, setSaving] = useState(false);
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
+  const [resetLink, setResetLink] = useState<string | null>(null);
 
   const isOwnAccount = user.id === currentUserId;
   const isDeactivated = user.status === "deactivated";
@@ -123,8 +136,11 @@ export function UserDetailSheet({
       const allOk = results.every((r) => r.ok);
 
       if (allOk) {
+        toast("User updated");
         onSaved();
         onOpenChange(false);
+      } else {
+        toast.error("Failed to update user");
       }
     } finally {
       setSaving(false);
@@ -134,12 +150,14 @@ export function UserDetailSheet({
   async function handleResetPassword() {
     const res = await fetch(`/api/users/${user.id}/reset`, { method: "POST" });
     if (res.ok) {
-      onSaved();
+      const data = await res.json();
+      setResetLink(`${window.location.origin}/invite/${data.token}`);
     }
   }
 
   async function handleDeactivate() {
     await fetch(`/api/users/${user.id}`, { method: "DELETE" });
+    setShowDeactivateConfirm(false);
     onSaved();
     onOpenChange(false);
   }
@@ -216,13 +234,31 @@ export function UserDetailSheet({
               Reset Password
             </Button>
 
+            {resetLink && (
+              <div className="rounded border bg-muted p-3">
+                <p className="text-sm font-medium mb-1">Reset link:</p>
+                <p className="text-sm break-all">{resetLink}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => {
+                    navigator.clipboard.writeText(resetLink);
+                    toast("Link copied to clipboard");
+                  }}
+                >
+                  Copy
+                </Button>
+              </div>
+            )}
+
             {user.status === "active" ? (
               <Button
                 variant="destructive"
                 size="sm"
                 className="w-full"
                 disabled={isOwnAccount}
-                onClick={handleDeactivate}
+                onClick={() => setShowDeactivateConfirm(true)}
               >
                 Deactivate
               </Button>
@@ -234,6 +270,26 @@ export function UserDetailSheet({
           </div>
         </div>
       </SheetContent>
+
+      <AlertDialog
+        open={showDeactivateConfirm}
+        onOpenChange={(open) => !open && setShowDeactivateConfirm(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate User</AlertDialogTitle>
+            <AlertDialogDescription>
+              This user will no longer be able to log in. You can reactivate them later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDeactivate}>
+              Confirm Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }
