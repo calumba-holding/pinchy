@@ -123,6 +123,25 @@ pinchy/
 - **API-first** — every UI action maps to a REST endpoint
 - **Self-hosted** — no phone-home, no telemetry unless opt-in
 
+### Audit Trail Guidelines
+Every admin action that changes state MUST be logged via `appendAuditLog()`. The `detail` JSON field must follow these rules:
+
+- **Snapshot human-readable names alongside IDs.** IDs alone are useless after an entity is deleted. Always include `{ id, name }` pairs for referenced entities (groups, users, agents).
+- **Log what changed, not just that something changed.** Bad: `{ changes: ["visibility"] }`. Good: `{ changes: { visibility: { from: "all", to: "restricted" }, allowedGroups: { added: [{ id, name }], removed: [{ id, name }] } } }`.
+- **Use added/removed diffs for membership changes.** Don't just log the final count — log who/what was added and removed with `{ id, name }` pairs.
+- **Include the resource name in the detail** for delete events (the resource itself won't be queryable after deletion).
+- **Keep detail under 2048 bytes** (larger payloads are auto-truncated with `_truncated: true`). For bulk operations with many items, summarize if needed.
+
+Example patterns:
+```jsonc
+// Group membership change
+{ "added": [{ "id": "u1", "name": "Max" }], "removed": [{ "id": "u2", "name": "Anna" }], "memberCount": 5 }
+// Agent visibility change
+{ "changes": { "visibility": { "from": "all", "to": "restricted" }, "allowedGroups": { "added": [{ "id": "g1", "name": "Engineering" }] } } }
+// User invited with groups
+{ "email": "max@example.com", "role": "member", "groups": [{ "id": "g1", "name": "Engineering" }] }
+```
+
 ### Documentation
 - **Docs site**: `docs/` directory, built with Astro Starlight. Deployed to [docs.heypinchy.com](https://docs.heypinchy.com).
 - **Docs-first process**: Every feature plan MUST include a documentation update task. When behavior changes, docs must be updated in the same PR.
