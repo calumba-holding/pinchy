@@ -61,7 +61,11 @@ vi.mock("@/db", () => ({
         ]),
       }),
     }),
-    select: vi.fn(),
+    select: vi.fn().mockImplementation(() => ({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([]),
+      }),
+    })),
   },
 }));
 
@@ -170,6 +174,7 @@ describe("PATCH /api/agents/[agentId] audit logging", () => {
     mockAgent({
       id: "agent-1",
       name: "Test Agent",
+      model: "anthropic/claude-sonnet-4-20250514",
       isPersonal: false,
       ownerId: null,
     });
@@ -177,12 +182,12 @@ describe("PATCH /api/agents/[agentId] audit logging", () => {
     vi.mocked(updateAgent).mockResolvedValueOnce({
       id: "agent-1",
       name: "Updated Agent",
-      model: "anthropic/claude-sonnet-4-20250514",
+      model: "anthropic/claude-opus-4-6",
     } as never);
 
     const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
       method: "PATCH",
-      body: JSON.stringify({ name: "Updated Agent", model: "anthropic/claude-sonnet-4-20250514" }),
+      body: JSON.stringify({ name: "Updated Agent", model: "anthropic/claude-opus-4-6" }),
       headers: { "Content-Type": "application/json" },
     });
 
@@ -196,8 +201,47 @@ describe("PATCH /api/agents/[agentId] audit logging", () => {
       actorId: "user-1",
       eventType: "agent.updated",
       resource: "agent:agent-1",
-      detail: { changes: ["name", "model"] },
+      detail: {
+        changes: {
+          name: { from: "Test Agent", to: "Updated Agent" },
+          model: { from: "anthropic/claude-sonnet-4-20250514", to: "anthropic/claude-opus-4-6" },
+        },
+      },
     });
+  });
+
+  it("does not log audit when no fields actually changed", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
+      user: { id: "user-1", role: "admin" },
+      expires: "",
+    } as any);
+
+    mockAgent({
+      id: "agent-1",
+      name: "Test Agent",
+      model: "anthropic/claude-sonnet-4-20250514",
+      isPersonal: false,
+      ownerId: null,
+    });
+
+    vi.mocked(updateAgent).mockResolvedValueOnce({
+      id: "agent-1",
+      name: "Test Agent",
+      model: "anthropic/claude-sonnet-4-20250514",
+    } as never);
+
+    const request = new NextRequest("http://localhost:7777/api/agents/agent-1", {
+      method: "PATCH",
+      body: JSON.stringify({ name: "Test Agent", model: "anthropic/claude-sonnet-4-20250514" }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await PATCH(request, {
+      params: Promise.resolve({ agentId: "agent-1" }),
+    });
+    expect(response.status).toBe(200);
+
+    expect(appendAuditLog).not.toHaveBeenCalled();
   });
 });
 
