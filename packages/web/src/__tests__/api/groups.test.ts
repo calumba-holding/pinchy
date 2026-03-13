@@ -507,11 +507,22 @@ describe("PUT /api/groups/[groupId]/members", () => {
     PUT = mod.PUT;
   });
 
-  it("replaces member list for admin", async () => {
+  it("replaces member list for admin with added/removed diff", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValueOnce({
       user: { id: "admin-1", role: "admin" },
       expires: "",
     } as any);
+
+    // 1st select: group exists check
+    mockSelectWhere.mockResolvedValueOnce([{ id: "group-1" }]);
+    // 2nd select: existing members (user-old is currently a member)
+    mockSelectWhere.mockResolvedValueOnce([{ userId: "user-old", groupId: "group-1" }]);
+    // 3rd select: resolve user names for changed users (user-1, user-2 added; user-old removed)
+    mockSelectWhere.mockResolvedValueOnce([
+      { id: "user-1", name: "User One" },
+      { id: "user-2", name: "User Two" },
+      { id: "user-old", name: "Old User" },
+    ]);
 
     const request = new NextRequest("http://localhost:7777/api/groups/group-1/members", {
       method: "PUT",
@@ -538,7 +549,53 @@ describe("PUT /api/groups/[groupId]/members", () => {
       expect.objectContaining({
         eventType: "group.members_updated",
         resource: "group:group-1",
-        detail: { memberCount: 2 },
+        detail: {
+          added: [
+            { id: "user-1", name: "User One" },
+            { id: "user-2", name: "User Two" },
+          ],
+          removed: [{ id: "user-old", name: "Old User" }],
+          memberCount: 2,
+        },
+      })
+    );
+  });
+
+  it("logs only removals when members are removed", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValueOnce({
+      user: { id: "admin-1", role: "admin" },
+      expires: "",
+    } as any);
+
+    // 1st select: group exists check
+    mockSelectWhere.mockResolvedValueOnce([{ id: "group-1" }]);
+    // 2nd select: existing members
+    mockSelectWhere.mockResolvedValueOnce([
+      { userId: "user-1", groupId: "group-1" },
+      { userId: "user-2", groupId: "group-1" },
+    ]);
+    // 3rd select: resolve user names for removed users
+    mockSelectWhere.mockResolvedValueOnce([{ id: "user-2", name: "User Two" }]);
+
+    const request = new NextRequest("http://localhost:7777/api/groups/group-1/members", {
+      method: "PUT",
+      body: JSON.stringify({ userIds: ["user-1"] }),
+    });
+
+    const response = await PUT(request, {
+      params: Promise.resolve({ groupId: "group-1" }),
+    });
+    expect(response.status).toBe(200);
+
+    expect(appendAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "group.members_updated",
+        resource: "group:group-1",
+        detail: {
+          added: [],
+          removed: [{ id: "user-2", name: "User Two" }],
+          memberCount: 1,
+        },
       })
     );
   });
@@ -626,6 +683,13 @@ describe("PUT /api/groups/[groupId]/members", () => {
       expires: "",
     } as any);
 
+    // 1st select: group exists check
+    mockSelectWhere.mockResolvedValueOnce([{ id: "group-1" }]);
+    // 2nd select: existing members
+    mockSelectWhere.mockResolvedValueOnce([{ userId: "user-1", groupId: "group-1" }]);
+    // 3rd select: resolve user names for removed user
+    mockSelectWhere.mockResolvedValueOnce([{ id: "user-1", name: "User One" }]);
+
     const request = new NextRequest("http://localhost:7777/api/groups/group-1/members", {
       method: "PUT",
       body: JSON.stringify({ userIds: [] }),
@@ -640,5 +704,15 @@ describe("PUT /api/groups/[groupId]/members", () => {
     expect(mockDelete).toHaveBeenCalled();
     // insert should not be called for empty array
     expect(mockInsert).not.toHaveBeenCalled();
+
+    expect(appendAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: {
+          added: [],
+          removed: [{ id: "user-1", name: "User One" }],
+          memberCount: 0,
+        },
+      })
+    );
   });
 });
