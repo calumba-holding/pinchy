@@ -97,4 +97,11 @@ describe("validateLicense", () => {
     const status = await validateLicense(token, testPublicKeyPem);
     expect(status.type).toBe("paid");
   });
+
+  it("returns active=false when features does not include enterprise", async () => {
+    const { validateLicense } = await import("@/lib/license");
+    const token = await createTestToken({ features: ["something-else"] });
+    const status = await validateLicense(token, testPublicKeyPem);
+    expect(status.active).toBe(false);
+  });
 });

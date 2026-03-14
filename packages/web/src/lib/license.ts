@@ -11,7 +11,10 @@ export interface LicenseStatus {
   daysRemaining?: number;
 }
 
-const INACTIVE: LicenseStatus = { active: false, features: [] };
+const INACTIVE: LicenseStatus = Object.freeze({
+  active: false,
+  features: Object.freeze([]) as string[],
+});
 
 /**
  * Validate a JWT license token against a public key.
@@ -26,6 +29,9 @@ export async function validateLicense(token: string, publicKeyPem: string): Prom
       issuer: "heypinchy.com",
     });
 
+    const features = (payload.features as string[]) ?? [];
+    if (!features.includes("enterprise")) return INACTIVE;
+
     const expiresAt = payload.exp ? new Date(payload.exp * 1000) : undefined;
     const now = new Date();
     const daysRemaining = expiresAt
@@ -36,7 +42,7 @@ export async function validateLicense(token: string, publicKeyPem: string): Prom
       active: true,
       type: payload.type as LicenseType | undefined,
       org: payload.sub,
-      features: (payload.features as string[]) ?? [],
+      features,
       expiresAt,
       daysRemaining,
     };
