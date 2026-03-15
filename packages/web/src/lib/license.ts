@@ -13,7 +13,7 @@ export interface LicenseStatus {
 
 const INACTIVE: LicenseStatus = Object.freeze({
   active: false,
-  features: Object.freeze([]) as string[],
+  features: Object.freeze([] as string[]),
 });
 
 /**
