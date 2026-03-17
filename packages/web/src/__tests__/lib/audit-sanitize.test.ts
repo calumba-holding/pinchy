@@ -138,4 +138,104 @@ describe("sanitizeDetail", () => {
       expect(level.password).toBe("deep-secret");
     });
   });
+
+  describe("pattern redaction", () => {
+    it("redacts OpenAI API keys", () => {
+      const input = { result: "Key is sk-abc123def456ghi789jkl012mno" };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).not.toContain("sk-abc123def456ghi789jkl012mno");
+      expect(result.result).toContain("[REDACTED]");
+    });
+
+    it("redacts Anthropic API keys", () => {
+      const input = { result: "Using sk-ant-api03-abcdefghijklmnopqrstuvwxyz" };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).not.toContain("sk-ant-api03-abcdefghijklmnopqrstuvwxyz");
+      expect(result.result).toContain("[REDACTED]");
+    });
+
+    it("redacts GitHub personal access tokens", () => {
+      const input = { result: "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijkl" };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).not.toContain("ghp_");
+      expect(result.result).toContain("[REDACTED]");
+    });
+
+    it("redacts GitHub OAuth tokens", () => {
+      const input = { result: "gho_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijkl" };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).toContain("[REDACTED]");
+    });
+
+    it("redacts GitHub fine-grained PATs", () => {
+      const input = { result: "github_pat_aBcDeFgHiJkLmNoPqRsT" };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).toContain("[REDACTED]");
+    });
+
+    it("redacts Slack bot tokens", () => {
+      const input = { result: "xoxb-123456789-abcdef" };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).toContain("[REDACTED]");
+    });
+
+    it("redacts Slack user tokens", () => {
+      const input = { result: "xoxp-123456789-abcdef" };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).toContain("[REDACTED]");
+    });
+
+    it("redacts Bearer tokens", () => {
+      const input = {
+        result: "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.abc.def",
+      };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).not.toContain("eyJhbGciOiJ");
+      expect(result.result).toContain("[REDACTED]");
+    });
+
+    it("redacts Telegram bot tokens", () => {
+      const input = { result: "Bot token: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz_12345678" };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).toContain("[REDACTED]");
+      expect(result.result).not.toContain("ABCdefGHI");
+    });
+
+    it("redacts Meta/Facebook access tokens", () => {
+      const input = { result: "Token: EAABsbCS1iZABAbcdefghijklmnopqrst" };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).toContain("[REDACTED]");
+      expect(result.result).not.toContain("EAABsbCS1iZAB");
+    });
+
+    it("redacts multiple patterns in a single string", () => {
+      const input = {
+        result:
+          "Keys: sk-abcdefghijklmnopqrstuvwxyz and ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijkl",
+      };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).not.toContain("sk-abc");
+      expect(result.result).not.toContain("ghp_");
+    });
+
+    it("does not redact short strings that partially match", () => {
+      const input = { result: "sk-short" };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).toBe("sk-short");
+    });
+
+    it("preserves surrounding text when redacting patterns", () => {
+      const input = { result: "Found key sk-abcdefghijklmnopqrstuvwxyz in file" };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).toContain("Found key");
+      expect(result.result).toContain("in file");
+      expect(result.result).toContain("[REDACTED]");
+    });
+
+    it("does not re-process already redacted strings", () => {
+      const input = { result: "[REDACTED]" };
+      const result = sanitizeDetail(input) as any;
+      expect(result.result).toBe("[REDACTED]");
+    });
+  });
 });

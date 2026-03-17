@@ -23,6 +23,30 @@ function isSensitiveKey(key: string): boolean {
   return SENSITIVE_KEY_PATTERNS.some((pattern) => lower.includes(pattern));
 }
 
+const SECRET_PATTERNS: RegExp[] = [
+  /sk-ant-[a-zA-Z0-9\-]{20,}/g, // Anthropic (must be before generic sk-)
+  /sk-[a-zA-Z0-9]{20,}/g, // OpenAI
+  /ghp_[a-zA-Z0-9]{36,}/g, // GitHub PAT
+  /gho_[a-zA-Z0-9]{36,}/g, // GitHub OAuth
+  /github_pat_[a-zA-Z0-9_]{20,}/g, // GitHub fine-grained PAT
+  /xoxb-[a-zA-Z0-9\-]+/g, // Slack bot token
+  /xoxp-[a-zA-Z0-9\-]+/g, // Slack user token
+  /Bearer\s+[a-zA-Z0-9._\-]{20,}/g, // Bearer auth
+  /[0-9]{8,10}:[a-zA-Z0-9_\-]{35}/g, // Telegram bot token
+  /EAA[a-zA-Z0-9]{20,}/g, // Meta/Facebook access token
+];
+
+function redactPatterns(value: string): string {
+  if (value === REDACTED) return value;
+
+  let result = value;
+  for (const pattern of SECRET_PATTERNS) {
+    pattern.lastIndex = 0;
+    result = result.replace(pattern, REDACTED);
+  }
+  return result;
+}
+
 function sanitizeValue(value: unknown, depth: number): unknown {
   if (value === null || value === undefined) return value;
   if (depth >= MAX_DEPTH) return value;
@@ -41,6 +65,10 @@ function sanitizeValue(value: unknown, depth: number): unknown {
       }
     }
     return result;
+  }
+
+  if (typeof value === "string") {
+    return redactPatterns(value);
   }
 
   return value;
