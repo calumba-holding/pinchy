@@ -46,7 +46,7 @@ function shouldShowBanner(license: LicenseInfo): {
         variant: "destructive",
         message: `Your trial expires in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}.`,
         linkText: "Upgrade \u2192",
-        linkHref: "https://heypinchy.com/pricing",
+        linkHref: "https://heypinchy.com/enterprise",
       };
     }
     if (daysRemaining !== null && daysRemaining <= 7) {
@@ -55,7 +55,7 @@ function shouldShowBanner(license: LicenseInfo): {
         variant: "warning",
         message: `Your trial expires in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}.`,
         linkText: "Upgrade \u2192",
-        linkHref: "https://heypinchy.com/pricing",
+        linkHref: "https://heypinchy.com/enterprise",
       };
     }
   }
@@ -67,7 +67,7 @@ function shouldShowBanner(license: LicenseInfo): {
         variant: "destructive",
         message: `Your license expires in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}.`,
         linkText: "Renew \u2192",
-        linkHref: "https://heypinchy.com/pricing",
+        linkHref: "https://heypinchy.com/enterprise",
       };
     }
     if (daysRemaining !== null && daysRemaining <= 30) {
@@ -76,7 +76,7 @@ function shouldShowBanner(license: LicenseInfo): {
         variant: "warning",
         message: `Your license expires in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}.`,
         linkText: "Renew \u2192",
-        linkHref: "https://heypinchy.com/pricing",
+        linkHref: "https://heypinchy.com/enterprise",
       };
     }
   }
@@ -104,9 +104,7 @@ export function EnterpriseBanner({ isAdmin }: { isAdmin: boolean }) {
 
   const isExternal = banner.linkHref.startsWith("http");
   const bgClass =
-    banner.variant === "destructive"
-      ? "bg-destructive text-destructive-foreground"
-      : "bg-amber-500 text-white";
+    banner.variant === "destructive" ? "bg-destructive text-white" : "bg-amber-500 text-white";
 
   return (
     <div role="alert" className={`px-4 py-2 text-sm text-center ${bgClass}`}>

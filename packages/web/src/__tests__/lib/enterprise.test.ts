@@ -52,6 +52,28 @@ describe("getLicenseStatus", () => {
     expect(getSetting).not.toHaveBeenCalled();
   });
 
+  it("env var takes priority over DB key", async () => {
+    const envToken = await createTestToken({ type: "trial" });
+    process.env.PINCHY_ENTERPRISE_KEY = envToken;
+
+    const mod = await import("@/lib/enterprise");
+    const status = await mod.getLicenseStatus(testPublicKeyPem);
+    expect(status.active).toBe(true);
+    expect(status.type).toBe("trial");
+    expect(getSetting).not.toHaveBeenCalled();
+  });
+
+  it("isKeyFromEnv returns true when env var is set", async () => {
+    process.env.PINCHY_ENTERPRISE_KEY = "some-key";
+    const mod = await import("@/lib/enterprise");
+    expect(mod.isKeyFromEnv()).toBe(true);
+  });
+
+  it("isKeyFromEnv returns false when no env var", async () => {
+    const mod = await import("@/lib/enterprise");
+    expect(mod.isKeyFromEnv()).toBe(false);
+  });
+
   it("falls back to DB setting when no env var", async () => {
     const token = await createTestToken({ type: "paid" }, "365d");
     vi.mocked(getSetting).mockResolvedValueOnce(token);

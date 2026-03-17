@@ -16,13 +16,22 @@ let cachedStatus: LicenseStatus | null = null;
 let cacheTimestamp = 0;
 
 /**
- * Load the license token from env var (priority) or DB setting.
+ * Load the license token. Env var always wins (immutable config).
+ * DB setting is only used when no env var is set.
  */
 async function loadToken(): Promise<string> {
   if (process.env.PINCHY_ENTERPRISE_KEY) {
     return process.env.PINCHY_ENTERPRISE_KEY;
   }
   return (await getSetting("enterprise_key")) ?? "";
+}
+
+/**
+ * Whether the license key is configured via environment variable.
+ * When true, the key cannot be changed via the Settings UI.
+ */
+export function isKeyFromEnv(): boolean {
+  return !!process.env.PINCHY_ENTERPRISE_KEY;
 }
 
 /**

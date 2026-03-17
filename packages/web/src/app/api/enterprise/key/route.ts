@@ -1,12 +1,22 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { setSetting, deleteSetting } from "@/lib/settings";
-import { clearLicenseCache, getLicenseStatus } from "@/lib/enterprise";
+import { clearLicenseCache, getLicenseStatus, isKeyFromEnv } from "@/lib/enterprise";
 import { appendAuditLog } from "@/lib/audit";
 
 export async function PUT(req: Request) {
   const sessionOrError = await requireAdmin();
   if (sessionOrError instanceof NextResponse) return sessionOrError;
+
+  if (isKeyFromEnv()) {
+    return NextResponse.json(
+      {
+        error:
+          "License key is managed via PINCHY_ENTERPRISE_KEY environment variable. Remove it to manage the key here.",
+      },
+      { status: 409 }
+    );
+  }
 
   const body = await req.json();
   const key = body.key;

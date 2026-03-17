@@ -33,7 +33,7 @@ const FALLBACK_MODELS: Record<ProviderName, ModelInfo[]> = {
     { id: "openai/o1", name: "o1" },
   ],
   google: [
-    { id: "google/gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+    { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash" },
     { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro" },
   ],
 };

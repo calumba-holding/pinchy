@@ -20,7 +20,7 @@ vi.mock("@/lib/providers", () => ({
       name: "Google",
       settingsKey: "google_api_key",
       envVar: "GEMINI_API_KEY",
-      defaultModel: "google/gemini-2.0-flash",
+      defaultModel: "google/gemini-2.5-flash",
       placeholder: "AIza...",
     },
   },
@@ -198,7 +198,7 @@ describe("fetchProviderModels", () => {
         JSON.stringify({
           models: [
             {
-              name: "models/gemini-2.0-flash",
+              name: "models/gemini-2.5-flash",
               displayName: "Gemini 2.0 Flash",
               supportedGenerationMethods: ["generateContent"],
             },
@@ -216,7 +216,7 @@ describe("fetchProviderModels", () => {
     const result = await fetchProviderModels();
     const google = result.find((p) => p.id === "google");
     expect(google).toBeDefined();
-    expect(google!.models).toEqual([{ id: "google/gemini-2.0-flash", name: "Gemini 2.0 Flash" }]);
+    expect(google!.models).toEqual([{ id: "google/gemini-2.5-flash", name: "Gemini 2.0 Flash" }]);
   });
 
   it("uses fallback models when API returns non-ok status", async () => {

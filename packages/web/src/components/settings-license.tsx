@@ -13,6 +13,7 @@ interface LicenseInfo {
   org: string | null;
   expiresAt: string | null;
   daysRemaining: number | null;
+  managedByEnv: boolean;
 }
 
 export function SettingsLicense() {
@@ -98,7 +99,13 @@ export function SettingsLicense() {
                 days remaining)
               </p>
             )}
-            {!showInput && (
+            {license.managedByEnv && (
+              <p className="text-sm text-muted-foreground">
+                Managed via <code className="bg-muted px-1 rounded">PINCHY_ENTERPRISE_KEY</code>{" "}
+                environment variable. Remove it to manage the key here.
+              </p>
+            )}
+            {!showInput && !license.managedByEnv && (
               <Button variant="outline" size="sm" onClick={() => setShowInput(true)}>
                 Update Key
               </Button>
@@ -116,13 +123,13 @@ export function SettingsLicense() {
                 rel="noopener noreferrer"
                 className="text-primary underline"
               >
-                Get a trial key
+                Learn more about Enterprise
               </a>
             </p>
           </div>
         )}
 
-        {(showInput || !license?.enterprise) && (
+        {(showInput || !license?.enterprise) && !license?.managedByEnv && (
           <div className="space-y-2">
             <Label htmlFor="license-key">License Key</Label>
             <Input

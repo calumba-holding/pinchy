@@ -27,6 +27,7 @@ vi.mock("@/lib/settings", () => ({
 vi.mock("@/lib/enterprise", () => ({
   clearLicenseCache: vi.fn(),
   getLicenseStatus: vi.fn(),
+  isKeyFromEnv: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock("@/lib/audit", () => ({

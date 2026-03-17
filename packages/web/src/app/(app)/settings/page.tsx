@@ -92,16 +92,18 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
         <Tabs defaultValue="context">
-          <TabsList>
-            <TabsTrigger value="context">Context {contextDirty && <DirtyDot />}</TabsTrigger>
-            <TabsTrigger value="profile">Profile {profileDirty && <DirtyDot />}</TabsTrigger>
-            {isAdmin && (
-              <TabsTrigger value="provider">Provider {providerDirty && <DirtyDot />}</TabsTrigger>
-            )}
-            {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
-            {isAdmin && <TabsTrigger value="groups">Groups</TabsTrigger>}
-            {isAdmin && <TabsTrigger value="license">License</TabsTrigger>}
-          </TabsList>
+          <div className="overflow-x-auto">
+            <TabsList>
+              <TabsTrigger value="context">Context {contextDirty && <DirtyDot />}</TabsTrigger>
+              <TabsTrigger value="profile">Profile {profileDirty && <DirtyDot />}</TabsTrigger>
+              {isAdmin && (
+                <TabsTrigger value="provider">Provider {providerDirty && <DirtyDot />}</TabsTrigger>
+              )}
+              {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
+              {isAdmin && <TabsTrigger value="groups">Groups</TabsTrigger>}
+              {isAdmin && <TabsTrigger value="license">License</TabsTrigger>}
+            </TabsList>
+          </div>
 
           <TabsContent value="context" keepMounted>
             <SettingsContext

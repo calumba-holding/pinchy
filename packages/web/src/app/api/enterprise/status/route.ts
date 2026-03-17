@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { getSession } from "@/lib/auth";
-import { getLicenseStatus } from "@/lib/enterprise";
+import { getLicenseStatus, isKeyFromEnv } from "@/lib/enterprise";
 
 export async function GET() {
   const session = await getSession({ headers: await headers() });
@@ -16,5 +16,6 @@ export async function GET() {
     org: status.org ?? null,
     expiresAt: status.expiresAt?.toISOString() ?? null,
     daysRemaining: status.daysRemaining ?? null,
+    managedByEnv: isKeyFromEnv(),
   });
 }
