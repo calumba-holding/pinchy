@@ -121,7 +121,7 @@ describe("sanitizeDetail", () => {
     });
 
     it("stops recursion at max depth", () => {
-      // Build a 12-level deep object
+      // Build a 12-level deep object: depth 0 is outermost, password lives at depth 12
       let obj: any = { password: "deep-secret" };
       for (let i = 0; i < 12; i++) {
         obj = { nested: obj };
@@ -129,8 +129,13 @@ describe("sanitizeDetail", () => {
 
       const result = sanitizeDetail(obj) as any;
 
-      // Should not throw. Levels beyond 10 are returned as-is.
-      expect(result).toBeDefined();
+      // Should not throw. The password key at depth 12 is beyond the limit
+      // of 10, so it must NOT be redacted.
+      let level = result;
+      for (let i = 0; i < 12; i++) {
+        level = level.nested;
+      }
+      expect(level.password).toBe("deep-secret");
     });
   });
 });

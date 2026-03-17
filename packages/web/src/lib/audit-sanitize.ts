@@ -25,7 +25,7 @@ function isSensitiveKey(key: string): boolean {
 
 function sanitizeValue(value: unknown, depth: number): unknown {
   if (value === null || value === undefined) return value;
-  if (depth > MAX_DEPTH) return value;
+  if (depth >= MAX_DEPTH) return value;
 
   if (Array.isArray(value)) {
     return value.map((item) => sanitizeValue(item, depth + 1));
