@@ -1,6 +1,8 @@
 const REDACTED = "[REDACTED]";
 const MAX_DEPTH = 10;
 
+// SYNC: This sanitization logic is duplicated in packages/plugins/pinchy-audit/index.ts
+// Keep both copies in sync when adding/removing patterns.
 const SENSITIVE_KEY_PATTERNS = [
   "password",
   "secret",

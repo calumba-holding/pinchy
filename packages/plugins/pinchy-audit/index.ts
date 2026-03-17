@@ -69,6 +69,8 @@ interface RecentToolStart {
 const REDACTED = "[REDACTED]";
 const MAX_DEPTH = 10;
 
+// SYNC: This sanitization logic is duplicated in packages/web/src/lib/audit-sanitize.ts
+// Keep both copies in sync when adding/removing patterns.
 const SENSITIVE_KEYS = [
   "password", "secret", "token", "apikey", "api_key",
   "authorization", "credential", "private_key", "privatekey",
@@ -111,7 +113,6 @@ function sanitizeValue(value: unknown, depth: number): unknown {
   if (value === null || value === undefined) return value;
   if (depth >= MAX_DEPTH) return value;
   if (Array.isArray(value)) return value.map((item) => sanitizeValue(item, depth + 1));
-  if (typeof value === "string") return redactPatterns(value);
   if (typeof value === "object") {
     const result: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
@@ -123,6 +124,7 @@ function sanitizeValue(value: unknown, depth: number): unknown {
     }
     return result;
   }
+  if (typeof value === "string") return redactPatterns(value);
   return value;
 }
 
