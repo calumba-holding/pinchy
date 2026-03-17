@@ -127,7 +127,7 @@ describe("writeOpenClawConfig", () => {
     const written = mockedWriteFileSync.mock.calls[0][1] as string;
     const config = JSON.parse(written);
 
-    expect(config.env.GOOGLE_API_KEY).toBe("AIza-key");
+    expect(config.env.GEMINI_API_KEY).toBe("AIza-key");
     expect(config.agents.defaults.model.primary).toBe("google/gemini-2.0-flash");
   });
 
@@ -334,7 +334,7 @@ describe("regenerateOpenClawConfig", () => {
 
     expect(config.env.ANTHROPIC_API_KEY).toBe("sk-ant-decrypted");
     expect(config.env.OPENAI_API_KEY).toBe("sk-openai-decrypted");
-    expect(config.env.GOOGLE_API_KEY).toBeUndefined();
+    expect(config.env.GEMINI_API_KEY).toBeUndefined();
   });
 
   it("should set defaults.model from default provider", async () => {

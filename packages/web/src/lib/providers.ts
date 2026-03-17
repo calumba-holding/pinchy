@@ -26,7 +26,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   google: {
     name: "Google",
     settingsKey: "google_api_key",
-    envVar: "GOOGLE_API_KEY",
+    envVar: "GEMINI_API_KEY",
     defaultModel: "google/gemini-2.0-flash",
     placeholder: "AIza...",
   },
