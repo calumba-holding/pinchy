@@ -34,15 +34,25 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm -C packages/web exec playwright install chromium --with-deps
 
+      - name: Generate enterprise key for screenshots
+        id: license
+        run: |
+          TOKEN=$(PINCHY_LICENSE_PRIVATE_KEY="${{ secrets.PINCHY_LICENSE_PRIVATE_KEY }}" \
+            pnpm -C packages/web exec tsx ../../scripts/generate-license.ts \
+            --org "Acme Corp (Screenshots)" --type trial --days 14)
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
       - name: Start Pinchy stack
         run: docker compose up --build -d
         env:
           BETTER_AUTH_SECRET: screenshot-session-secret
           ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-          PINCHY_ENTERPRISE_KEY: ${{ secrets.PINCHY_ENTERPRISE_KEY }}
+          PINCHY_ENTERPRISE_KEY: ${{ steps.license.outputs.token }}
 
       - name: Seed demo data
         run: ./screenshots/seed.sh
+        env:
+          PINCHY_ENTERPRISE_KEY: ${{ steps.license.outputs.token }}
 
       - name: Prepare output directory
         run: mkdir -p ${{ github.workspace }}/screenshots/output
