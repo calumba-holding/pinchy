@@ -4,8 +4,9 @@ export default defineConfig({
   testDir: ".",
   testMatch: "capture.ts",
   fullyParallel: false,
-  retries: 0,
+  retries: 1,
   workers: 1,
+  timeout: 60000,
   reporter: "list",
   use: {
     baseURL: process.env.BASE_URL ?? "http://localhost:7777",

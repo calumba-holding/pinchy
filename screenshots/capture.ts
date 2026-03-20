@@ -8,24 +8,37 @@
  * Run seed.ts first to populate demo data.
  */
 import { test, expect, type Page } from "@playwright/test";
+import * as fs from "fs";
+import * as path from "path";
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:7777";
 const ADMIN_EMAIL = "admin@demo.pinchy.dev";
 const ADMIN_PASSWORD = "PinchyDemo2026!";
 const OUTPUT_DIR = process.env.SCREENSHOT_DIR ?? "screenshots/output";
+const STORAGE_STATE = path.join(OUTPUT_DIR, ".auth.json");
 
 // Standard viewport for website screenshots (clean 16:10 ratio)
 const VIEWPORT = { width: 1440, height: 900 };
 
 async function login(page: Page) {
+  // Reuse existing session if available
+  if (fs.existsSync(STORAGE_STATE)) {
+    await page.goto(`${BASE_URL}/`);
+    // Check if we're redirected to login
+    await page.waitForTimeout(2000);
+    if (!page.url().includes("/login")) return;
+  }
+
   await page.goto(`${BASE_URL}/login`);
   await page.getByLabel(/email/i).fill(ADMIN_EMAIL);
   await page.getByLabel("Password", { exact: true }).fill(ADMIN_PASSWORD);
   await page.getByRole("button", { name: /sign in/i }).click();
   // Wait for redirect to app
   await page.waitForURL((url) => !url.pathname.includes("/login"), {
-    timeout: 15000,
+    timeout: 30000,
   });
+  // Save session for reuse
+  await page.context().storageState({ path: STORAGE_STATE });
 }
 
 test.describe("Feature screenshots", () => {
