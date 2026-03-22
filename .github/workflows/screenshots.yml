@@ -8,7 +8,7 @@ on:
 jobs:
   capture:
     name: Capture screenshots
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -23,14 +23,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
-        run: pnpm -C packages/web exec playwright install chromium
+        run: pnpm -C packages/web exec playwright install chromium --with-deps
 
-      - name: Install Docker (Colima)
+      - name: Install Geist font
         run: |
-          brew install docker docker-compose colima
-          colima start --cpu 3 --memory 4
-          # Symlink socket for docker compose compatibility
-          sudo ln -sf $HOME/.colima/default/docker.sock /var/run/docker.sock
+          mkdir -p ~/.local/share/fonts
+          curl -sL https://github.com/vercel/geist-font/releases/download/1.4.01/Geist-1.4.01.zip -o /tmp/geist.zip
+          unzip -o /tmp/geist.zip -d /tmp/geist
+          find /tmp/geist -name '*.ttf' -exec cp {} ~/.local/share/fonts/ \;
+          fc-cache -fv
 
       - name: Generate enterprise key for screenshots
         id: license
