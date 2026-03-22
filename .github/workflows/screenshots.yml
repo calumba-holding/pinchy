@@ -28,9 +28,9 @@ jobs:
       - name: Install Geist font
         run: |
           mkdir -p ~/.local/share/fonts
-          curl -sL https://github.com/vercel/geist-font/releases/download/1.4.01/Geist-1.4.01.zip -o /tmp/geist.zip
-          unzip -o /tmp/geist.zip -d /tmp/geist
-          find /tmp/geist -name '*.ttf' -exec cp {} ~/.local/share/fonts/ \;
+          gh release download 1.8.0 --repo vercel/geist-font --pattern 'geist-font-*.zip' --dir /tmp
+          unzip -o /tmp/geist-font-*.zip -d /tmp/geist
+          find /tmp/geist -name '*.ttf' -o -name '*.otf' | xargs -I{} cp {} ~/.local/share/fonts/
           fc-cache -fv
 
       - name: Generate enterprise key for screenshots
