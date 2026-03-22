@@ -45,6 +45,7 @@ jobs:
       - name: Build and start Pinchy
         run: |
           cd packages/web
+          pnpm db:migrate
           pnpm build
           pnpm start &
           # Wait for Pinchy to be ready
@@ -60,7 +61,6 @@ jobs:
           BETTER_AUTH_SECRET: screenshot-session-secret
           ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           PINCHY_ENTERPRISE_KEY: ${{ steps.license.outputs.token }}
-          OPENCLAW_GATEWAY_URL: ws://localhost:18789
           PORT: 7777
 
       - name: Seed demo data
