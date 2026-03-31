@@ -6,6 +6,7 @@ vi.mock("fs", async (importOriginal) => {
   const readFileSyncMock = vi.fn();
   const existsSyncMock = vi.fn().mockReturnValue(true);
   const mkdirSyncMock = vi.fn();
+  const renameSyncMock = vi.fn();
   return {
     ...actual,
     default: {
@@ -14,11 +15,13 @@ vi.mock("fs", async (importOriginal) => {
       readFileSync: readFileSyncMock,
       existsSync: existsSyncMock,
       mkdirSync: mkdirSyncMock,
+      renameSync: renameSyncMock,
     },
     writeFileSync: writeFileSyncMock,
     readFileSync: readFileSyncMock,
     existsSync: existsSyncMock,
     mkdirSync: mkdirSyncMock,
+    renameSync: renameSyncMock,
   };
 });
 
@@ -43,7 +46,11 @@ vi.mock("@/lib/migrate-onboarding", () => ({
 }));
 
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
-import { writeOpenClawConfig, regenerateOpenClawConfig } from "@/lib/openclaw-config";
+import {
+  writeOpenClawConfig,
+  regenerateOpenClawConfig,
+  updateIdentityLinks,
+} from "@/lib/openclaw-config";
 import { db } from "@/db";
 import { getSetting } from "@/lib/settings";
 
@@ -313,8 +320,9 @@ describe("regenerateOpenClawConfig", () => {
     const config = JSON.parse(written);
 
     expect(config.gateway.auth.token).toBe("existing-secret-token");
-    // Only gateway block is preserved — other top-level fields (meta, etc.) are rebuilt from DB
-    expect(config.meta).toBeUndefined();
+    // OpenClaw-enriched fields (meta, commands, agents.defaults.*) are preserved
+    // to avoid unnecessary diffs that trigger hot-reloads breaking Telegram polling
+    expect(config.meta).toEqual({ version: "1.2.3", generatedAt: "2025-01-01T00:00:00Z" });
     expect(config.gateway.mode).toBe("local");
     expect(config.gateway.bind).toBe("lan");
   });
@@ -772,11 +780,315 @@ describe("restart-state integration", () => {
     expect(restartState.notifyRestart).toHaveBeenCalledOnce();
   });
 
-  it("regenerateOpenClawConfig calls restartState.notifyRestart", async () => {
+  it("regenerateOpenClawConfig does not call restartState.notifyRestart (OpenClaw detects file changes)", async () => {
     const { restartState } = await import("@/server/restart-state");
 
     await regenerateOpenClawConfig();
 
-    expect(restartState.notifyRestart).toHaveBeenCalledOnce();
+    expect(restartState.notifyRestart).not.toHaveBeenCalled();
+  });
+
+  it("should skip writing and not restart when config content is unchanged", async () => {
+    const { restartState } = await import("@/server/restart-state");
+
+    // First call writes the config
+    await regenerateOpenClawConfig();
+    const firstWrite = mockedWriteFileSync.mock.calls[0][1] as string;
+
+    vi.clearAllMocks();
+    // Mock readFileSync to return what was just written
+    mockedReadFileSync.mockReturnValue(firstWrite);
+    mockedExistsSync.mockReturnValue(true);
+    mockedDb.select.mockReturnValue({
+      from: vi.fn().mockResolvedValue([]),
+    } as never);
+    mockedGetSetting.mockResolvedValue(null);
+
+    // Second call should skip writing
+    await regenerateOpenClawConfig();
+
+    expect(mockedWriteFileSync).not.toHaveBeenCalled();
+    expect(restartState.notifyRestart).not.toHaveBeenCalled();
+  });
+
+  it("should include Telegram channel config with accounts format when bot token is configured", async () => {
+    mockedDb.select.mockReturnValue({
+      from: vi.fn().mockResolvedValue([
+        {
+          id: "agent-1",
+          name: "Smithers",
+          model: "anthropic/claude-haiku-4-5-20251001",
+          allowedTools: [],
+          createdAt: new Date(),
+        },
+      ]),
+    } as never);
+
+    mockedGetSetting.mockImplementation(async (key: string) => {
+      if (key === "telegram_bot_token:agent-1") return "123456:ABC-token";
+      if (key === "telegram_bot_username:agent-1") return "acme_smithers_bot";
+      return null;
+    });
+
+    await regenerateOpenClawConfig();
+
+    const written = mockedWriteFileSync.mock.calls[0][1] as string;
+    const config = JSON.parse(written);
+
+    expect(config.channels.telegram).toEqual({
+      dmPolicy: "pairing",
+      accounts: {
+        "agent-1": { botToken: "123456:ABC-token" },
+      },
+    });
+    expect(config.bindings).toEqual([
+      { agentId: "agent-1", match: { channel: "telegram", accountId: "agent-1" } },
+    ]);
+    expect(config.session.dmScope).toBe("per-peer");
+  });
+
+  it("should include multiple accounts when multiple agents have bots", async () => {
+    let callCount = 0;
+    mockedDb.select.mockReturnValue({
+      from: vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve([
+            { id: "agent-1", name: "Smithers", model: "m", allowedTools: [] },
+            { id: "agent-2", name: "Support", model: "m", allowedTools: [] },
+          ]);
+        }
+        return Promise.resolve([]);
+      }),
+    } as never);
+
+    mockedGetSetting.mockImplementation(async (key: string) => {
+      if (key === "telegram_bot_token:agent-1") return "token-1";
+      if (key === "telegram_bot_token:agent-2") return "token-2";
+      return null;
+    });
+
+    await regenerateOpenClawConfig();
+
+    const written = mockedWriteFileSync.mock.calls[0][1] as string;
+    const config = JSON.parse(written);
+
+    expect(config.channels.telegram.accounts).toEqual({
+      "agent-1": { botToken: "token-1" },
+      "agent-2": { botToken: "token-2" },
+    });
+    expect(config.bindings).toEqual([
+      { agentId: "agent-1", match: { channel: "telegram", accountId: "agent-1" } },
+      { agentId: "agent-2", match: { channel: "telegram", accountId: "agent-2" } },
+    ]);
+  });
+
+  it("should generate per-user peer bindings for personal agents (Smithers)", async () => {
+    // Personal agent (Smithers) with bot token: each linked user should get
+    // a peer-specific binding routing to their OWN personal Smithers agent.
+    let callCount = 0;
+    mockedDb.select.mockReturnValue({
+      from: vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          // agents table: admin's Smithers has the bot, plus user-b's Smithers
+          return Promise.resolve([
+            {
+              id: "admin-smithers",
+              name: "Smithers",
+              model: "m",
+              allowedTools: [],
+              isPersonal: true,
+              ownerId: "user-a",
+            },
+            {
+              id: "user-b-smithers",
+              name: "Smithers",
+              model: "m",
+              allowedTools: [],
+              isPersonal: true,
+              ownerId: "user-b",
+            },
+          ]);
+        }
+        // channel_links table: both users linked
+        return Promise.resolve([
+          { userId: "user-a", channel: "telegram", channelUserId: "111222333" },
+          { userId: "user-b", channel: "telegram", channelUserId: "444555666" },
+        ]);
+      }),
+    } as never);
+
+    mockedGetSetting.mockImplementation(async (key: string) => {
+      if (key === "telegram_bot_token:admin-smithers") return "123456:ABC-token";
+      return null;
+    });
+
+    await regenerateOpenClawConfig();
+
+    const written = mockedWriteFileSync.mock.calls[0][1] as string;
+    const config = JSON.parse(written);
+
+    // One account for the bot
+    expect(config.channels.telegram.accounts).toEqual({
+      "admin-smithers": { botToken: "123456:ABC-token" },
+    });
+
+    // Per-user peer bindings: user-a → admin-smithers, user-b → user-b-smithers
+    expect(config.bindings).toEqual(
+      expect.arrayContaining([
+        {
+          agentId: "admin-smithers",
+          match: {
+            channel: "telegram",
+            accountId: "admin-smithers",
+            peer: { kind: "dm", id: "111222333" },
+          },
+        },
+        {
+          agentId: "user-b-smithers",
+          match: {
+            channel: "telegram",
+            accountId: "admin-smithers",
+            peer: { kind: "dm", id: "444555666" },
+          },
+        },
+      ])
+    );
+    // No generic binding without peer (all users are routed via peer-specific bindings)
+    const genericBinding = config.bindings.find(
+      (b: Record<string, unknown>) => (b.match as Record<string, unknown>).peer === undefined
+    );
+    expect(genericBinding).toBeUndefined();
+  });
+
+  it("should not include Telegram config when no bot token is configured", async () => {
+    mockedDb.select.mockReturnValue({
+      from: vi.fn().mockResolvedValue([
+        {
+          id: "agent-1",
+          name: "Smithers",
+          model: "anthropic/claude-haiku-4-5-20251001",
+          allowedTools: [],
+          createdAt: new Date(),
+        },
+      ]),
+    } as never);
+
+    mockedGetSetting.mockResolvedValue(null);
+
+    await regenerateOpenClawConfig();
+
+    const written = mockedWriteFileSync.mock.calls[0][1] as string;
+    const config = JSON.parse(written);
+
+    expect(config.channels).toBeUndefined();
+    expect(config.bindings).toBeUndefined();
+  });
+
+  it("should include identityLinks from channel_links table", async () => {
+    let callCount = 0;
+    mockedDb.select.mockReturnValue({
+      from: vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          // First call: agents table
+          return Promise.resolve([
+            { id: "agent-1", name: "Smithers", model: "m", allowedTools: [] },
+          ]);
+        }
+        // Second call: channel_links table
+        return Promise.resolve([
+          { userId: "user-1", channel: "telegram", channelUserId: "999888" },
+        ]);
+      }),
+    } as never);
+
+    mockedGetSetting.mockImplementation(async (key: string) => {
+      if (key === "telegram_bot_token:agent-1") return "token";
+      if (key === "telegram_bot_username:agent-1") return "bot";
+      return null;
+    });
+
+    await regenerateOpenClawConfig();
+
+    const written = mockedWriteFileSync.mock.calls[0][1] as string;
+    const config = JSON.parse(written);
+
+    expect(config.session.identityLinks).toEqual({
+      "user-1": ["telegram:999888"],
+    });
+  });
+});
+
+describe("updateIdentityLinks", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedExistsSync.mockReturnValue(true);
+  });
+
+  it("should only update session.identityLinks without touching other fields", async () => {
+    const existingConfig = {
+      gateway: { mode: "local", bind: "lan", auth: { token: "secret" } },
+      env: { ANTHROPIC_API_KEY: "sk-ant-key" },
+      agents: {
+        defaults: { model: { primary: "anthropic/claude" }, heartbeat: { intervalMs: 1800000 } },
+        list: [{ id: "agent-1", name: "Smithers" }],
+      },
+      channels: { telegram: { enabled: true, botToken: "123:abc", dmPolicy: "pairing" } },
+      plugins: { allow: ["telegram", "pinchy-audit"], entries: {} },
+      meta: { version: "1.0" },
+    };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(existingConfig));
+
+    const { updateIdentityLinks } = await import("@/lib/openclaw-config");
+    await updateIdentityLinks({ "user-1": ["telegram:8754697762"] });
+
+    expect(mockedWriteFileSync).toHaveBeenCalledOnce();
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0][1] as string);
+
+    // identityLinks updated
+    expect(written.session.identityLinks).toEqual({ "user-1": ["telegram:8754697762"] });
+
+    // Everything else preserved exactly
+    expect(written.agents.defaults.heartbeat).toEqual({ intervalMs: 1800000 });
+    expect(written.agents.defaults.model).toEqual({ primary: "anthropic/claude" });
+    expect(written.agents.list).toEqual([{ id: "agent-1", name: "Smithers" }]);
+    expect(written.env.ANTHROPIC_API_KEY).toBe("sk-ant-key");
+    expect(written.plugins.allow).toEqual(["telegram", "pinchy-audit"]);
+    expect(written.meta.version).toBe("1.0");
+    expect(written.channels.telegram.botToken).toBe("123:abc");
+  });
+
+  it("should remove identityLinks when called with empty object", async () => {
+    const existingConfig = {
+      gateway: { mode: "local" },
+      session: { dmScope: "per-peer", identityLinks: { "user-1": ["telegram:123"] } },
+    };
+    mockedReadFileSync.mockReturnValue(JSON.stringify(existingConfig));
+
+    const { updateIdentityLinks } = await import("@/lib/openclaw-config");
+    await updateIdentityLinks({});
+
+    const written = JSON.parse(mockedWriteFileSync.mock.calls[0][1] as string);
+    expect(written.session.identityLinks).toEqual({});
+    expect(written.session.dmScope).toBe("per-peer");
+    expect(written.gateway.mode).toBe("local");
+  });
+
+  it("should skip write when identityLinks unchanged", async () => {
+    const existingConfig = {
+      gateway: { mode: "local" },
+      session: { identityLinks: { "user-1": ["telegram:123"] } },
+    };
+    // readFileSync is called twice: once by readExistingConfig, once by the skip-if-unchanged check.
+    // Both must return the same content that would be produced by JSON.stringify(updated, null, 2).
+    const serialized = JSON.stringify(existingConfig, null, 2);
+    mockedReadFileSync.mockReturnValue(serialized);
+
+    const { updateIdentityLinks } = await import("@/lib/openclaw-config");
+    updateIdentityLinks({ "user-1": ["telegram:123"] });
+
+    expect(mockedWriteFileSync).not.toHaveBeenCalled();
   });
 });

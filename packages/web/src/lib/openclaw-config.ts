@@ -1,10 +1,10 @@
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
+import { writeFileSync, readFileSync, existsSync, mkdirSync, renameSync } from "fs";
 import { randomBytes } from "crypto";
 import { dirname } from "path";
 import { PROVIDERS, type ProviderName } from "@/lib/providers";
 import { getDefaultModel } from "@/lib/provider-models";
 import { db } from "@/db";
-import { agents } from "@/db/schema";
+import { agents, channelLinks } from "@/db/schema";
 import { getSetting } from "@/lib/settings";
 import { computeDeniedGroups } from "@/lib/tool-registry";
 import { getOpenClawWorkspacePath } from "@/lib/workspace";
@@ -12,6 +12,17 @@ import { restartState } from "@/server/restart-state";
 import { migrateExistingSmithers } from "@/lib/migrate-onboarding";
 
 const CONFIG_PATH = process.env.OPENCLAW_CONFIG_PATH || "/openclaw-config/openclaw.json";
+
+/** Atomic write: tmp file + rename to prevent OpenClaw reading a truncated config */
+function writeConfigAtomic(content: string) {
+  const dir = dirname(CONFIG_PATH);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  const tmpPath = CONFIG_PATH + ".tmp";
+  writeFileSync(tmpPath, content, { encoding: "utf-8", mode: 0o644 });
+  renameSync(tmpPath, CONFIG_PATH);
+}
 
 interface OpenClawConfigParams {
   provider: ProviderName;
@@ -77,13 +88,7 @@ export function writeOpenClawConfig({ provider, apiKey, model }: OpenClawConfigP
   };
 
   const merged = deepMerge(existing, pinchyFields);
-
-  const dir = dirname(CONFIG_PATH);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-
-  writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2), { encoding: "utf-8", mode: 0o644 });
+  writeConfigAtomic(JSON.stringify(merged, null, 2));
   restartState.notifyRestart();
 }
 
@@ -114,11 +119,16 @@ export async function regenerateOpenClawConfig() {
     }
   }
 
-  // Read default provider to set defaults.model
+  // Only set defaults.model — nothing else. OpenClaw enriches agents.defaults
+  // with heartbeat, models, contextPruning, compaction at runtime. If Pinchy
+  // writes those fields (even to preserve them), it causes a race condition:
+  // after a full restart, OpenClaw hasn't enriched yet → Pinchy writes without
+  // them → OpenClaw enriches → diff detected → hot-reload → polling dies
+  // (openclaw#47458). By only writing model, we avoid touching any other field.
+  const pinchyDefaults: Record<string, unknown> = {};
   const defaultProvider = (await getSetting("default_provider")) as ProviderName | null;
-  const defaults: Record<string, unknown> = {};
   if (defaultProvider && PROVIDERS[defaultProvider]) {
-    defaults.model = { primary: await getDefaultModel(defaultProvider) };
+    pinchyDefaults.model = { primary: await getDefaultModel(defaultProvider) };
   }
 
   // Build agents list with OpenClaw-side workspace paths, tools.deny, and plugin configs
@@ -164,15 +174,29 @@ export async function regenerateOpenClawConfig() {
     return agentEntry;
   });
 
-  // Build complete config — gateway preserved, everything else from DB
+  // Build complete config — gateway and OpenClaw-enriched fields preserved,
+  // everything else from DB. OpenClaw adds meta, commands, etc. at startup;
+  // removing them would cause unnecessary diffs on every write.
+  //
+  // Deep-merge agents into existing to preserve OpenClaw-enriched fields
+  // (contextPruning, heartbeat, models, compaction) that may not yet be
+  // in the config file right after a full restart.
+  const existingAgents = (existing.agents as Record<string, unknown>) || {};
   const config: Record<string, unknown> = {
     gateway,
     env,
-    agents: {
-      defaults,
+    agents: deepMerge(existingAgents, {
+      defaults: pinchyDefaults,
       list: agentsList,
-    },
+    }),
   };
+
+  // Preserve OpenClaw-enriched top-level fields that Pinchy doesn't manage
+  for (const key of ["meta", "commands"] as const) {
+    if (existing[key] !== undefined) {
+      config[key] = existing[key];
+    }
+  }
 
   const entries: Record<string, unknown> = {};
   for (const [pluginId, agentConfigs] of Object.entries(pluginConfigs)) {
@@ -215,12 +239,14 @@ export async function regenerateOpenClawConfig() {
 
   // Note: pinchy-files is only included when agents use it (via pluginConfigs loop above).
 
-  // Set plugins.allow to only the enabled plugin IDs. This prevents OpenClaw from
-  // auto-discovering unused plugins from the extensions directory, which would cause
-  // either a restart loop (invalid config) or "disabled but config present" warning spam.
-  const allowedPlugins = Object.keys(entries);
+  // Merge our plugin IDs into the existing allow list. OpenClaw adds its own
+  // plugins (e.g. "telegram") to plugins.allow — if we overwrite the list,
+  // OpenClaw sees a diff and triggers a full gateway restart every time.
+  const existingAllow = ((existing.plugins as Record<string, unknown>)?.allow as string[]) || [];
+  const ourPlugins = Object.keys(entries);
+  const allowedPlugins = [...new Set([...existingAllow, ...ourPlugins])];
 
-  if (Object.keys(entries).length > 0) {
+  if (allowedPlugins.length > 0 || Object.keys(entries).length > 0) {
     config.plugins = { allow: allowedPlugins, entries };
   }
 
@@ -260,11 +286,232 @@ export async function regenerateOpenClawConfig() {
     };
   }
 
-  const dir = dirname(CONFIG_PATH);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
+  // Build Telegram channel config from DB settings using OpenClaw's multi-account format.
+  // Each agent with a bot token gets its own account. Bindings route via accountId.
+  //
+  // NOTE: allowFrom is NOT written here. It's managed via per-account allow-from
+  // store files (credentials/telegram-<accountId>-allowFrom.json) to avoid
+  // triggering the broken channel restart (openclaw/openclaw#47458).
+  const accounts: Record<string, { botToken: string }> = {};
+  interface TelegramBinding {
+    agentId: string;
+    match: { channel: string; accountId: string; peer?: { kind: string; id: string } };
+  }
+  const bindings: TelegramBinding[] = [];
+  const personalBotsAccountIds: Array<{ accountId: string; ownerId: string | null }> = [];
+
+  for (const agent of allAgents) {
+    const botToken = await getSetting(`telegram_bot_token:${agent.id}`);
+    if (botToken) {
+      accounts[agent.id] = { botToken };
+      if (agent.isPersonal) {
+        // Personal agents: per-user peer bindings will be added below
+        personalBotsAccountIds.push({ accountId: agent.id, ownerId: agent.ownerId });
+      } else {
+        // Shared agents: one generic binding per account
+        bindings.push({ agentId: agent.id, match: { channel: "telegram", accountId: agent.id } });
+      }
+    }
   }
 
-  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), { encoding: "utf-8", mode: 0o644 });
-  restartState.notifyRestart();
+  if (Object.keys(accounts).length > 0) {
+    const links = await db.select().from(channelLinks);
+    const identityLinks: Record<string, string[]> = {};
+    for (const link of links) {
+      const identity = `${link.channel}:${link.channelUserId}`;
+      if (!identityLinks[link.userId]) {
+        identityLinks[link.userId] = [identity];
+      } else {
+        identityLinks[link.userId].push(identity);
+      }
+    }
+
+    // Build per-user peer bindings for personal agents (e.g. Smithers).
+    // Each linked user's DMs are routed to THEIR personal agent, not the
+    // bot owner's agent. This ensures Telegram conversations match the
+    // user's personal Smithers in the web UI.
+    if (personalBotsAccountIds.length > 0) {
+      const telegramLinks = links.filter((l) => l.channel === "telegram");
+      // Map userId → their personal agent ID (hoisted outside loop)
+      const personalAgentsByOwner = new Map(
+        allAgents.filter((a) => a.isPersonal && !a.deletedAt).map((a) => [a.ownerId, a.id])
+      );
+
+      for (const { accountId } of personalBotsAccountIds) {
+        for (const link of telegramLinks) {
+          // Route to user's own personal agent, or fall back to the bot owner's agent
+          const targetAgentId = personalAgentsByOwner.get(link.userId) || accountId;
+          bindings.push({
+            agentId: targetAgentId,
+            match: {
+              channel: "telegram",
+              accountId,
+              peer: { kind: "dm", id: link.channelUserId },
+            },
+          });
+        }
+      }
+    }
+
+    // Preserve OpenClaw-enriched channel fields (groupPolicy, streaming)
+    const existingTelegram =
+      ((existing.channels as Record<string, unknown>)?.telegram as Record<string, unknown>) || {};
+    config.channels = {
+      telegram: {
+        ...existingTelegram,
+        dmPolicy: "pairing",
+        accounts,
+      },
+    };
+    config.bindings = bindings;
+    config.session = {
+      dmScope: "per-peer",
+      ...(Object.keys(identityLinks).length > 0 && { identityLinks }),
+    };
+  }
+
+  // Only write if content actually changed — prevents unnecessary OpenClaw restarts
+  const newContent = JSON.stringify(config, null, 2);
+  try {
+    const existing = readFileSync(CONFIG_PATH, "utf-8");
+    if (existing === newContent) return;
+  } catch {
+    // File doesn't exist yet — write it
+  }
+
+  writeConfigAtomic(newContent);
+}
+
+// ── Targeted config updates ───────────────────────────────────────────────
+
+/**
+ * Update only session.identityLinks in the config file.
+ *
+ * Unlike regenerateOpenClawConfig(), this reads the existing config and only
+ * modifies session.identityLinks. All other fields (agents.defaults, env,
+ * plugins, channels, meta, etc.) are preserved byte-for-byte. This avoids
+ * unnecessary diffs that trigger hot-reloads breaking Telegram polling
+ * (openclaw#47458).
+ *
+ * OpenClaw treats identityLinks changes as "dynamic reads" — no channel
+ * restart, no hot-reload, just updated in memory.
+ */
+export function updateIdentityLinks(identityLinks: Record<string, string[]>): void {
+  const existing = readExistingConfig();
+
+  const session = (existing.session as Record<string, unknown>) || {};
+  const updatedSession = {
+    ...session,
+    identityLinks,
+  };
+
+  const updated = { ...existing, session: updatedSession };
+
+  // Only write if content actually changed
+  const newContent = JSON.stringify(updated, null, 2);
+  try {
+    const current = readFileSync(CONFIG_PATH, "utf-8");
+    if (current === newContent) return;
+  } catch {
+    // File doesn't exist — write it
+  }
+
+  writeConfigAtomic(newContent);
+}
+
+/**
+ * Update a single Telegram account in the config (add or remove).
+ *
+ * Uses OpenClaw's multi-account format: channels.telegram.accounts.<accountId>.
+ * Preserves all other accounts, bindings, and OpenClaw-enriched fields.
+ *
+ * Pass `account: null` to remove an account. When the last account is removed,
+ * the entire telegram channel config is removed.
+ *
+ * Used by bot connect/disconnect to avoid full config regeneration, which
+ * overwrites OpenClaw-enriched fields (agents.defaults.*) and triggers
+ * hot-reloads that break Telegram polling (openclaw#47458).
+ */
+export function updateTelegramChannelConfig(
+  accountId: string | null,
+  account: { botToken: string } | null,
+  identityLinks: Record<string, string[]> | null
+): void {
+  const existing = readExistingConfig();
+
+  if (accountId && account) {
+    // Add/update account
+    const existingTelegram =
+      ((existing.channels as Record<string, unknown>)?.telegram as Record<string, unknown>) || {};
+    const existingAccounts = (existingTelegram.accounts as Record<string, unknown>) || {};
+
+    existingAccounts[accountId] = account;
+
+    existing.channels = {
+      ...((existing.channels as Record<string, unknown>) || {}),
+      telegram: {
+        ...existingTelegram,
+        dmPolicy: "pairing",
+        accounts: existingAccounts,
+      },
+    };
+
+    // Update bindings: add this account's binding, preserve others
+    const existingBindings =
+      (existing.bindings as Array<{ agentId: string; match: Record<string, string> }>) || [];
+    const otherBindings = existingBindings.filter((b) => b.match?.accountId !== accountId);
+    existing.bindings = [
+      ...otherBindings,
+      { agentId: accountId, match: { channel: "telegram", accountId } },
+    ];
+  } else if (accountId && !account) {
+    // Remove specific account
+    const existingTelegram =
+      ((existing.channels as Record<string, unknown>)?.telegram as Record<string, unknown>) || {};
+    const existingAccounts = (existingTelegram.accounts as Record<string, unknown>) || {};
+
+    delete existingAccounts[accountId];
+
+    if (Object.keys(existingAccounts).length === 0) {
+      // Last account removed — remove entire telegram config
+      const channels = (existing.channels as Record<string, unknown>) || {};
+      delete channels.telegram;
+      existing.channels = Object.keys(channels).length > 0 ? channels : undefined;
+      existing.bindings = undefined;
+    } else {
+      existing.channels = {
+        ...((existing.channels as Record<string, unknown>) || {}),
+        telegram: { ...existingTelegram, accounts: existingAccounts },
+      };
+      // Remove this account's binding
+      const existingBindings =
+        (existing.bindings as Array<{ agentId: string; match: Record<string, string> }>) || [];
+      existing.bindings = existingBindings.filter((b) => b.match?.accountId !== accountId);
+    }
+  } else {
+    // No accountId — remove ALL telegram config (used by remove-all)
+    const channels = (existing.channels as Record<string, unknown>) || {};
+    delete channels.telegram;
+    existing.channels = Object.keys(channels).length > 0 ? channels : undefined;
+    existing.bindings = undefined;
+  }
+
+  const session = (existing.session as Record<string, unknown>) || {};
+  existing.session = {
+    ...session,
+    dmScope: "per-peer",
+    // null = "don't touch existing identityLinks" (used by bot connect/disconnect).
+    // Non-null = overwrite with provided value (used by link/unlink).
+    ...(identityLinks !== null && { identityLinks }),
+  };
+
+  const newContent = JSON.stringify(existing, null, 2);
+  try {
+    const current = readFileSync(CONFIG_PATH, "utf-8");
+    if (current === newContent) return;
+  } catch {
+    // File doesn't exist
+  }
+
+  writeConfigAtomic(newContent);
 }

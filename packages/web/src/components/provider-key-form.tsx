@@ -198,6 +198,11 @@ export function ProviderKeyForm({
       });
 
       if (!res.ok) {
+        // Session expired — redirect to login
+        if (res.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
         let message = "Setup failed";
         try {
           const data = await res.json();
