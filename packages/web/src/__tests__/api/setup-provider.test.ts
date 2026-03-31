@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { POST } from "@/app/api/setup/provider/route";
 
 vi.mock("@/lib/api-auth", () => ({
@@ -254,5 +254,17 @@ describe("POST /api/setup/provider", () => {
     expect(response.status).toBe(403);
     const data = await response.json();
     expect(data.error).toBe("Forbidden");
+  });
+
+  it("should accept ollama as a valid provider", async () => {
+    const response = await POST(
+      makeRequest({ provider: "ollama", apiKey: "sk-ollama-valid" }) as any
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it("should accept google as a valid provider", async () => {
+    const response = await POST(makeRequest({ provider: "google", apiKey: "AIza-valid" }) as any);
+    expect(response.status).toBe(200);
   });
 });
