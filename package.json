@@ -41,7 +41,7 @@
     "packages/web/**/*.{ts,tsx,js,mjs,cjs,json,css,md}": [
       "pnpm -C packages/web exec prettier --write"
     ],
-    "docs/src/**/*.md": [
+    "docs/src/**/*.{mdx,md}": [
       "pnpm -C packages/web exec prettier --write"
     ],
     ".github/**/*.yml": [
