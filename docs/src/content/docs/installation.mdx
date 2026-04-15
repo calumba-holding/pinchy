@@ -100,17 +100,19 @@ Docker volumes ensure data survives container restarts:
 
 ### Port configuration
 
-To change the exposed port, update both `docker-compose.yml` and the `PORT` environment variable:
+Pinchy always listens on port **7777** inside the container. To change the port exposed on the host, set the `PINCHY_PORT` environment variable:
 
-```yaml
-# docker-compose.yml
-services:
-  pinchy:
-    ports:
-      - "3000:3000"
-    environment:
-      - PORT=3000
+```bash
+PINCHY_PORT=3000 docker compose up -d
 ```
+
+Or add it to your `.env` file:
+
+```bash
+PINCHY_PORT=3000
+```
+
+The default is `7777`. The `docker-compose.yml` maps `${PINCHY_PORT:-7777}:7777` — only the host-side port is configurable.
 
 ## Development mode
 

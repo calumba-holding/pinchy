@@ -95,8 +95,10 @@ If you need to roll back after an upgrade:
 
 3. **Pull the previous version**
 
+   Replace `vX.Y.Z` with the version you want to roll back to (check the [Releases page](https://github.com/heypinchy/pinchy/releases)):
+
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/heypinchy/pinchy/v0.1.0/docker-compose.yml -o docker-compose.yml
+   curl -fsSL https://raw.githubusercontent.com/heypinchy/pinchy/vX.Y.Z/docker-compose.yml -o docker-compose.yml
    docker compose pull
    ```
 
@@ -114,7 +116,7 @@ If you need to roll back after an upgrade:
   backup step matters.
 </Aside>
 
-## Upgrading from v0.2.1 to %%PINCHY_VERSION%%
+## Upgrading from v0.3.0 to %%PINCHY_VERSION%%
 
 Standard upgrade — no breaking changes, no new required environment variables.
 
@@ -124,6 +126,28 @@ docker compose pull && docker compose up -d
 ```
 
 ### What's new in %%PINCHY_VERSION%%
+
+- **Telegram channels** — connect any agent to a Telegram bot. Users link their accounts with a pairing code and chat with agents from their phone. See [Set Up Telegram](/guides/telegram-setup/).
+- **Odoo ERP integration** — give agents scoped, permission-aware access to Odoo with 16 pre-built agent templates. See [Connect Odoo](/guides/connect-odoo/).
+- **Ollama (local and cloud)** — run agents fully air-gapped on your own hardware, or use Ollama Cloud's hosted open-source models. See [Set Up Local Ollama](/guides/ollama-setup/) and [Manage LLM Providers](/guides/llm-providers/).
+- **Usage dashboard improvements** — cache-token tracking, source breakdown (chat vs. system vs. plugin), and a background poller that captures OpenClaw usage even for work that doesn't flow through the web UI.
+- **Domain lock and insecure-mode banner** — lock Pinchy to a canonical HTTPS hostname; a warning banner appears when running without HTTPS on a bound IP/domain. See [Lock Pinchy to a Domain](/guides/domain-lock/).
+- **Audit log event status** — every audit entry (not just tool calls) now shows success/failure with filterable status. Entries from earlier versions show a neutral placeholder.
+- **Disconnect recovery during chat** — if the OpenClaw gateway disconnects mid-conversation, Pinchy detects it, tells the user, and recovers automatically when the gateway returns.
+- **LLM provider errors surfaced in chat** — provider failures (invalid key, rate limit, no credits) now appear as a clear error card in the chat with an admin hint, instead of failing silently.
+- **Pre-built Docker images on GHCR** — `docker compose pull` fetches images directly from GHCR (no local build step), making upgrades faster.
+- **OpenClaw runtime updated** to 2026.4.12.
+
+## Upgrading from v0.2.1 to v0.3.0
+
+Standard upgrade — no breaking changes, no new required environment variables.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/heypinchy/pinchy/v0.3.0/docker-compose.yml -o docker-compose.yml
+docker compose pull && docker compose up -d
+```
+
+### What's new in v0.3.0
 
 - **Usage & Cost Stats dashboard** — admins can view token usage and estimated costs per agent and per user at `/usage`.
 - **Smart PDF reading** — Knowledge Base agents can now extract text from PDFs automatically.
