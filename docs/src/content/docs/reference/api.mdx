@@ -286,12 +286,12 @@ Add or update a provider.
 
 **Request body:**
 
-| Field       | Type    | Required | Description                                          |
-| ----------- | ------- | -------- | ---------------------------------------------------- |
-| `provider`  | string  | Yes      | Provider identifier                                  |
-| `apiKey`    | string  | Cond.    | API key (required for cloud providers)               |
-| `baseUrl`   | string  | Cond.    | URL (required for `ollama-local`)                    |
-| `isDefault` | boolean | No       | Mark as the default provider for new agents         |
+| Field       | Type    | Required | Description                                 |
+| ----------- | ------- | -------- | ------------------------------------------- |
+| `provider`  | string  | Yes      | Provider identifier                         |
+| `apiKey`    | string  | Cond.    | API key (required for cloud providers)      |
+| `baseUrl`   | string  | Cond.    | URL (required for `ollama-local`)           |
+| `isDefault` | boolean | No       | Mark as the default provider for new agents |
 
 Pinchy validates the credentials by calling the provider's `/models` endpoint before persisting. API keys are encrypted at rest with AES-256-GCM.
 
@@ -341,8 +341,8 @@ Set or clear the locked domain. See [Lock Pinchy to a Domain](/guides/domain-loc
 
 **Request body:**
 
-| Field          | Type         | Required | Description                                                       |
-| -------------- | ------------ | -------- | ----------------------------------------------------------------- |
+| Field          | Type         | Required | Description                                                      |
+| -------------- | ------------ | -------- | ---------------------------------------------------------------- |
 | `lockedDomain` | string\|null | Yes      | Canonical HTTPS hostname. Pass `null` to disable domain locking. |
 
 ## Organization Context (admin only)
@@ -742,10 +742,10 @@ Per-agent usage totals within a time window.
 
 **Query parameters:**
 
-| Parameter | Type   | Default | Description                                   |
-| --------- | ------ | ------- | --------------------------------------------- |
-| `days`    | number | 30      | Look-back window. `0` means all-time          |
-| `agentId` | string | —       | Filter by a single agent                      |
+| Parameter | Type   | Default | Description                          |
+| --------- | ------ | ------- | ------------------------------------ |
+| `days`    | number | 30      | Look-back window. `0` means all-time |
+| `agentId` | string | —       | Filter by a single agent             |
 
 **Response:**
 
@@ -764,9 +764,27 @@ Per-agent usage totals within a time window.
     }
   ],
   "totals": {
-    "chat":   { "inputTokens": "...", "outputTokens": "...", "cacheReadTokens": "...", "cacheWriteTokens": "...", "cost": "..." },
-    "system": { "inputTokens": "...", "outputTokens": "...", "cacheReadTokens": "...", "cacheWriteTokens": "...", "cost": "..." },
-    "plugin": { "inputTokens": "...", "outputTokens": "...", "cacheReadTokens": "...", "cacheWriteTokens": "...", "cost": "..." }
+    "chat": {
+      "inputTokens": "...",
+      "outputTokens": "...",
+      "cacheReadTokens": "...",
+      "cacheWriteTokens": "...",
+      "cost": "..."
+    },
+    "system": {
+      "inputTokens": "...",
+      "outputTokens": "...",
+      "cacheReadTokens": "...",
+      "cacheWriteTokens": "...",
+      "cost": "..."
+    },
+    "plugin": {
+      "inputTokens": "...",
+      "outputTokens": "...",
+      "cacheReadTokens": "...",
+      "cacheWriteTokens": "...",
+      "cost": "..."
+    }
   }
 }
 ```
