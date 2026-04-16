@@ -13,6 +13,7 @@ import {
 import { getSetting } from "@/lib/settings";
 import { decrypt } from "@/lib/encryption";
 import { computeDeniedGroups } from "@/lib/tool-registry";
+import { TOOL_CAPABLE_OLLAMA_CLOUD_MODELS } from "@/lib/ollama-cloud-models";
 import { getOpenClawWorkspacePath } from "@/lib/workspace";
 import { migrateExistingSmithers } from "@/lib/migrate-onboarding";
 
@@ -393,27 +394,14 @@ export async function regenerateOpenClawConfig() {
       baseUrl: "https://ollama.com/v1",
       apiKey: ollamaCloudKey,
       api: "openai-completions",
-      models: [
-        {
-          id: "gemini-3-flash-preview:cloud",
-          name: "Gemini 3 Flash Preview",
-          contextWindow: 1048576,
-          maxTokens: 65536,
-        },
-        { id: "kimi-k2.5:cloud", name: "Kimi K2.5", contextWindow: 262144, maxTokens: 8192 },
-        {
-          id: "mistral-large-3:675b-cloud",
-          name: "Mistral Large 3 675B",
-          contextWindow: 131072,
-          maxTokens: 8192,
-        },
-        {
-          id: "qwen3.5:397b-cloud",
-          name: "Qwen 3.5 397B",
-          contextWindow: 262144,
-          maxTokens: 8192,
-        },
-      ],
+      // Derived from TOOL_CAPABLE_OLLAMA_CLOUD_MODELS — see that file for
+      // the source of each context window (ollama.com/library/<name>).
+      models: TOOL_CAPABLE_OLLAMA_CLOUD_MODELS.map((m) => ({
+        id: m.id,
+        name: m.id,
+        contextWindow: m.contextWindow,
+        maxTokens: m.maxTokens,
+      })),
     };
   }
 
