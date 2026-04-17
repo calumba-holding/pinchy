@@ -64,4 +64,24 @@ describe("cloud-init.yml", () => {
     // both — the apt package ships a unit file; we just need it enabled.
     expect(cloudInit).toMatch(/systemctl\s+(enable|restart|reload)[^\n]*caddy/);
   });
+
+  it("installs caddy non-interactively so the pre-staged Caddyfile survives dpkg's conffile prompt", () => {
+    // Regression: the old cloud-init wrote /etc/caddy/Caddyfile BEFORE running
+    // apt-get install caddy. dpkg sees the pre-existing conffile as modified and
+    // asks 'Y/I/N/O/D/Z' — but cloud-init has no stdin, so install exits with
+    // 217/USER because the postinst (which creates the `caddy` system user)
+    // never runs. Caddy then fails to start and port 80 stays dead.
+    //
+    // Fix: the apt-get install line that installs caddy must pass
+    //   -o Dpkg::Options::="--force-confold"
+    // so dpkg keeps our Caddyfile without prompting, postinst completes, the
+    // caddy user is created, and systemctl enable --now caddy succeeds.
+    const caddyInstallLines = cloudInit
+      .split("\n")
+      .filter((line) => /apt-get install[^\n]*\bcaddy\b/.test(line));
+    expect(caddyInstallLines.length).toBeGreaterThan(0);
+    for (const line of caddyInstallLines) {
+      expect(line).toMatch(/--force-confold/);
+    }
+  });
 });

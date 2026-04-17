@@ -60,8 +60,12 @@ runcmd:
     }
     EOF
 
-  # Install Caddy, Docker, and UFW in one apt call (Caddy starts with our Caddyfile)
-  - apt-get install -y -qq caddy docker.io docker-compose-v2 ufw
+  # Install Caddy, Docker, and UFW in one apt call (Caddy starts with our Caddyfile).
+  # --force-confold keeps our pre-staged /etc/caddy/Caddyfile without dpkg's
+  # interactive conffile prompt, which would otherwise fail cloud-init (no stdin)
+  # and leave the caddy package in iU state (postinst skipped, `caddy` user never
+  # created, systemd start fails with exit 217/USER).
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y -qq -o Dpkg::Options::=--force-confold caddy docker.io docker-compose-v2 ufw
   - systemctl enable --now caddy
   - systemctl reload caddy
 
