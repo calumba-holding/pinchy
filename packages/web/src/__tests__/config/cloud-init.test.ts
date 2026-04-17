@@ -9,28 +9,59 @@ describe("cloud-init.yml", () => {
   const cloudInit = readFileSync(cloudInitPath, "utf-8");
   const compose = readFileSync(composePath, "utf-8");
 
-  it("writes a PINCHY_PORT that stays a valid docker port spec after compose expansion", () => {
-    // docker-compose.yml wraps PINCHY_PORT as "${PINCHY_PORT:-default}:7777".
-    // Docker parses port specs with 1, 2, or 3 colon-separated parts:
-    //   "7777"              → CONTAINER only
-    //   "HOST:CONTAINER"    → HOST_PORT:CONTAINER_PORT
-    //   "IP:HOST:CONTAINER" → HOST_IP:HOST_PORT:CONTAINER_PORT
-    // If PINCHY_PORT already contains a colon, the wrapped value has three
-    // parts and docker treats the first segment as a HOST_IP — which must be
-    // a valid IP or compose errors with "invalid IP address".
-    // Regression: a PINCHY_PORT=80:7777 cloud-init wrote expanded to
-    // "80:7777:7777", crashing docker compose with "invalid IP address: 80".
+  it("installs Caddy from the official Cloudsmith apt repository", () => {
+    // Caddy must be the single port-80 entry point so the transition from
+    // loading page to Pinchy is seamless. We install from Caddy's signed
+    // Cloudsmith repo (GPG-verified) rather than a naked binary download.
+    expect(cloudInit).toMatch(/dl\.cloudsmith\.io\/public\/caddy\/stable\/gpg\.key/);
+    expect(cloudInit).toMatch(/dl\.cloudsmith\.io\/public\/caddy\/stable\/debian\.deb\.txt/);
+    expect(cloudInit).toMatch(/apt-get install[^\n]*\bcaddy\b/);
+  });
 
-    // Verify the wrapping pattern is still what we assume.
-    expect(compose).toMatch(/\$\{PINCHY_PORT:-[^}]+\}:7777/);
+  it("does not use python3 http.server as a loading-page shim", () => {
+    // The old design started a python3 http.server on port 80, then killed it
+    // before starting Pinchy — leaving a 30–60s gap where port 80 had no
+    // listener. Caddy replaces that loader and stays up through the transition.
+    expect(cloudInit).not.toMatch(/python3 -m http\.server/);
+    expect(cloudInit).not.toMatch(/loading-server\.pid/);
+  });
 
-    const match = cloudInit.match(/PINCHY_PORT=([^\s"]+)/);
-    expect(match).not.toBeNull();
-    const pinchyPort = match![1];
+  it("writes a Caddyfile that reverse_proxies to Pinchy with a loading-page fallback", () => {
+    // Caddy's documented failover pattern: list the primary upstream first,
+    // then a local fallback. lb_policy first + lb_try_duration + fail_duration
+    // make Caddy serve the fallback instantly when Pinchy is unreachable
+    // (startup, upgrades, crashes).
+    expect(cloudInit).toMatch(/reverse_proxy\s+127\.0\.0\.1:7777\s+127\.0\.0\.1:9999/);
+    expect(cloudInit).toMatch(/lb_policy\s+first/);
+    expect(cloudInit).toMatch(/lb_try_duration\s+1s/);
+    expect(cloudInit).toMatch(/fail_duration\s+\d+s/);
+  });
 
-    if (pinchyPort.includes(":")) {
-      const hostIp = pinchyPort.split(":")[0];
-      expect(hostIp).toMatch(/^(\d{1,3}\.){3}\d{1,3}$/);
-    }
+  it("binds the fallback loading-page server to localhost only", () => {
+    // The :9999 upstream is a Caddy-internal fallback — exposing it publicly
+    // would leak the raw loading page on its own port. Bind to 127.0.0.1.
+    expect(cloudInit).toMatch(/bind\s+127\.0\.0\.1/);
+  });
+
+  it("serves the loading page from a Caddy-accessible web root", () => {
+    // The loading page must be on disk where the :9999 Caddyfile block roots
+    // its file_server. /var/www/pinchy-loading is the conventional location
+    // for Caddy-served static content on Debian/Ubuntu.
+    expect(cloudInit).toMatch(/\/var\/www\/pinchy-loading\/index\.html/);
+    expect(cloudInit).toMatch(/file_server/);
+  });
+
+  it("does not override PINCHY_PORT so Pinchy keeps the secure 127.0.0.1:7777 default", () => {
+    // Pinchy binds to 127.0.0.1:7777 by default. Caddy on the host reaches it
+    // via localhost. No PINCHY_PORT override means no risk of accidentally
+    // exposing Pinchy directly on 0.0.0.0.
+    expect(cloudInit).not.toMatch(/PINCHY_PORT=/);
+    expect(compose).toMatch(/\$\{PINCHY_PORT:-127\.0\.0\.1:7777\}:7777/);
+  });
+
+  it("enables and starts Caddy via systemd so it restarts on reboot", () => {
+    // Caddy must survive host reboots and Pinchy restarts. systemd handles
+    // both — the apt package ships a unit file; we just need it enabled.
+    expect(cloudInit).toMatch(/systemctl\s+(enable|restart|reload)[^\n]*caddy/);
   });
 });

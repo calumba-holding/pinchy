@@ -119,11 +119,11 @@ Hetzner Cloud is an excellent choice for running Pinchy. Their servers run in EU
     <summary>What does this script do?</summary>
 
     This is a **cloud-init** script — a standard way to configure servers on first boot. When your server starts, it automatically:
-    1. Installs Docker and a firewall
+    1. Installs Caddy, Docker, and a firewall
     2. Opens only the ports needed (SSH, HTTP, HTTPS)
     3. Adds 2 GB of swap space (a safety net for heavy agent workloads)
-    4. Shows a loading page while Pinchy images are being downloaded
-    5. Downloads and starts Pinchy from pre-built Docker images
+    4. Configures Caddy as a reverse proxy with a built-in loading page — so visitors see a friendly page during install and through any future Pinchy restart
+    5. Downloads and starts Pinchy from pre-built Docker images (bound to `127.0.0.1:7777`, reachable only via Caddy)
 
     No manual setup required. You can also [download the script](/cloud-init.yml) separately.
 
@@ -139,12 +139,7 @@ Hetzner Cloud is an excellent choice for running Pinchy. Their servers run in EU
 
 11. **Open Pinchy**
 
-    After about a minute, visit `http://<your-server-ip>` in your browser (replace `<your-server-ip>` with the actual IP address). You should see the Pinchy setup wizard.
-
-    <Aside type="note">
-      If you see a connection error, wait another 30 seconds — the images might
-      still be downloading.
-    </Aside>
+    Visit `http://<your-server-ip>` in your browser (replace `<your-server-ip>` with the actual IP address). You'll see a loading page while Pinchy finishes installing, then it automatically hands off to the setup wizard — no refresh needed.
 
     The setup wizard will guide you through creating your admin account and configuring your first LLM provider.
 
@@ -208,58 +203,38 @@ While connected, every command you type runs on your server. Type `exit` to disc
 
 ### Set up HTTPS with Caddy
 
-First, switch Pinchy from port 80 to a localhost-only binding so that Caddy can take over port 80 and 443:
+Caddy is already installed and serving Pinchy on port 80 — the cloud-init script set it up. Switching to HTTPS is a single edit.
 
-```bash
-nano /opt/pinchy/.env
-```
-
-Change the `PINCHY_PORT` line to:
-
-```bash
-PINCHY_PORT=127.0.0.1:7777
-```
-
-Restart Pinchy to apply:
-
-```bash
-cd /opt/pinchy && docker compose up -d
-```
-
-<Aside type="caution">
-  Docker manages its own iptables rules and can bypass host firewall tools like
-  UFW. The `127.0.0.1:` prefix ensures port 7777 is only reachable from
-  localhost — without it, the port is exposed to the internet regardless of
-  firewall settings.
-</Aside>
-
-Install Caddy, which handles SSL certificates automatically:
-
-```bash
-apt-get install -y caddy
-```
-
-Edit the Caddy configuration:
+Open the Caddy configuration:
 
 ```bash
 nano /etc/caddy/Caddyfile
 ```
 
-Replace the contents with (use your actual domain):
+Replace the `:80 {` line at the top with your domain (keep the rest of the file as is):
 
 ```
 pinchy.example.com {
-    reverse_proxy localhost:7777
+    reverse_proxy 127.0.0.1:7777 127.0.0.1:9999 {
+        lb_policy first
+        lb_try_duration 1s
+        fail_duration 5s
+    }
 }
 ```
 
-Save the file (Ctrl+O, Enter, Ctrl+X) and restart Caddy:
+Save the file (Ctrl+O, Enter, Ctrl+X) and reload Caddy:
 
 ```bash
-systemctl restart caddy
+systemctl reload caddy
 ```
 
-After a few seconds, visit `https://pinchy.example.com` — Caddy automatically provisions a Let's Encrypt certificate.
+After a few seconds, visit `https://pinchy.example.com` — Caddy automatically provisions a Let's Encrypt certificate. The loading-page fallback on `:9999` stays unchanged so users still see a friendly page if Pinchy ever becomes unreachable during an upgrade or restart.
+
+<Aside type="tip">
+  Pinchy already listens only on `127.0.0.1:7777` — Caddy is the single entry
+  point from the internet. No `PINCHY_PORT` changes needed.
+</Aside>
 
 ### Lock your domain
 
