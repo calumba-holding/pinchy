@@ -67,7 +67,7 @@ export const ChatErrorMessage: FC<{ error: ChatError }> = ({ error }) => {
         <>
           <div className="flex items-center gap-2 font-medium text-destructive dark:text-red-200">
             <AlertTriangle className="size-4 shrink-0" data-testid="error-warning-icon" />
-            {agentLabel} couldn&apos;t respond
+            {`${agentLabel} couldn't respond`}
           </div>
           <p className="mt-1.5 text-destructive/90 dark:text-red-300/90">{error.providerError}</p>
           {error.hint && (
