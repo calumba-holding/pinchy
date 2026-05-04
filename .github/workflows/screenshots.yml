@@ -17,6 +17,14 @@ jobs:
   capture:
     name: Capture screenshots
     runs-on: ubuntu-latest
+    # docker-compose.yml requires PINCHY_VERSION since
+    # 0a1e4ebd2 (feat(compose): pin image versions via PINCHY_VERSION env
+    # var). The job builds production images locally with tag :latest, so
+    # this job uses "latest" rather than the release tag — the locally-
+    # built layers never get pushed and the deployed docs site only cares
+    # about the rendered screenshots, not which tag produced them.
+    env:
+      PINCHY_VERSION: latest
 
     steps:
       - uses: actions/checkout@v4
