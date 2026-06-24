@@ -78,7 +78,7 @@ caproverOneClickApp:
   variables:
     - id: $$cap_pinchy_version
       label: Pinchy version
-      defaultValue: 'v0.6.0'
+      defaultValue: 'v0.7.0'
       description: The released Pinchy version to deploy (must have published images).
       validRegex: '/^v\d+\.\d+\.\d+$/'
     - id: $$cap_db_password

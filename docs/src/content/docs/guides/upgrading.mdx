@@ -149,7 +149,7 @@ If you need to roll back after an upgrade:
   backup step matters.
 </Aside>
 
-## Upgrading from v0.6.0 to %%PINCHY_VERSION%%
+## Upgrading from v0.6.0 to v0.7.0
 
 ### Breaking changes
 
@@ -161,13 +161,13 @@ The standard flow applies:
 
 ```bash
 cd /opt/pinchy
-sed -i 's/PINCHY_VERSION=v0.6.0/PINCHY_VERSION=%%PINCHY_VERSION%%/' .env
+sed -i 's/PINCHY_VERSION=v0.6.0/PINCHY_VERSION=v0.7.0/' .env
 docker compose pull && docker compose up -d && docker image prune -f
 ```
 
 #### One last sign-in, then your session survives updates
 
-Until now, every update could silently sign you out. On HTTPS/domain-locked instances the session cookie's name depended on a value that was computed nondeterministically at startup, so it sometimes changed between container versions and orphaned your existing login. %%PINCHY_VERSION%% pins that decision to the domain-lock state via a stable, persisted flag, so the cookie name no longer changes across restarts.
+Until now, every update could silently sign you out. On HTTPS/domain-locked instances the session cookie's name depended on a value that was computed nondeterministically at startup, so it sometimes changed between container versions and orphaned your existing login. v0.7.0 pins that decision to the domain-lock state via a stable, persisted flag, so the cookie name no longer changes across restarts.
 
 One transitional effect: **this upgrade may sign you out one final time** as the cookie name settles onto the stable value. The flag is reconciled before the server starts, so the very first boot already uses the stable cookie name — no second sign-out, and Secure cookies are never briefly downgraded. After that, logins persist across updates as expected. Nothing to configure — just sign back in once if prompted.
 
