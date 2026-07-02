@@ -38,7 +38,7 @@ describe("pinchy-email manifest contract", () => {
     ).toBe(false);
   });
 
-  it("requires connectionId, permissions, and tools per agent", () => {
+  it("requires connectionId and permissions per agent (tools is optional)", () => {
     expect(
       validatePluginEntry(manifest, {
         apiBaseUrl: "http://x",
@@ -46,6 +46,30 @@ describe("pinchy-email manifest contract", () => {
         agents: { "a-1": { connectionId: "c-1" } },
       }).ok,
     ).toBe(false);
+  });
+
+  // Migration test -- see AGENTS.md "Test Migrations Against Pre-Existing
+  // Data". Pre-upgrade regenerateOpenClawConfig() wrote agent entries with
+  // only connectionId+permissions (no "tools"). If an upgraded OpenClaw
+  // container (new plugin manifest) loads a stale openclaw.json written by
+  // that old code before Pinchy regenerates config, schema validation must
+  // not reject it -- or all email tools vanish for every agent on that
+  // installation. "tools" is intentionally NOT in the manifest's required
+  // list so old-shaped entries keep validating; it is still declared as a
+  // property for the shape build.ts emits today.
+  it("validates an old-shape agent entry (connectionId+permissions, no tools) written by pre-upgrade code", () => {
+    const result = validatePluginEntry(manifest, {
+      apiBaseUrl: "http://x",
+      gatewayToken: "t",
+      agents: {
+        "a-1": {
+          connectionId: "c-1",
+          permissions: { email: ["read"] },
+        },
+      },
+    });
+    if (!result.ok) throw new Error(result.errors.join("\n"));
+    expect(result.ok).toBe(true);
   });
 
   it("uses additionalProperties: false", () => {

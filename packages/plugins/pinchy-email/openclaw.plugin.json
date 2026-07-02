@@ -28,7 +28,7 @@
             "permissions": { "type": "object" },
             "tools": { "type": "array", "items": { "type": "string" } }
           },
-          "required": ["connectionId", "permissions", "tools"]
+          "required": ["connectionId", "permissions"]
         }
       }
     },
