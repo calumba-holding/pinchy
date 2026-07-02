@@ -196,7 +196,8 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
   {
     id: "email_search",
     label: "Email: Search",
-    description: "Search emails with query",
+    description:
+      "Search emails with structured filters (sender, recipient, subject, unread, age, folder)",
     category: "safe",
     integration: "email",
   },

@@ -965,8 +965,8 @@ const plugin = {
                     type: "text",
                     text:
                       `Saved to the workspace uploads directory as "${finalFilename}" ` +
-                      `(${humanReadableSize(attachment.data.length)}). Readable with the file/pdf tools; ` +
-                      `attachable to an Odoo record via odoo_attach_file using this filename.`,
+                      `(${humanReadableSize(attachment.data.length)}). Readable with the pdf tool ` +
+                      `(for PDFs); attachable to an Odoo record via odoo_attach_file using this filename.`,
                   },
                 ],
               };

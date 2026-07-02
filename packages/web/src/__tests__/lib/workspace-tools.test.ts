@@ -97,6 +97,17 @@ describe("generateToolsContent", () => {
     expect(content.match(/## Connected Email/g)).toHaveLength(1);
   });
 
+  it("renders the legacy 'list' operation with a human-readable label", () => {
+    // "list" is a legacy alias (pre-#328 template creation) that grants the
+    // same toolset as "read"/"search" — see EMAIL_OPERATION_DISPLAY_ORDER in
+    // tool-registry.ts. TOOLS.md must render it with a label, not the raw
+    // string, so a legacy list-row agent's bootstrap file stays readable.
+    const content = generateToolsContent([
+      { address: "legacy@example.com", label: "legacy@example.com", operations: ["list"] },
+    ]);
+    expect(content).toContain("Granted operations: list messages");
+  });
+
   it("renders unknown operations literally (no prototype-key lookup)", () => {
     // A label lookup via OBJ[op] would resolve "constructor" to a function on
     // Object.prototype and render its source. The Map-based lookup must fall

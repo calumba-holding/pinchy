@@ -261,7 +261,7 @@ export function getAgentBootstrapSizes(agentId: string): number[] {
  * A mailbox connected to an agent, rendered into the agent's TOOLS.md
  * bootstrap file so the agent knows the identity of the account it operates
  * on. `operations` are the granted email operations (subset of
- * read/search/draft/send).
+ * read/search/list/draft/send).
  */
 export interface MailboxContext {
   address: string;
@@ -275,11 +275,13 @@ export interface MailboxContext {
  * Record indexed with a dynamic key) so an unknown operation can never hit a
  * prototype property — it falls back to the raw operation string instead.
  * "read" includes search (see EMAIL_OPERATIONS in tool-registry.ts); the
- * standalone "search" label only renders for legacy permission rows.
+ * standalone "search" and "list" labels only render for legacy permission
+ * rows (see EMAIL_OPERATION_DISPLAY_ORDER in tool-registry.ts).
  */
 const EMAIL_OPERATION_LABELS = new Map<string, string>([
   ["read", "read and search messages"],
   ["search", "search the mailbox"],
+  ["list", "list messages"],
   ["draft", "create drafts"],
   ["send", "send email"],
 ]);
