@@ -191,11 +191,44 @@ export async function getGmailRequests(): Promise<
     grant_type?: string;
     hasRefreshToken?: boolean;
     query?: Record<string, string>;
+    messageId?: string;
+    attachmentId?: string;
   }>
 > {
   const res = await fetch(`${GMAIL_MOCK_URL}/control/requests`);
   if (!res.ok) throw new Error(`Failed to get gmail requests: ${res.status}`);
   return res.json();
+}
+
+/**
+ * Seed messages into the Gmail mock using the friendly shape — the mock's
+ * normalizeGmailMessage() builds the real Gmail payload (headers, MIME parts,
+ * attachment parts) from these fields. See config/gmail-mock/server.js.
+ */
+export async function seedGmailMockMessages(
+  messages: Array<{
+    id?: string;
+    subject?: string;
+    from?: string;
+    to?: string;
+    body?: string;
+    isRead?: boolean;
+    labelIds?: string[];
+    attachments?: Array<{
+      filename: string;
+      mimeType: string;
+      contentBase64: string;
+      attachmentId?: string;
+      inline?: boolean;
+    }>;
+  }>
+): Promise<void> {
+  const res = await fetch(`${GMAIL_MOCK_URL}/control/seed`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages }),
+  });
+  if (!res.ok) throw new Error(`Failed to seed Gmail mock messages: ${res.status}`);
 }
 
 export async function login(email = _adminEmail, password = _adminPassword): Promise<string> {
@@ -318,6 +351,16 @@ export async function seedGraphMockMessages(
     from?: string;
     body?: string;
     isRead?: boolean;
+    hasAttachments?: boolean;
+    attachments?: Array<{
+      "@odata.type"?: string;
+      id: string;
+      name: string;
+      contentType: string;
+      size: number;
+      isInline: boolean;
+      contentBytes: string;
+    }>;
   }>
 ): Promise<void> {
   const res = await fetch(`${GRAPH_MOCK_URL}/control/seed`, {

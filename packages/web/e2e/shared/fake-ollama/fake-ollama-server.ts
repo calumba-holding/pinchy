@@ -170,6 +170,8 @@ const EMAIL_SEARCH_TRIGGER = "E2E_EMAIL_SEARCH_TOOL";
 const EMAIL_SEARCH_RESPONSE = "Emails searched: coverage probe complete.";
 const EMAIL_SEND_TRIGGER = "E2E_EMAIL_SEND_TOOL";
 const EMAIL_SEND_RESPONSE = "Email sent: coverage probe complete.";
+const EMAIL_GET_ATTACHMENT_TRIGGER = "E2E_EMAIL_GET_ATTACHMENT_TOOL";
+const EMAIL_GET_ATTACHMENT_RESPONSE = "Attachment downloaded: coverage probe complete.";
 const WEB_SEARCH_TRIGGER = "E2E_WEB_SEARCH_TOOL";
 const WEB_SEARCH_RESPONSE = "Search complete: coverage probe complete.";
 const WORKSPACE_LS_TRIGGER = "E2E_WORKSPACE_LS_TOOL";
@@ -251,6 +253,14 @@ const TOOL_TRIGGERS: TriggerConfig[] = [
       subject: "Pinchy E2E probe",
       body: "This is an E2E coverage probe.",
     },
+  },
+  {
+    trigger: EMAIL_GET_ATTACHMENT_TRIGGER,
+    response: EMAIL_GET_ATTACHMENT_RESPONSE,
+    toolName: "email_get_attachment",
+    // These two literal ids are the contract the Gmail/Graph E2E specs seed
+    // their attachment fixtures with.
+    arguments: { messageId: "msg-att-e2e", attachmentId: "att-e2e-1" },
   },
   {
     trigger: WEB_SEARCH_TRIGGER,
@@ -984,6 +994,8 @@ export const FAKE_OLLAMA_EMAIL_SEARCH_TOOL_TRIGGER = EMAIL_SEARCH_TRIGGER;
 export const FAKE_OLLAMA_EMAIL_SEARCH_TOOL_RESPONSE = EMAIL_SEARCH_RESPONSE;
 export const FAKE_OLLAMA_EMAIL_SEND_TOOL_TRIGGER = EMAIL_SEND_TRIGGER;
 export const FAKE_OLLAMA_EMAIL_SEND_TOOL_RESPONSE = EMAIL_SEND_RESPONSE;
+export const FAKE_OLLAMA_EMAIL_GET_ATTACHMENT_TOOL_TRIGGER = EMAIL_GET_ATTACHMENT_TRIGGER;
+export const FAKE_OLLAMA_EMAIL_GET_ATTACHMENT_TOOL_RESPONSE = EMAIL_GET_ATTACHMENT_RESPONSE;
 export const FAKE_OLLAMA_WEB_SEARCH_TOOL_TRIGGER = WEB_SEARCH_TRIGGER;
 export const FAKE_OLLAMA_WEB_SEARCH_TOOL_RESPONSE = WEB_SEARCH_RESPONSE;
 export const FAKE_OLLAMA_WORKSPACE_LS_TOOL_TRIGGER = WORKSPACE_LS_TRIGGER;

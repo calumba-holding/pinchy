@@ -19,7 +19,9 @@ function resetState() {
       id: generateId(),
       subject: "Test Email 1",
       from: { emailAddress: { address: "sender@contoso.com", name: "Sender" } },
-      toRecipients: [{ emailAddress: { address: "test@contoso.com", name: "Test User" } }],
+      toRecipients: [
+        { emailAddress: { address: "test@contoso.com", name: "Test User" } },
+      ],
       body: { contentType: "text", content: "Hello from seed!" },
       receivedDateTime: new Date().toISOString(),
       isRead: false,
@@ -34,7 +36,14 @@ resetState();
 function requireBearer(req, res) {
   const auth = req.headers.authorization || "";
   if (!auth.startsWith("Bearer ") || auth.trim() === "Bearer") {
-    res.status(401).json({ error: { code: "InvalidAuthenticationToken", message: "Access token is empty." } });
+    res
+      .status(401)
+      .json({
+        error: {
+          code: "InvalidAuthenticationToken",
+          message: "Access token is empty.",
+        },
+      });
     return false;
   }
   return true;
@@ -44,10 +53,20 @@ function requireBearer(req, res) {
 // Tenant-scoped token endpoint (/:tenant/oauth2/v2.0/token)
 app.post("/:tenant/oauth2/v2.0/token", (req, res) => {
   const { grant_type, code, refresh_token } = req.body;
-  requestLog.push({ endpoint: "/oauth2/v2.0/token", grant_type, hasCode: !!code, hasRefreshToken: !!refresh_token });
+  requestLog.push({
+    endpoint: "/oauth2/v2.0/token",
+    grant_type,
+    hasCode: !!code,
+    hasRefreshToken: !!refresh_token,
+  });
 
   if (refresh_token === "invalid-refresh-token" || code === "invalid-code") {
-    return res.status(400).json({ error: "invalid_grant", error_description: "The provided value is invalid." });
+    return res
+      .status(400)
+      .json({
+        error: "invalid_grant",
+        error_description: "The provided value is invalid.",
+      });
   }
 
   const ts = Date.now();
@@ -83,8 +102,70 @@ app.get("/v1.0/me/messages", (req, res) => {
 app.get("/v1.0/me/messages/:id", (req, res) => {
   if (!requireBearer(req, res)) return;
   const msg = messages.find((m) => m.id === req.params.id);
-  if (!msg) return res.status(404).json({ error: { code: "ErrorItemNotFound", message: "The specified object was not found in the store." } });
+  if (!msg)
+    return res
+      .status(404)
+      .json({
+        error: {
+          code: "ErrorItemNotFound",
+          message: "The specified object was not found in the store.",
+        },
+      });
   res.json(msg);
+});
+
+// GET /v1.0/me/messages/:id/attachments — list attachment metadata (no contentBytes)
+app.get("/v1.0/me/messages/:id/attachments", (req, res) => {
+  if (!requireBearer(req, res)) return;
+  requestLog.push({
+    endpoint: `/v1.0/me/messages/${req.params.id}/attachments`,
+    messageId: req.params.id,
+    method: "GET",
+  });
+  const msg = messages.find((m) => m.id === req.params.id);
+  if (!msg)
+    return res
+      .status(404)
+      .json({
+        error: {
+          code: "ErrorItemNotFound",
+          message: "The specified object was not found in the store.",
+        },
+      });
+  const value = (msg.attachments ?? []).map((a) => ({
+    "@odata.type": a["@odata.type"],
+    id: a.id,
+    name: a.name,
+    contentType: a.contentType,
+    size: a.size,
+    isInline: a.isInline,
+  }));
+  res.json({ value });
+});
+
+// GET /v1.0/me/messages/:id/attachments/:attachmentId — single attachment, including contentBytes
+app.get("/v1.0/me/messages/:id/attachments/:attachmentId", (req, res) => {
+  if (!requireBearer(req, res)) return;
+  requestLog.push({
+    endpoint: `/v1.0/me/messages/${req.params.id}/attachments/${req.params.attachmentId}`,
+    messageId: req.params.id,
+    attachmentId: req.params.attachmentId,
+    method: "GET",
+  });
+  const msg = messages.find((m) => m.id === req.params.id);
+  const attachment = msg?.attachments?.find(
+    (a) => a.id === req.params.attachmentId,
+  );
+  if (!attachment)
+    return res
+      .status(404)
+      .json({
+        error: {
+          code: "ErrorItemNotFound",
+          message: "The specified object was not found in the store.",
+        },
+      });
+  res.json(attachment);
 });
 
 // POST /v1.0/me/messages — create a draft
@@ -98,7 +179,11 @@ app.post("/v1.0/me/messages", (req, res) => {
     ...req.body,
   };
   messages.push(draft);
-  requestLog.push({ endpoint: "/v1.0/me/messages", method: "POST", draftId: draft.id });
+  requestLog.push({
+    endpoint: "/v1.0/me/messages",
+    method: "POST",
+    draftId: draft.id,
+  });
   res.status(201).json(draft);
 });
 
@@ -106,9 +191,20 @@ app.post("/v1.0/me/messages", (req, res) => {
 app.patch("/v1.0/me/messages/:id", (req, res) => {
   if (!requireBearer(req, res)) return;
   const idx = messages.findIndex((m) => m.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: { code: "ErrorItemNotFound", message: "The specified object was not found in the store." } });
+  if (idx === -1)
+    return res
+      .status(404)
+      .json({
+        error: {
+          code: "ErrorItemNotFound",
+          message: "The specified object was not found in the store.",
+        },
+      });
   messages[idx] = { ...messages[idx], ...req.body };
-  requestLog.push({ endpoint: `/v1.0/me/messages/${req.params.id}`, method: "PATCH" });
+  requestLog.push({
+    endpoint: `/v1.0/me/messages/${req.params.id}`,
+    method: "PATCH",
+  });
   res.json(messages[idx]);
 });
 
@@ -117,16 +213,27 @@ app.post("/v1.0/me/messages/:id/send", (req, res) => {
   if (!requireBearer(req, res)) return;
   const idx = messages.findIndex((m) => m.id === req.params.id);
   if (idx !== -1) {
-    messages[idx] = { ...messages[idx], isDraft: false, sentDateTime: new Date().toISOString() };
+    messages[idx] = {
+      ...messages[idx],
+      isDraft: false,
+      sentDateTime: new Date().toISOString(),
+    };
   }
-  requestLog.push({ endpoint: `/v1.0/me/messages/${req.params.id}/send`, method: "POST" });
+  requestLog.push({
+    endpoint: `/v1.0/me/messages/${req.params.id}/send`,
+    method: "POST",
+  });
   res.status(202).end();
 });
 
 // POST /v1.0/me/sendMail — send a direct message
 app.post("/v1.0/me/sendMail", (req, res) => {
   if (!requireBearer(req, res)) return;
-  requestLog.push({ endpoint: "/v1.0/me/sendMail", method: "POST", subject: req.body?.message?.subject });
+  requestLog.push({
+    endpoint: "/v1.0/me/sendMail",
+    method: "POST",
+    subject: req.body?.message?.subject,
+  });
   res.status(202).end();
 });
 
@@ -134,7 +241,15 @@ app.post("/v1.0/me/sendMail", (req, res) => {
 app.post("/v1.0/me/messages/:id/createReply", (req, res) => {
   if (!requireBearer(req, res)) return;
   const original = messages.find((m) => m.id === req.params.id);
-  if (!original) return res.status(404).json({ error: { code: "ErrorItemNotFound", message: "The specified object was not found in the store." } });
+  if (!original)
+    return res
+      .status(404)
+      .json({
+        error: {
+          code: "ErrorItemNotFound",
+          message: "The specified object was not found in the store.",
+        },
+      });
   const reply = {
     id: `draft-${generateId()}`,
     isDraft: true,
@@ -146,7 +261,11 @@ app.post("/v1.0/me/messages/:id/createReply", (req, res) => {
     body: { contentType: "text", content: "" },
   };
   messages.push(reply);
-  requestLog.push({ endpoint: `/v1.0/me/messages/${req.params.id}/createReply`, method: "POST", replyId: reply.id });
+  requestLog.push({
+    endpoint: `/v1.0/me/messages/${req.params.id}/createReply`,
+    method: "POST",
+    replyId: reply.id,
+  });
   res.status(201).json(reply);
 });
 
@@ -154,7 +273,10 @@ app.post("/v1.0/me/messages/:id/createReply", (req, res) => {
 app.get("/v1.0/me/mailFolders/:wellKnown/messages", (req, res) => {
   if (!requireBearer(req, res)) return;
   const folder = req.params.wellKnown.toLowerCase();
-  requestLog.push({ endpoint: `/v1.0/me/mailFolders/${req.params.wellKnown}/messages`, query: req.query });
+  requestLog.push({
+    endpoint: `/v1.0/me/mailFolders/${req.params.wellKnown}/messages`,
+    query: req.query,
+  });
   const filtered = messages.filter((m) => {
     if (!m.parentFolderId) return true;
     return m.parentFolderId.toLowerCase() === folder;

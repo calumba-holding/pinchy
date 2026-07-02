@@ -21,6 +21,7 @@ import {
   FAKE_OLLAMA_EMAIL_LIST_TOOL_TRIGGER,
   FAKE_OLLAMA_EMAIL_SEARCH_TOOL_TRIGGER,
   FAKE_OLLAMA_EMAIL_SEND_TOOL_TRIGGER,
+  FAKE_OLLAMA_EMAIL_GET_ATTACHMENT_TOOL_TRIGGER,
   FAKE_OLLAMA_PORT,
   startFakeOllama,
   stopFakeOllama,
@@ -231,7 +232,7 @@ test.describe("Microsoft email dispatch probe (pinchy-email plugin coverage)", (
     //    shape is sufficient end-to-end.
     const patchRes = await pinchyPatch(
       `/api/agents/${dispatchAgentId}`,
-      { allowedTools: ["email_list", "email_search", "email_send"] },
+      { allowedTools: ["email_list", "email_search", "email_send", "email_get_attachment"] },
       dispatchCookie
     );
     if (patchRes.status !== 200) throw new Error(`Agent patch failed: ${String(patchRes.status)}`);
@@ -389,6 +390,64 @@ test.describe("Microsoft email dispatch probe (pinchy-email plugin coverage)", (
     expect(
       reqs.some((r) => r.endpoint === "/v1.0/me/sendMail"),
       `graph-mock received no sendMail request; saw: ${JSON.stringify(reqs)}`
+    ).toBe(true);
+  });
+
+  test("graph-mock receives email_get_attachment request when tool is invoked via chat", async ({
+    page,
+  }) => {
+    await resetGraphMock();
+    const pdfBytes = Buffer.from("%PDF-1.7 e2e");
+    await seedGraphMockMessages([
+      {
+        id: "msg-att-e2e",
+        subject: "Invoice",
+        from: "billing@example.com",
+        body: "See attached",
+        isRead: false,
+        hasAttachments: true,
+        attachments: [
+          {
+            "@odata.type": "#microsoft.graph.fileAttachment",
+            id: "att-e2e-1",
+            name: "invoice.pdf",
+            contentType: "application/pdf",
+            size: pdfBytes.length,
+            isInline: false,
+            contentBytes: pdfBytes.toString("base64"),
+          },
+        ],
+      },
+    ]);
+
+    await loginViaUI(page, getAdminEmail(), getAdminPassword());
+    await page.goto(`/chat/${dispatchAgentId}`);
+    await expect(page).toHaveURL(`/chat/${dispatchAgentId}`, { timeout: 10_000 });
+
+    const input = page.getByPlaceholder(/send a message/i);
+    await expect(input).toBeVisible({ timeout: 10_000 });
+    // Capture `since` BEFORE dispatch — mirrors the other round-trip tests to
+    // avoid matching a stale audit entry from an earlier test on this agent.
+    const since = new Date().toISOString();
+    await input.fill(`${FAKE_OLLAMA_EMAIL_GET_ATTACHMENT_TOOL_TRIGGER}: download the invoice`);
+    await input.press("Enter");
+
+    const dispatched = await pollAuditForTool(page, {
+      toolName: "email_get_attachment",
+      agentId: dispatchAgentId,
+      since,
+    });
+    expect(dispatched).toBe(true);
+
+    // The plugin must have downloaded the single attachment by id — the route
+    // distinct from the list-attachments route, which never includes the
+    // concrete attachment id in its path.
+    const reqs = (await getGraphMockRequests()) as Array<{ endpoint: string }>;
+    expect(
+      reqs.some(
+        (r) => typeof r.endpoint === "string" && r.endpoint.includes("/attachments/att-e2e-1")
+      ),
+      `graph-mock received no single-attachment download request; saw: ${JSON.stringify(reqs)}`
     ).toBe(true);
   });
 });

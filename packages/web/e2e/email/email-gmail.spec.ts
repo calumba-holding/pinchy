@@ -6,6 +6,7 @@ import {
   resetGmailMock,
   getSentMessages,
   getGmailRequests,
+  seedGmailMockMessages,
   createGoogleConnectionInDb,
   getAdminEmail,
   getAdminPassword,
@@ -20,6 +21,7 @@ import {
 import {
   FAKE_OLLAMA_EMAIL_LIST_TOOL_TRIGGER,
   FAKE_OLLAMA_EMAIL_SEND_TOOL_TRIGGER,
+  FAKE_OLLAMA_EMAIL_GET_ATTACHMENT_TOOL_TRIGGER,
   FAKE_OLLAMA_PORT,
   startFakeOllama,
   stopFakeOllama,
@@ -224,7 +226,7 @@ test.describe("Email dispatch probe (pinchy-email plugin coverage)", () => {
     //    the allow-list.
     const patchRes = await pinchyPatch(
       `/api/agents/${dispatchAgentId}`,
-      { allowedTools: ["email_list", "email_send"] },
+      { allowedTools: ["email_list", "email_send", "email_get_attachment"] },
       dispatchCookie
     );
     if (patchRes.status !== 200) throw new Error(`Agent patch failed: ${String(patchRes.status)}`);
@@ -343,5 +345,60 @@ test.describe("Email dispatch probe (pinchy-email plugin coverage)", () => {
     // fake-ollama's exact MIME encoding which is itself an integration detail.
     const sent = await getSentMessages();
     expect(sent.length, "gmail-mock got no sent message").toBeGreaterThan(0);
+  });
+
+  // Symmetric with the Microsoft dispatch probe's email_get_attachment test.
+  // The plan called for a "lighter" Gmail coverage test, but a get_attachment
+  // dispatch is cleanly observable through gmail-mock's request log — unlike
+  // e.g. email_read, whose rendered chat output isn't observable through the
+  // audit/mock surface. The symmetric round-trip is the more verifiable
+  // choice here, at negligible extra cost.
+  test("gmail-mock receives email_get_attachment request when tool is invoked via chat", async ({
+    page,
+  }) => {
+    await resetGmailMock();
+    await seedGmailMockMessages([
+      {
+        id: "msg-att-e2e",
+        subject: "Invoice",
+        from: "billing@example.com",
+        body: "See attached",
+        labelIds: ["INBOX"],
+        attachments: [
+          {
+            filename: "invoice.pdf",
+            mimeType: "application/pdf",
+            contentBase64: Buffer.from("%PDF-1.7 e2e").toString("base64"),
+            attachmentId: "att-e2e-1",
+          },
+        ],
+      },
+    ]);
+
+    await loginViaUI(page, getAdminEmail(), getAdminPassword());
+    await page.goto(`/chat/${dispatchAgentId}`);
+    await expect(page).toHaveURL(`/chat/${dispatchAgentId}`, { timeout: 10_000 });
+
+    const input = page.getByPlaceholder(/send a message/i);
+    await expect(input).toBeVisible({ timeout: 10_000 });
+    // Capture `since` BEFORE dispatch — mirrors the other round-trip tests to
+    // avoid matching a stale audit entry from an earlier test on this agent.
+    const since = new Date().toISOString();
+    await input.fill(`${FAKE_OLLAMA_EMAIL_GET_ATTACHMENT_TOOL_TRIGGER}: download the invoice`);
+    await input.press("Enter");
+
+    const dispatched = await pollAuditForTool(page, {
+      toolName: "email_get_attachment",
+      agentId: dispatchAgentId,
+      since,
+    });
+    expect(dispatched).toBe(true);
+
+    // The plugin must have called the attachment-download endpoint.
+    const reqs = await getGmailRequests();
+    expect(
+      reqs.some((r) => typeof r.endpoint === "string" && r.endpoint.includes("/attachments/")),
+      `gmail-mock received no attachment request; saw: ${JSON.stringify(reqs)}`
+    ).toBe(true);
   });
 });
