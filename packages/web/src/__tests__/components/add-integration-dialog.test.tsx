@@ -368,6 +368,18 @@ describe("AddIntegrationDialog", () => {
       // Should show the Microsoft connect dialog header
       expect(screen.getByText("Connect Microsoft")).toBeInTheDocument();
     });
+
+    it("should show HTTPS warning and no connect button when not on HTTPS", async () => {
+      // jsdom defaults to http://localhost, so insecure mode is the default.
+      // Azure rejects non-HTTPS redirect URIs (except localhost) just like
+      // Google, so Microsoft must gate on HTTPS too.
+      const user = userEvent.setup();
+      render(<AddIntegrationDialog {...defaultProps} />);
+      await selectMicrosoftType(user);
+
+      expect(screen.getByText(/HTTPS is required/)).toBeInTheDocument();
+      expect(screen.queryByText("Connect Microsoft Account")).not.toBeInTheDocument();
+    });
   });
 
   // Both Google and Microsoft OAuth connect steps are rendered by the single,

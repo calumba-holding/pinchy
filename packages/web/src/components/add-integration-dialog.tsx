@@ -158,7 +158,11 @@ interface ProviderConnectCopy {
    * links the wizard tests assert.
    */
   startUrl: string;
-  /** Whether an HTTPS-secure context is required before the flow renders (Google only). */
+  /**
+   * Whether an HTTPS-secure context is required before the flow renders.
+   * Both Google and Microsoft require it: Azure's redirect-URI policy
+   * rejects non-HTTPS URIs (except localhost) the same way Google's does.
+   */
   requiresSecure: boolean;
 }
 
@@ -197,7 +201,7 @@ const PROVIDER_CONNECT_COPY: Record<OAuthProviderId, ProviderConnectCopy> = {
     fullGuidePath: "guides/connect-email-microsoft",
     connectLabel: "Connect Microsoft Account",
     startUrl: "/api/integrations/oauth/start?provider=microsoft",
-    requiresSecure: false,
+    requiresSecure: true,
   },
 };
 
@@ -281,7 +285,7 @@ function ProviderConnectStep({
 
   const idPrefix = descriptor.id;
 
-  // Not HTTPS — show warning (Google only)
+  // Not HTTPS — show warning (Google and Microsoft both require HTTPS)
   if (blockedByInsecure) {
     return (
       <div className="space-y-4">
