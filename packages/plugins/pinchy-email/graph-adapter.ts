@@ -101,9 +101,11 @@ export class GraphAdapter implements EmailAdapter {
 
   async list(opts: ListOptions): Promise<EmailSummary[]> {
     const limit = opts.limit ?? 20;
-    const path = opts.folder
-      ? `/me/mailFolders/${mapFolder(opts.folder)}/messages`
-      : `/me/messages`;
+    // folder defaults to INBOX when omitted, matching the email_list tool
+    // schema and SKILL.md documentation — without this, an omitted folder
+    // queried the whole mailbox instead of the documented default.
+    const folder = opts.folder ?? "INBOX";
+    const path = `/me/mailFolders/${mapFolder(folder)}/messages`;
     const parts: string[] = [
       `$top=${encodeURIComponent(String(limit))}`,
       `$select=${encodeURIComponent(SUMMARY_SELECT)}`,

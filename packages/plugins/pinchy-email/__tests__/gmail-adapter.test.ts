@@ -123,7 +123,7 @@ describe("GmailAdapter", () => {
         userId: "me",
         maxResults: 10,
         q: undefined,
-        labelIds: undefined,
+        labelIds: ["INBOX"],
       });
 
       expect(mockGet).toHaveBeenCalledWith({
@@ -169,6 +169,19 @@ describe("GmailAdapter", () => {
 
       expect(mockList).toHaveBeenCalledWith(
         expect.objectContaining({ maxResults: 20 }),
+      );
+    });
+
+    it("defaults to the INBOX label when folder is omitted", async () => {
+      // The email_list tool schema and SKILL.md both document folder as
+      // "defaults to INBOX" when omitted — the adapter must actually apply
+      // that default rather than querying the whole mailbox.
+      mockList.mockResolvedValue({ data: { messages: [] } });
+
+      await adapter.list({});
+
+      expect(mockList).toHaveBeenCalledWith(
+        expect.objectContaining({ labelIds: ["INBOX"] }),
       );
     });
   });

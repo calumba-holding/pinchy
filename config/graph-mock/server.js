@@ -98,6 +98,21 @@ app.get("/v1.0/me/messages", (req, res) => {
   res.json({ value: messages, "@odata.count": messages.length });
 });
 
+// GET /v1.0/me/mailFolders/:folderId/messages — list messages scoped to a
+// well-known folder (inbox, sentitems, drafts, ...). This is the path the
+// adapter uses whenever a folder is set — including the INBOX default when
+// email_list is called without one. Seeded messages carry no folder
+// assignment; like gmail-mock (which treats every seeded message as INBOX),
+// the folder segment only affects the logged endpoint.
+app.get("/v1.0/me/mailFolders/:folderId/messages", (req, res) => {
+  if (!requireBearer(req, res)) return;
+  requestLog.push({
+    endpoint: `/v1.0/me/mailFolders/${req.params.folderId}/messages`,
+    query: req.query,
+  });
+  res.json({ value: messages, "@odata.count": messages.length });
+});
+
 // GET /v1.0/me/messages/:id — get a message by id
 app.get("/v1.0/me/messages/:id", (req, res) => {
   if (!requireBearer(req, res)) return;

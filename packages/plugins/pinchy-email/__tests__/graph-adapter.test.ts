@@ -32,7 +32,10 @@ describe("GraphAdapter.list", () => {
     );
   });
 
-  it("list({}) hits /v1.0/me/messages with no folder filter", async () => {
+  it("list({}) defaults to the inbox mailFolder when folder is omitted", async () => {
+    // The email_list tool schema and SKILL.md both document folder as
+    // "defaults to INBOX" when omitted — the adapter must actually apply
+    // that default rather than querying the whole mailbox.
     const adapter = new GraphAdapter({ accessToken: "tok" });
     (fetch as Mock).mockResolvedValueOnce({
       ok: true,
@@ -40,11 +43,7 @@ describe("GraphAdapter.list", () => {
     });
     await adapter.list({});
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/v1.0/me/messages"),
-      expect.any(Object),
-    );
-    expect(fetch).not.toHaveBeenCalledWith(
-      expect.stringContaining("mailFolders"),
+      expect.stringContaining("/v1.0/me/mailFolders/inbox/messages"),
       expect.any(Object),
     );
   });
@@ -78,7 +77,9 @@ describe("GraphAdapter.list", () => {
     });
     await adapter.list({});
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining("http://graph-mock:9005/v1.0/me/messages"),
+      expect.stringContaining(
+        "http://graph-mock:9005/v1.0/me/mailFolders/inbox/messages",
+      ),
       expect.any(Object),
     );
     delete process.env.GRAPH_API_BASE_URL;

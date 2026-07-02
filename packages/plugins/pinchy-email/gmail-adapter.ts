@@ -65,12 +65,15 @@ export class GmailAdapter implements EmailAdapter {
   }
 
   async list(opts: ListOptions): Promise<EmailSummary[]> {
-    const { folder, limit = 20, unreadOnly } = opts;
+    // folder defaults to INBOX when omitted, matching the email_list tool
+    // schema and SKILL.md documentation — without this, an omitted folder
+    // queried the whole mailbox instead of the documented default.
+    const { folder = "INBOX", limit = 20, unreadOnly } = opts;
 
     return this.fetchSummaries({
       maxResults: limit,
       q: unreadOnly ? "is:unread" : undefined,
-      labelIds: folder ? [mapFolder(folder)] : undefined,
+      labelIds: [mapFolder(folder)],
     });
   }
 
