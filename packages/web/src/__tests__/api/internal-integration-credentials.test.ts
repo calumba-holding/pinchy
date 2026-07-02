@@ -449,6 +449,37 @@ describe("GET /api/internal/integrations/:connectionId/credentials", () => {
       expect(db.update).toHaveBeenCalled();
     });
 
+    it("returns 503 with a structured error when Microsoft OAuth settings are missing for an expired token (no stale credentials leaked)", async () => {
+      vi.mocked(isMsTokenExpired).mockReturnValue(true);
+      const expiredAt = new Date(Date.now() - 60_000).toISOString();
+      vi.mocked(decrypt).mockReturnValue(
+        JSON.stringify({
+          accessToken: "ms-stale-access-token",
+          refreshToken: "ms-stale-refresh-token",
+          expiresAt: expiredAt,
+          scope: "offline_access Mail.ReadWrite",
+        })
+      );
+      vi.mocked(getOAuthSettings).mockResolvedValue(null);
+
+      const res = await GET(makeRequest("conn-ms"), makeParams("conn-ms"));
+      expect(res.status).toBe(503);
+
+      const data = await res.json();
+      expect(data.error).toBe(
+        "Microsoft OAuth settings missing — reconnect the mailbox or restore the OAuth app"
+      );
+      // Must NOT leak the stale/expired credentials in the response body.
+      expect(data.credentials).toBeUndefined();
+      expect(JSON.stringify(data)).not.toContain("ms-stale-access-token");
+      expect(JSON.stringify(data)).not.toContain("ms-stale-refresh-token");
+
+      // Refresh must not have been attempted (no client credentials available)
+      // and the DB must not be touched.
+      expect(refreshMsAccessToken).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
     it("concurrent requests for the same connectionId share a single refresh (in-flight dedup)", async () => {
       vi.mocked(isMsTokenExpired).mockReturnValue(true);
       const expiredAt = new Date(Date.now() - 60_000).toISOString();
