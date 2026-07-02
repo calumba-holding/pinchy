@@ -812,7 +812,12 @@ const plugin = {
 
               // Defense-in-depth: confirm the resolved path never escapes the
               // agent's uploads directory, even though sanitizeAttachmentFilename
-              // already strips path separators and ".." segments.
+              // already strips path separators and ".." segments. NOTE: this
+              // check alone would NOT catch a literal ".." / "." filename — it
+              // relies on sanitizeAttachmentFilename stripping leading dots so
+              // those forms fall into the attachment-<id> fallback and never
+              // reach here. Keep that leading-dot strip if you refactor the
+              // sanitizer.
               if (
                 basename(filePath) !== finalFilename ||
                 !filePath.startsWith(`${dir}/`)

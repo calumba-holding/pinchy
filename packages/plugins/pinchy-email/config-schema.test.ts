@@ -31,7 +31,10 @@ describe("pinchy-email manifest contract", () => {
 
   it("requires agents at the top level (missing agents fails)", () => {
     expect(
-      validatePluginEntry(manifest, { apiBaseUrl: "http://x", gatewayToken: "t" }).ok,
+      validatePluginEntry(manifest, {
+        apiBaseUrl: "http://x",
+        gatewayToken: "t",
+      }).ok,
     ).toBe(false);
   });
 
@@ -46,15 +49,21 @@ describe("pinchy-email manifest contract", () => {
   });
 
   it("uses additionalProperties: false", () => {
-    expect((manifest.configSchema as Record<string, unknown>).additionalProperties).toBe(false);
+    expect(
+      (manifest.configSchema as Record<string, unknown>).additionalProperties,
+    ).toBe(false);
   });
 
   it("declares contracts.tools with all email tool names", () => {
     const contracts = (manifest as Record<string, unknown>).contracts as
-      | { tools?: string[] }
-      | undefined;
-    expect(contracts?.tools?.toSorted()).toEqual(
-      ["email_draft", "email_list", "email_read", "email_search", "email_send"],
-    );
+      { tools?: string[] } | undefined;
+    expect(contracts?.tools?.toSorted()).toEqual([
+      "email_draft",
+      "email_get_attachment",
+      "email_list",
+      "email_read",
+      "email_search",
+      "email_send",
+    ]);
   });
 });

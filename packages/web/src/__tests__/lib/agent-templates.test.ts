@@ -180,8 +180,14 @@ describe("agent-templates", () => {
       }
     });
 
-    it("all email templates include email_list, email_read, email_search, email_draft tools", () => {
-      const required = ["email_list", "email_read", "email_search", "email_draft"];
+    it("all email templates include email_list, email_read, email_search, email_get_attachment, email_draft tools", () => {
+      const required = [
+        "email_list",
+        "email_read",
+        "email_search",
+        "email_get_attachment",
+        "email_draft",
+      ];
       for (const id of emailTemplateIds) {
         for (const tool of required) {
           expect(AGENT_TEMPLATES[id].allowedTools, `${id} should include ${tool}`).toContain(tool);

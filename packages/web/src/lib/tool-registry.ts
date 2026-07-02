@@ -201,6 +201,13 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     integration: "email",
   },
   {
+    id: "email_get_attachment",
+    label: "Email: Download attachment",
+    description: "Download an email attachment into the agent's workspace",
+    category: "safe",
+    integration: "email",
+  },
+  {
     id: "email_draft",
     label: "Email: Create draft",
     description: "Create email draft (does not send)",
@@ -295,7 +302,12 @@ export type EmailOperation = (typeof EMAIL_OPERATIONS)[number];
  */
 export const EMAIL_OPERATION_DISPLAY_ORDER = ["read", "search", "draft", "send"] as const;
 
-const EMAIL_READ_TOOLS = ["email_list", "email_read", "email_search"] as const;
+const EMAIL_READ_TOOLS = [
+  "email_list",
+  "email_read",
+  "email_search",
+  "email_get_attachment",
+] as const;
 const EMAIL_DRAFT_TOOLS = ["email_draft"] as const;
 const EMAIL_SEND_TOOLS = ["email_send"] as const;
 

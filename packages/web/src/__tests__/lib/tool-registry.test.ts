@@ -500,12 +500,13 @@ describe("Odoo access level helpers", () => {
 
   it("email tools are registered in TOOL_REGISTRY", () => {
     const emailTools = TOOL_REGISTRY.filter((t) => t.integration === "email");
-    expect(emailTools).toHaveLength(5);
+    expect(emailTools).toHaveLength(6);
 
     const ids = emailTools.map((t) => t.id);
     expect(ids).toContain("email_list");
     expect(ids).toContain("email_read");
     expect(ids).toContain("email_search");
+    expect(ids).toContain("email_get_attachment");
     expect(ids).toContain("email_draft");
     expect(ids).toContain("email_send");
   });
@@ -514,13 +515,17 @@ describe("Odoo access level helpers", () => {
     expect(getToolById("email_list")?.category).toBe("safe");
     expect(getToolById("email_read")?.category).toBe("safe");
     expect(getToolById("email_search")?.category).toBe("safe");
+    // Downloading an attachment writes only into the agent's own workspace
+    // uploads dir (no external side effect) and is granted by the read
+    // permission, so it stays in the "safe" category alongside the other reads.
+    expect(getToolById("email_get_attachment")?.category).toBe("safe");
     expect(getToolById("email_draft")?.category).toBe("powerful");
     expect(getToolById("email_send")?.category).toBe("powerful");
   });
 
-  it("getEmailTools() returns exactly 5 tools", () => {
+  it("getEmailTools() returns exactly 6 tools", () => {
     const tools = getEmailTools();
-    expect(tools).toHaveLength(5);
+    expect(tools).toHaveLength(6);
     expect(tools.every((t) => t.integration === "email")).toBe(true);
   });
 });
@@ -532,6 +537,7 @@ describe("Email operation helpers", () => {
         "email_list",
         "email_read",
         "email_search",
+        "email_get_attachment",
       ]);
     });
 
@@ -548,6 +554,7 @@ describe("Email operation helpers", () => {
         "email_list",
         "email_read",
         "email_search",
+        "email_get_attachment",
         "email_draft",
         "email_send",
       ]);
@@ -567,6 +574,7 @@ describe("Email operation helpers", () => {
       expect(detectEmailOperations(["email_list"])).toEqual(["read"]);
       expect(detectEmailOperations(["email_read"])).toEqual(["read"]);
       expect(detectEmailOperations(["email_search"])).toEqual(["read"]);
+      expect(detectEmailOperations(["email_get_attachment"])).toEqual(["read"]);
     });
 
     it("detects draft from email_draft", () => {

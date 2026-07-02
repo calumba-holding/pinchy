@@ -377,9 +377,10 @@ describe("regenerateOpenClawConfig TOOLS.md mailbox context", () => {
       multi: {
         connectionId: "conn-mail",
         permissions: { email: ["read"] },
-        // "read" includes email_search — the UI never writes a separate
-        // "search" operation row (see getEmailToolsForOperations).
-        tools: ["email_list", "email_read", "email_search"],
+        // "read" includes email_search AND email_get_attachment — the UI never
+        // writes a separate "search" operation row, and downloading an
+        // attachment is part of reading a mailbox (see getEmailToolsForOperations).
+        tools: ["email_list", "email_read", "email_search", "email_get_attachment"],
       },
     });
   });
