@@ -433,6 +433,12 @@ export type AuditLogEntry =
         reason?: string;
         fields?: string[];
         modelCount?: number;
+        // Present instead of a plaintext `name` when the connection's
+        // human-readable name is itself PII (an OAuth mailbox address).
+        // See redactEmail(): GDPR Art. 17 forbids writing the raw address
+        // into this HMAC-signed, append-only log.
+        emailHash?: string;
+        emailPreview?: string;
       };
     })
   | (AuditLogBase & {

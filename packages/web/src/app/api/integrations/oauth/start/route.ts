@@ -256,6 +256,19 @@ export async function POST(request: NextRequest) {
     maxAge: 600,
     path: "/",
   });
+  // Defense in depth: reconnect never creates a pending row, so it has no
+  // oauth_pending_id of its own to set. But a PREVIOUS, abandoned fresh-connect
+  // (GET /oauth/start) may have left a still-live oauth_pending_id cookie
+  // behind. If left in place, the callback's pending-row lookup would find
+  // that unrelated row and could shadow this reconnect's provider resolution.
+  // Clear it here so a stale cookie dies at reconnect start.
+  response.cookies.set("oauth_pending_id", "", {
+    httpOnly: true,
+    secure: isSecure,
+    sameSite: "lax",
+    maxAge: 0,
+    path: "/",
+  });
   // CRITICAL: reconnect has no pending record and no oauth_pending_id cookie,
   // so the callback identifies the provider from this cookie. Without it the
   // callback defaults to Google and exchanges the code against the wrong host.

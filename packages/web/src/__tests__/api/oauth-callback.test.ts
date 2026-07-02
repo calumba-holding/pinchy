@@ -7,6 +7,7 @@ const {
   mockAppendAuditLog,
   mockValues,
   mockSelectLimit,
+  mockSelectWhere,
   mockSelectFrom,
   mockUpdateReturning,
   mockUpdateSet,
@@ -26,6 +27,7 @@ const {
     mockAppendAuditLog: vi.fn().mockResolvedValue(undefined),
     mockValues: vi.fn(),
     mockSelectLimit,
+    mockSelectWhere,
     mockSelectFrom,
     mockUpdateReturning,
     mockUpdateSet,
@@ -1029,6 +1031,29 @@ describe("GET /api/integrations/oauth/callback", () => {
       );
     });
 
+    it("redacts the mailbox address in the reconnect audit detail (no plaintext PII per GDPR Art. 17)", async () => {
+      vi.stubEnv("AUDIT_HMAC_SECRET", "f".repeat(64));
+      // redactEmail() keeps local parts of 4 chars or fewer unmasked (see
+      // audit.test.ts "preview keeps short local parts intact"), so the
+      // shared mockConnection's 4-char "user@gmail.com" would make this
+      // assertion pass even without redaction. Use a longer local part so
+      // the preview is provably masked, not merely coincidentally equal.
+      mockUpdateReturning.mockResolvedValue([
+        { ...mockConnection, id: "existing-conn-id", name: "clemens.helm@gmail.com" },
+      ]);
+      await GET(
+        makeRequest(
+          { code: "auth-code-123", state: RECONNECT_STATE },
+          `oauth_state=${RECONNECT_STATE}`
+        )
+      );
+
+      const detail = mockAppendAuditLog.mock.calls[0][0].detail;
+      expect(detail.name).not.toBe("clemens.helm@gmail.com");
+      expect(detail).toHaveProperty("emailHash");
+      expect(detail.emailHash).toMatch(/^[0-9a-f]{64}$/);
+    });
+
     it("does not set oauth_pending_id cookie (no pending row created)", async () => {
       const response = await GET(
         makeRequest(
@@ -1168,6 +1193,192 @@ describe("GET /api/integrations/oauth/callback", () => {
         makeRequest(
           { code: "bad-code", state: MS_RECONNECT_STATE },
           `oauth_state=${MS_RECONNECT_STATE}`
+        )
+      );
+
+      expect(mockAppendAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          outcome: "failure",
+          detail: expect.objectContaining({
+            type: "microsoft",
+          }),
+        })
+      );
+    });
+  });
+
+  describe("reconnect flow — stale oauth_pending_id cookie from an abandoned fresh-connect", () => {
+    // Build a state param that encodes reconnectConnectionId (as POST /oauth/start would)
+    function buildReconnectState(reconnectConnectionId: string) {
+      const stateObj = {
+        nonce: "test-nonce-stale-789",
+        reconnectConnectionId,
+      };
+      return Buffer.from(JSON.stringify(stateObj)).toString("base64url");
+    }
+
+    const MS_RECONNECT_STATE = buildReconnectState("existing-ms-conn-id");
+
+    // A still-live pending row from an abandoned GET /oauth/start (fresh
+    // connect) for Google — the user closed the tab mid-flow, but the row is
+    // not yet 15 minutes old, so the GC sweep hasn't removed it, and the
+    // reconnect POST never clears the stale oauth_pending_id cookie. The mock
+    // below returns this row ONLY if the pending-row lookup's `and(eq(id),
+    // eq(status))` where-clause shape fires — which must never happen once
+    // state establishes this is a reconnect.
+    const mockStaleGooglePendingRow = {
+      id: "stale-pending-google-id",
+      type: "google",
+      name: "Google (connecting…)",
+      description: "",
+      credentials: "encrypted-empty",
+      data: null,
+      status: "pending",
+      createdAt: new Date("2026-04-09"),
+      updatedAt: new Date("2026-04-09"),
+    };
+
+    const mockExistingMsConnection = {
+      id: "existing-ms-conn-id",
+      type: "microsoft",
+      name: "user@contoso.com",
+      description: "",
+      credentials: "encrypted-old-creds",
+      data: { emailAddress: "user@contoso.com", provider: "outlook" },
+      status: "auth_failed",
+      createdAt: new Date("2026-04-01"),
+      updatedAt: new Date("2026-04-01"),
+    };
+
+    function mockMsTokenExchange() {
+      return {
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          access_token: "ms-access-token",
+          refresh_token: "ms-refresh-token",
+          expires_in: 3600,
+          scope: "offline_access User.Read Mail.ReadWrite Mail.Send",
+        }),
+      };
+    }
+
+    function mockMsProfileFetch() {
+      return {
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          mail: "user@contoso.com",
+          userPrincipalName: "user@contoso.com",
+        }),
+      };
+    }
+
+    // Recursively scans a drizzle SQL query-builder object's queryChunks for
+    // an " and " literal chunk, which only appears when the condition was
+    // built with `and(...)` (i.e. the pending-row lookup's `and(eq(id),
+    // eq(status))`), never for a bare `eq(id)` (resolveProviderFallback's
+    // reconnect-row lookup). This lets the mock tell the two lookups apart
+    // even though they share the same `db.select().from().where().limit()`
+    // mock chain.
+    function isAndCondition(sqlNode: unknown, depth = 0): boolean {
+      if (depth > 10 || !sqlNode || typeof sqlNode !== "object") return false;
+      const chunks = (sqlNode as { queryChunks?: unknown[] }).queryChunks;
+      if (!Array.isArray(chunks)) return false;
+      return chunks.some((chunk) => {
+        if (!chunk || typeof chunk !== "object") return false;
+        if ("value" in chunk) {
+          const value = (chunk as { value: unknown }).value;
+          if (Array.isArray(value) && value.includes(" and ")) return true;
+        }
+        // and(...)'s " and " literal lives inside a nested SQL sub-object
+        // (the two eq() operands wrapped together), not at the top level.
+        if ("queryChunks" in chunk) return isAndCondition(chunk, depth + 1);
+        return false;
+      });
+    }
+
+    beforeEach(() => {
+      mockGetSession.mockResolvedValue(adminSession());
+      mockGetOAuthSettings.mockImplementation((p: string) =>
+        Promise.resolve(
+          p === "microsoft"
+            ? { clientId: "ms-client-id", clientSecret: "ms-client-secret", tenantId: "my-tenant" }
+            : { clientId: "test-client-id", clientSecret: "test-client-secret" }
+        )
+      );
+      // A stale, still-live pending row from an abandoned Google fresh-connect
+      // sits in the DB under oauth_pending_id. Both the (buggy) pending-row
+      // lookup and the (correct) reconnect-row lookup go through the same
+      // mocked `db.select().from().where().limit()` chain, so the mock
+      // discriminates by inspecting the where-clause shape via
+      // isAndCondition(): the pending-row lookup filters by `and(eq(id),
+      // eq(status))`, resolveProviderFallback's reconnect-row lookup filters
+      // by a bare `eq(id)`. If the pending-row lookup fires at all — the bug
+      // this test guards against — it resolves the stale Google row and every
+      // assertion below fails.
+      mockSelectWhere.mockImplementation((condition: unknown) => {
+        mockSelectLimit.mockResolvedValueOnce(
+          isAndCondition(condition) ? [mockStaleGooglePendingRow] : [mockExistingMsConnection]
+        );
+        return { limit: mockSelectLimit };
+      });
+      mockUpdateReturning.mockResolvedValue([mockExistingMsConnection]);
+    });
+
+    it("exchanges the code against the Microsoft token endpoint, not the stale pending row's Google endpoint", async () => {
+      mockFetch
+        .mockResolvedValueOnce(mockMsTokenExchange())
+        .mockResolvedValueOnce(mockMsProfileFetch());
+
+      // Cookie state: a stale oauth_pending_id from an abandoned Google
+      // fresh-connect coexists with a valid reconnect state for Microsoft.
+      // oauth_provider cookie is absent (as in the "cookie lost" scenario).
+      await GET(
+        makeRequest(
+          { code: "ms-auth-code", state: MS_RECONNECT_STATE },
+          `oauth_state=${MS_RECONNECT_STATE}; oauth_pending_id=stale-pending-google-id`
+        )
+      );
+
+      expect(mockGetOAuthSettings).toHaveBeenCalledWith("microsoft");
+      const tokenCall = mockFetch.mock.calls[0];
+      expect(tokenCall[0]).toBe("https://login.microsoftonline.com/my-tenant/oauth2/v2.0/token");
+      // Exactly one SELECT ran (the reconnect-row lookup) — the pending-row
+      // lookup for the stale oauth_pending_id must never fire once state
+      // establishes this is a reconnect.
+      expect(mockSelectLimit).toHaveBeenCalledTimes(1);
+    });
+
+    it("writes the reconnect audit rows with type/resource matching Microsoft, not the stale pending row's Google", async () => {
+      mockFetch
+        .mockResolvedValueOnce(mockMsTokenExchange())
+        .mockResolvedValueOnce(mockMsProfileFetch());
+
+      await GET(
+        makeRequest(
+          { code: "ms-auth-code", state: MS_RECONNECT_STATE },
+          `oauth_state=${MS_RECONNECT_STATE}; oauth_pending_id=stale-pending-google-id`
+        )
+      );
+
+      expect(mockAppendAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: "integration.credentials_updated",
+          resource: "integration:existing-ms-conn-id",
+          outcome: "success",
+        })
+      );
+    });
+
+    it("on token exchange failure, the audit row is labeled microsoft, not the stale pending row's google", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: vi.fn().mockResolvedValue({ error: "invalid_grant" }),
+      });
+
+      await GET(
+        makeRequest(
+          { code: "bad-code", state: MS_RECONNECT_STATE },
+          `oauth_state=${MS_RECONNECT_STATE}; oauth_pending_id=stale-pending-google-id`
         )
       );
 

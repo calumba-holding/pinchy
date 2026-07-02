@@ -436,6 +436,20 @@ describe("POST /api/integrations/oauth/start (reconnect)", () => {
     expect(res.status).toBe(400);
   });
 
+  it("clears the oauth_pending_id cookie so a stale cookie from an abandoned fresh-connect can't shadow this reconnect", async () => {
+    // Defense in depth for the stale-pending-cookie bug: a fresh-connect GET
+    // may have left oauth_pending_id set from an abandoned flow. The reconnect
+    // POST never creates a pending row, so it must actively delete this cookie
+    // rather than just omitting it — otherwise the leftover cookie survives
+    // into the callback and can shadow the reconnect's provider resolution.
+    const { POST } = await import("@/app/api/integrations/oauth/start/route");
+    const res = await POST(makePostRequest({ reconnectConnectionId: "c1" }));
+    const setCookies = res.headers.getSetCookie
+      ? res.headers.getSetCookie().join("; ")
+      : (res.headers.get("set-cookie") ?? "");
+    expect(setCookies).toMatch(/oauth_pending_id=;.*Max-Age=0/i);
+  });
+
   describe("Microsoft reconnect", () => {
     const microsoftSettings = {
       clientId: "ms-client-id",

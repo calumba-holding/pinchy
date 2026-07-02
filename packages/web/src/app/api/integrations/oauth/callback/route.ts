@@ -108,22 +108,26 @@ export async function GET(request: Request) {
     return errorRedirect(origin, "state_mismatch");
   }
 
+  // Decode the state once and reuse it for both provider determination below
+  // and the reconnect-vs-fresh-connect branch further down.
+  const statePayload = decodeStatePayload(state);
+  const reconnectConnectionId = statePayload?.reconnectConnectionId;
+
   // 4. Determine provider. Precedence:
-  //    a) pending connection row (set during oauth/start GET — fresh connect flow)
-  //    b) reconnect connection row (state carries reconnectConnectionId — the
-  //       DB row's `type` is the source of truth, not the oauth_provider
-  //       cookie, since Google reconnect never sets that cookie and any
-  //       reconnect's cookie can be dropped in transit)
+  //    a) reconnect connection row (state carries reconnectConnectionId — this
+  //       is authoritative: a reconnect state and a live pending row can only
+  //       co-occur when a stale oauth_pending_id cookie survives from an
+  //       abandoned fresh-connect flow, so the pending row must NOT be
+  //       consulted once we know this is a reconnect. The DB row's `type` is
+  //       the source of truth, not the oauth_provider cookie, since Google
+  //       reconnect never sets that cookie and any reconnect's cookie can be
+  //       dropped in transit)
+  //    b) pending connection row (set during oauth/start GET — fresh connect flow)
   //    c) oauth_provider cookie (legacy fallback)
   //    d) "google" (last-resort legacy default)
   const pendingId = cookies["oauth_pending_id"];
-  const statePayloadForProviderLookup = decodeStatePayload(state);
-  const reconnectConnectionIdForProviderLookup =
-    statePayloadForProviderLookup?.reconnectConnectionId;
-  // Assigned on every path below; no initializer so TS definite-assignment
-  // analysis (and CodeQL) verify that instead of masking a missed branch.
-  let pendingType: string;
-  if (pendingId) {
+  let pendingType: string | undefined;
+  if (!reconnectConnectionId && pendingId) {
     const pendingRows = await db
       .select()
       .from(integrationConnections)
@@ -131,20 +135,9 @@ export async function GET(request: Request) {
         and(eq(integrationConnections.id, pendingId), eq(integrationConnections.status, "pending"))
       )
       .limit(1);
-    if (pendingRows.length > 0) {
-      pendingType = pendingRows[0].type;
-    } else {
-      pendingType = await resolveProviderFallback(
-        reconnectConnectionIdForProviderLookup,
-        cookies["oauth_provider"]
-      );
-    }
-  } else {
-    pendingType = await resolveProviderFallback(
-      reconnectConnectionIdForProviderLookup,
-      cookies["oauth_provider"]
-    );
+    pendingType = pendingRows[0]?.type;
   }
+  pendingType ??= await resolveProviderFallback(reconnectConnectionId, cookies["oauth_provider"]);
 
   // Resolve the descriptor; fail-safe to Google (matches the pendingType
   // default). getOAuthProvider avoids object-injection on pendingType.
@@ -315,10 +308,8 @@ export async function GET(request: Request) {
 
   let connection: typeof integrationConnections.$inferSelect;
 
-  // Check if this is a reconnect (state encodes reconnectConnectionId)
-  const statePayload = decodeStatePayload(state);
-  const reconnectConnectionId = statePayload?.reconnectConnectionId;
-
+  // Check if this is a reconnect (state encodes reconnectConnectionId,
+  // decoded once at the top of the handler and reused here)
   if (reconnectConnectionId) {
     // Reconnect path: update the existing connection row so that
     // agent_connection_permissions referencing it are preserved.
@@ -348,6 +339,14 @@ export async function GET(request: Request) {
     });
 
     // 9a. Audit log for reconnect
+    // GDPR Art. 17: never record the plaintext email address. The audit row
+    // is HMAC-signed, so we cannot redact later. redactEmail() gives us a
+    // keyed hash + masked preview; the connectionId in `resource` is enough
+    // to look up the live mailbox name from the integrations table while it
+    // exists. `name` carries the masked preview (not the raw address) to
+    // satisfy the shared `{ id, name }` audit-detail contract for this event
+    // type. Mirrors the fresh-connect branch's redaction below.
+    const { emailPreview, emailHash } = redactEmail(connection.name);
     deferAuditLog({
       actorType: "user",
       actorId: session.user.id!,
@@ -355,7 +354,8 @@ export async function GET(request: Request) {
       resource: `integration:${connection.id}`,
       detail: {
         id: connection.id,
-        name: connection.name,
+        name: emailPreview,
+        emailHash,
         fields: ["oauth_tokens"],
       },
       outcome: "success",
