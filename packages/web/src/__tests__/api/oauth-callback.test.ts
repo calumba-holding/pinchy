@@ -227,6 +227,25 @@ describe("GET /api/integrations/oauth/callback", () => {
       expect(mockValues).not.toHaveBeenCalled();
     });
 
+    it("prefers the provider error over a present code (fail-closed precedence)", async () => {
+      mockGetSession.mockResolvedValue(adminSession());
+
+      const response = await GET(
+        makeRequest(
+          { error: "access_denied", code: "abc", state: VALID_STATE },
+          `oauth_state=${VALID_STATE}; oauth_pending_id=pending-conn-id`
+        )
+      );
+
+      const location = new URL(response.headers.get("Location")!);
+      expect(location.searchParams.get("error")).toBe("consent_declined");
+      expect(mockDeleteWhere).toHaveBeenCalled();
+
+      // A provider error must never let token exchange proceed, even if a
+      // (spoofable) code param is also present.
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it("maps unrecognized provider error codes to a generic provider_error", async () => {
       mockGetSession.mockResolvedValue(adminSession());
 
