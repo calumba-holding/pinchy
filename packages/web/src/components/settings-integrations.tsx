@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useIntegrationActions } from "@/hooks/use-integration-actions";
@@ -130,11 +130,17 @@ export function SettingsIntegrations({ oauthError }: { oauthError?: string } = {
   // this both avoids a needless request when e.g. only Odoo is connected, and
   // keeps this component from doubling up mount-time GETs for a provider the
   // Connected apps section already queries.
+  // Guards against out-of-order network responses: if the connections list
+  // changes again before an in-flight fetchAppConfigured call resolves, a
+  // slower older response must not clobber a faster newer one once it lands.
+  const appConfiguredRequestId = useRef(0);
+
   const fetchAppConfigured = useCallback(async (forConnections: IntegrationConnection[]) => {
     const providers = (["google", "microsoft"] as const).filter((provider) =>
       forConnections.some((conn) => conn.type === provider && conn.status === "active")
     );
     if (providers.length === 0) return;
+    const requestId = ++appConfiguredRequestId.current;
     const results = await Promise.all(
       providers.map(async (provider) => {
         try {
@@ -149,6 +155,7 @@ export function SettingsIntegrations({ oauthError }: { oauthError?: string } = {
         }
       })
     );
+    if (requestId !== appConfiguredRequestId.current) return; // superseded by a newer call
     setAppConfigured((prev) => ({ ...prev, ...Object.fromEntries(results) }));
   }, []);
 

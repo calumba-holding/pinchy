@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import { SettingsIntegrations } from "@/components/settings-integrations";
@@ -638,6 +638,93 @@ describe("SettingsIntegrations — derived 'app not configured' state", () => {
   // "App not configured" before settling. We therefore don't assert a loading state
   // here — forcing one would require an artificial unresolved-promise test double
   // that doesn't reflect real fetch timing.
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("ignores a stale app-configured response that resolves after a fresher one", async () => {
+    vi.useFakeTimers();
+
+    // A perpetually-pending Microsoft connection keeps the poll loop alive so we
+    // can force a second fetchAppConfigured call while the first is still in
+    // flight, plus an always-active Microsoft connection whose app-configured
+    // state is what we're racing.
+    const everPendingConnection = { ...pendingMicrosoftConnection, id: "ms-poll-keepalive" };
+    const activeConnection = { ...activeMicrosoftConnection, id: "ms-race-target" };
+
+    // Every /api/settings/oauth call made before the poll tick (both this
+    // component's own mount-time fetchAppConfigured call AND the sibling
+    // ConnectedApps section's independent per-provider fetches) is held open
+    // and reports the app as configured — the stale answer we must not let
+    // win. Calls made after the poll tick resolve immediately with the fresh,
+    // correct answer.
+    let pollTriggered = false;
+    const heldMountCalls: Array<() => void> = [];
+
+    const fetchSpy = vi.spyOn(global, "fetch").mockImplementation((input) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      if (url.startsWith("/api/settings/oauth")) {
+        const respond = (configured: boolean) =>
+          ({
+            ok: true,
+            text: async () => JSON.stringify({ configured, clientId: "", connectionCount: 0 }),
+            json: async () => ({ configured, clientId: "", connectionCount: 0 }),
+          }) as unknown as Response;
+        if (!pollTriggered) {
+          return new Promise<Response>((resolve) => {
+            heldMountCalls.push(() => resolve(respond(true)));
+          });
+        }
+        return Promise.resolve(respond(false));
+      }
+      // /api/integrations — return a fresh array reference each call so the
+      // connections-driven effect re-fires even though the content is stable.
+      const body = [everPendingConnection, activeConnection];
+      return Promise.resolve({
+        ok: true,
+        text: async () => JSON.stringify(body),
+        json: async () => body,
+      } as unknown as Response);
+    });
+
+    render(<SettingsIntegrations />);
+
+    // Wait for all three mount-time oauth-settings calls to have been issued
+    // and held open: ConnectedApps' own provider=google and provider=microsoft
+    // fetches, plus this component's fetchAppConfigured provider=microsoft
+    // call (only microsoft, since only microsoft connections are in the list).
+    await vi.waitFor(() => {
+      expect(heldMountCalls.length).toBe(3);
+    });
+
+    // The poll tick re-fetches connections (new array reference), triggering a
+    // fresh, faster fetchAppConfigured call while the mount-time calls are
+    // still unresolved.
+    pollTriggered = true;
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    // The fresh, correct response has already resolved and applied.
+    await vi.waitFor(() => {
+      expect(screen.getByText("App not configured")).toBeInTheDocument();
+    });
+
+    // Now let the stale mount-time responses resolve, and explicitly flush the
+    // resulting promise chain (fetch → apiGet's JSON parsing → Promise.all →
+    // setAppConfigured → re-render) so a would-be clobber has every chance to
+    // apply before we assert it didn't.
+    heldMountCalls.forEach((resolve) => resolve());
+    await act(async () => {
+      for (let i = 0; i < 10; i++) {
+        await Promise.resolve();
+      }
+    });
+
+    expect(screen.getByText("App not configured")).toBeInTheDocument();
+    expect(screen.queryByText("Connected")).not.toBeInTheDocument();
+
+    fetchSpy.mockRestore();
+  });
 });
 
 describe("SettingsIntegrations — OAuth callback errors", () => {
