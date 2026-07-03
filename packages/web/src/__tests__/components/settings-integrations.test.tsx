@@ -76,14 +76,69 @@ const authFailedGoogleConnection = {
   cannotDecrypt: false,
 };
 
-function mockFetchConnections(connections: unknown[]) {
+const activeMicrosoftConnection = {
+  id: "conn-ms-active",
+  type: "microsoft",
+  name: "user@outlook.com",
+  description: "",
+  credentials: "encrypted",
+  status: "active",
+  lastError: null,
+  lastErrorAt: null,
+  data: null,
+  createdAt: "2026-04-13T12:00:00Z",
+  updatedAt: "2026-04-13T12:00:00Z",
+  cannotDecrypt: false,
+};
+
+const activeGoogleConnection = {
+  id: "conn-google-active",
+  type: "google",
+  name: "user@gmail.com",
+  description: "",
+  credentials: "encrypted",
+  status: "active",
+  lastError: null,
+  lastErrorAt: null,
+  data: null,
+  createdAt: "2026-04-13T12:00:00Z",
+  updatedAt: "2026-04-13T12:00:00Z",
+  cannotDecrypt: false,
+};
+
+const pendingMicrosoftConnection = {
+  id: "conn-ms-pending-appcheck",
+  type: "microsoft",
+  name: "Microsoft (connecting...)",
+  description: "",
+  credentials: "{}",
+  status: "pending",
+  lastError: null,
+  lastErrorAt: null,
+  data: null,
+  createdAt: "2026-06-30T10:00:00Z",
+  updatedAt: "2026-06-30T10:00:00Z",
+  cannotDecrypt: false,
+};
+
+function mockFetchConnections(
+  connections: unknown[],
+  appConfigured: { google?: boolean; microsoft?: boolean } = {}
+) {
   return vi.spyOn(global, "fetch").mockImplementation((input) => {
     const url = typeof input === "string" ? input : (input as Request).url;
-    // The Connected apps section fetches per-provider OAuth app state on mount.
-    // These tests only assert connection-list behaviour, so report both
-    // providers as unconfigured and route everything else to the connections.
+    // The Connected apps section (and, as of this change, the connection-list
+    // status badges) fetch per-provider OAuth app state on mount. Default both
+    // providers to unconfigured; individual tests override via appConfigured.
     if (url.startsWith("/api/settings/oauth")) {
-      const state = { configured: false, clientId: "", connectionCount: 0 };
+      const provider = new URL(url, "http://localhost").searchParams.get("provider");
+      const configured =
+        provider === "google"
+          ? (appConfigured.google ?? false)
+          : provider === "microsoft"
+            ? (appConfigured.microsoft ?? false)
+            : false;
+      const state = { configured, clientId: "", connectionCount: 0 };
       return Promise.resolve({
         ok: true,
         text: async () => JSON.stringify(state),
@@ -381,7 +436,11 @@ describe("SettingsIntegrations — live-update polling for pending connections",
     const fetchSpy = vi.spyOn(global, "fetch").mockImplementation((input) => {
       const url = typeof input === "string" ? input : (input as Request).url;
       if (url.startsWith("/api/settings/oauth")) {
-        const state = { configured: false, clientId: "", connectionCount: 0 };
+        // This suite exercises polling/transition behavior, not the derived
+        // app-configured state, so report the Microsoft app as configured —
+        // otherwise the "active" assertions below would hit the (correct,
+        // separately-tested) "App not configured" branch instead of "Connected".
+        const state = { configured: true, clientId: "", connectionCount: 0 };
         return Promise.resolve({
           ok: true,
           text: async () => JSON.stringify(state),
@@ -440,7 +499,9 @@ describe("SettingsIntegrations — live-update polling for pending connections",
     const fetchSpy = vi.spyOn(global, "fetch").mockImplementation((input) => {
       const url = typeof input === "string" ? input : (input as Request).url;
       if (url.startsWith("/api/settings/oauth")) {
-        const state = { configured: false, clientId: "", connectionCount: 0 };
+        // Same rationale as the test above: this suite is about poll cadence,
+        // not the derived app-configured badge, so report the app as configured.
+        const state = { configured: true, clientId: "", connectionCount: 0 };
         return Promise.resolve({
           ok: true,
           text: async () => JSON.stringify(state),
@@ -468,6 +529,115 @@ describe("SettingsIntegrations — live-update polling for pending connections",
 
     fetchSpy.mockRestore();
   });
+});
+
+describe("SettingsIntegrations — derived 'app not configured' state", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders 'App not configured' (not 'Connected') for an active Microsoft connection when the Microsoft app was removed", async () => {
+    const fetchSpy = mockFetchConnections([activeMicrosoftConnection], { microsoft: false });
+
+    render(<SettingsIntegrations />);
+
+    await waitFor(() => {
+      expect(screen.getByText("user@outlook.com")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("App not configured")).toBeInTheDocument();
+    expect(screen.queryByText("Connected")).not.toBeInTheDocument();
+
+    fetchSpy.mockRestore();
+  });
+
+  it("still renders 'Connected' for an active Microsoft connection when the Microsoft app is configured (regression guard)", async () => {
+    const fetchSpy = mockFetchConnections([activeMicrosoftConnection], { microsoft: true });
+
+    render(<SettingsIntegrations />);
+
+    await waitFor(() => {
+      expect(screen.getByText("user@outlook.com")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Connected")).toBeInTheDocument();
+    expect(screen.queryByText("App not configured")).not.toBeInTheDocument();
+
+    fetchSpy.mockRestore();
+  });
+
+  it("renders 'App not configured' (not 'Connected') for an active Google connection when the Google app was removed", async () => {
+    const fetchSpy = mockFetchConnections([activeGoogleConnection], { google: false });
+
+    render(<SettingsIntegrations />);
+
+    await waitFor(() => {
+      expect(screen.getByText("user@gmail.com")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("App not configured")).toBeInTheDocument();
+    expect(screen.queryByText("Connected")).not.toBeInTheDocument();
+
+    fetchSpy.mockRestore();
+  });
+
+  it("still renders 'Connected' for an active Google connection when the Google app is configured (regression guard)", async () => {
+    const fetchSpy = mockFetchConnections([activeGoogleConnection], { google: true });
+
+    render(<SettingsIntegrations />);
+
+    await waitFor(() => {
+      expect(screen.getByText("user@gmail.com")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Connected")).toBeInTheDocument();
+    expect(screen.queryByText("App not configured")).not.toBeInTheDocument();
+
+    fetchSpy.mockRestore();
+  });
+
+  it("keeps the 'Reconnect' menu item available for an active connection flagged as app-not-configured", async () => {
+    const user = userEvent.setup();
+    const fetchSpy = mockFetchConnections([activeMicrosoftConnection], { microsoft: false });
+
+    render(<SettingsIntegrations />);
+
+    await waitFor(() => {
+      expect(screen.getByText("App not configured")).toBeInTheDocument();
+    });
+
+    const row = screen.getByText("user@outlook.com").closest("[class*='rounded-lg']")!;
+    const buttons = row.querySelectorAll("button");
+    const menuButton = buttons[buttons.length - 1];
+    await user.click(menuButton);
+
+    expect(screen.getByText("Reconnect")).toBeInTheDocument();
+
+    fetchSpy.mockRestore();
+  });
+
+  it("does not affect a 'pending' Microsoft connection regardless of the app-configured fetch result", async () => {
+    const fetchSpy = mockFetchConnections([pendingMicrosoftConnection], { microsoft: false });
+
+    render(<SettingsIntegrations />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Setup in progress")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("App not configured")).not.toBeInTheDocument();
+    expect(screen.queryByText("Connected")).not.toBeInTheDocument();
+
+    fetchSpy.mockRestore();
+  });
+
+  // The component resolves the app-configured fetch via the same microtask-deferred
+  // effect pattern as ConnectedApps (see fetchAppConfigured below), and our fetch mock
+  // resolves synchronously-enough within a microtask that there is no observable
+  // intermediate frame where an active connection renders neither "Connected" nor
+  // "App not configured" before settling. We therefore don't assert a loading state
+  // here — forcing one would require an artificial unresolved-promise test double
+  // that doesn't reflect real fetch timing.
 });
 
 describe("SettingsIntegrations — OAuth callback errors", () => {

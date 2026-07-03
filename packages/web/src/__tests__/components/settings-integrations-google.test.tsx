@@ -64,11 +64,14 @@ const odooConnection = {
 function mockFetchConnections(connections: unknown[]) {
   return vi.spyOn(global, "fetch").mockImplementation((input) => {
     const url = typeof input === "string" ? input : (input as Request).url;
-    // The Connected apps section fetches per-provider OAuth app state on mount.
-    // These tests only assert connection-list behaviour, so report both
-    // providers as unconfigured and route everything else to the connections.
+    // The Connected apps section (and, for active connections, the
+    // connection-list status badge) fetch per-provider OAuth app state on
+    // mount. These tests assert plain type-aware rendering, not the derived
+    // app-configured state, so report both providers as configured — an
+    // unconfigured Google app is covered separately in
+    // settings-integrations.test.tsx's "app not configured" suite.
     if (url.startsWith("/api/settings/oauth")) {
-      const state = { configured: false, clientId: "", connectionCount: 0 };
+      const state = { configured: true, clientId: "", connectionCount: 0 };
       return Promise.resolve({
         ok: true,
         text: async () => JSON.stringify(state),

@@ -40,6 +40,8 @@ import { ConnectedApps } from "./connected-apps";
 import { BraveIcon, GoogleIcon, MicrosoftIcon, OdooIcon } from "./integration-icons";
 import type { IntegrationConnection } from "@/lib/integrations/types";
 import { getAccessibleCategoryLabels } from "@/lib/integrations/odoo-sync";
+import { getOAuthProvider, type OAuthProviderId } from "@/lib/integrations/oauth-providers";
+import { apiGet } from "@/lib/api-client";
 
 function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString);
@@ -96,6 +98,12 @@ export function SettingsIntegrations({ oauthError }: { oauthError?: string } = {
   const [renameName, setRenameName] = useState("");
   const [resumeGoogleSetup, setResumeGoogleSetup] = useState(false);
   const [editCredConn, setEditCredConn] = useState<IntegrationConnection | null>(null);
+  // Derived (never persisted) "is the provider's OAuth app still configured?"
+  // flag, keyed by provider id. Starts empty (neither key present) so the
+  // active-connection status badge doesn't flash "App not configured" before
+  // the fetch resolves — the render only takes that branch once the provider's
+  // key is explicitly `false`.
+  const [appConfigured, setAppConfigured] = useState<Partial<Record<OAuthProviderId, boolean>>>({});
 
   useEffect(() => {
     if (!oauthError) return;
@@ -114,12 +122,55 @@ export function SettingsIntegrations({ oauthError }: { oauthError?: string } = {
     }
   }, []);
 
+  // Live, per-provider "is this OAuth app currently configured?" state — purely
+  // derived from GET /api/settings/oauth?provider=<id>, the same endpoint the
+  // Connected apps section already calls. No DB write, no persisted flag: if an
+  // admin restores the app, the next fetch flips the badge back automatically.
+  // Only fetched for providers that actually have a connection in the list —
+  // this both avoids a needless request when e.g. only Odoo is connected, and
+  // keeps this component from doubling up mount-time GETs for a provider the
+  // Connected apps section already queries.
+  const fetchAppConfigured = useCallback(async (forConnections: IntegrationConnection[]) => {
+    const providers = (["google", "microsoft"] as const).filter((provider) =>
+      forConnections.some((conn) => conn.type === provider && conn.status === "active")
+    );
+    if (providers.length === 0) return;
+    const results = await Promise.all(
+      providers.map(async (provider) => {
+        try {
+          const state = await apiGet<{ configured: boolean }>(
+            `/api/settings/oauth?provider=${provider}`
+          );
+          return [provider, state.configured] as const;
+        } catch {
+          // Fail closed on network/auth errors: an unknown app state should not
+          // be reported as "configured" green.
+          return [provider, false] as const;
+        }
+      })
+    );
+    setAppConfigured((prev) => ({ ...prev, ...Object.fromEntries(results) }));
+  }, []);
+
   const { testing, syncing, testConnection, syncSchema, renameConnection, deleteConnection } =
     useIntegrationActions(fetchConnections);
 
   useEffect(() => {
     fetchConnections();
   }, [fetchConnections]);
+
+  useEffect(() => {
+    // Deferred past the effect body so the eventual setAppConfigured happens in
+    // a microtask, not synchronously inside the effect (react-hooks/
+    // set-state-in-effect) — same pattern as connected-apps.tsx / new-agent-form.tsx.
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (!cancelled) void fetchAppConfigured(connections);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [connections, fetchAppConfigured]);
 
   // Live-update the list while a connection is still being set up. A pending
   // connection (e.g. an OAuth flow finishing in another tab) flips to
@@ -214,6 +265,16 @@ export function SettingsIntegrations({ oauthError }: { oauthError?: string } = {
                   isOdoo && conn.data && typeof conn.data.lastSyncAt === "string"
                     ? conn.data.lastSyncAt
                     : null;
+                // Derived, not persisted: a connection whose OAuth app (Google or
+                // Microsoft) was reset/deleted still reads "active" from the DB,
+                // but any token refresh against it will fail. Only applies to
+                // active connections of an OAuth-backed type — pending/auth_failed
+                // already have their own, more specific states.
+                const oauthProvider = getOAuthProvider(conn.type);
+                const appMissing =
+                  conn.status === "active" &&
+                  oauthProvider !== null &&
+                  appConfigured[oauthProvider.id] === false;
                 return (
                   <div key={conn.id} className="rounded-lg border p-4 space-y-2">
                     <div className="flex items-center justify-between">
@@ -257,7 +318,7 @@ export function SettingsIntegrations({ oauthError }: { oauthError?: string } = {
                             </>
                           ) : (
                             <>
-                              {conn.status === "auth_failed" && (
+                              {(conn.status === "auth_failed" || appMissing) && (
                                 <DropdownMenuItem onClick={() => setEditCredConn(conn)}>
                                   Reconnect
                                 </DropdownMenuItem>
@@ -334,6 +395,26 @@ export function SettingsIntegrations({ oauthError }: { oauthError?: string } = {
                               </span>
                             )}
                           </>
+                        ) : appMissing ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex items-center gap-1.5 cursor-default">
+                                <AlertTriangle
+                                  className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400"
+                                  aria-label="App not configured"
+                                />
+                                <span className="text-sm text-amber-700 dark:text-amber-400 font-medium">
+                                  App not configured
+                                </span>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>
+                                The {oauthProvider?.label} app was removed. Restore it under
+                                Connected apps, or reconnect this mailbox.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
                         ) : conn.type === "google" ? (
                           <>
                             <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
