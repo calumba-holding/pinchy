@@ -76,7 +76,11 @@ async function failOAuthExchange(
   actorId: string,
   providerId: string,
   pendingId: string | undefined,
-  reason: "token_exchange_failed" | "profile_fetch_failed"
+  reason:
+    | "token_exchange_failed"
+    | "profile_fetch_failed"
+    | "invalid_token_response"
+    | "missing_refresh_token"
 ) {
   deferAuditLog({
     actorType: "user",
@@ -90,6 +94,47 @@ async function failOAuthExchange(
     outcome: "failure",
   });
   await deletePendingConnection(pendingId);
+}
+
+// Thrown internally to unify every "the token response can't be used" failure
+// (bad shape, missing access_token, missing refresh_token, or a throwing
+// computeExpiresAt) behind ONE catch block below, so every one of them goes
+// through failOAuthExchange + errorRedirect instead of surfacing as a raw
+// Next.js 500 mid-redirect. Never escapes this module.
+class InvalidTokenResponseError extends Error {
+  constructor(public readonly reason: "invalid_token_response" | "missing_refresh_token") {
+    super(reason);
+    this.name = "InvalidTokenResponseError";
+  }
+}
+
+/**
+ * Validate the shape of a provider's token-exchange response before any of
+ * its fields are used. A malformed response (missing/wrong-typed
+ * access_token, non-numeric expires_in, or — for a flow that requires one —
+ * a missing refresh_token) must fail closed with an audited redirect, not a
+ * raw throw mid-callback (the single-use authorization code is already
+ * burned by this point, so a 500 here strands the user with no way to
+ * recover except starting the connect flow over).
+ *
+ * refresh_token is required unconditionally: both the fresh-connect (GET
+ * /oauth/start) and reconnect (POST /oauth/start) authorize URLs always set
+ * `prompt=consent` (and Google additionally sets `access_type=offline`), so
+ * every token exchange — fresh connect or reconnect — is expected to return
+ * a fresh refresh_token from both providers. There is no "preserve the prior
+ * refresh_token on reconnect" behavior in this route to preserve: the
+ * reconnect branch reads `tokenData.refresh_token` from the SAME exchange,
+ * the same way the fresh-connect branch does.
+ */
+function assertValidTokenResponse<
+  T extends { access_token: unknown; refresh_token: unknown; expires_in: unknown },
+>(tokenData: T): asserts tokenData is T & { access_token: string; refresh_token: string } {
+  if (typeof tokenData.access_token !== "string" || tokenData.access_token.length === 0) {
+    throw new InvalidTokenResponseError("invalid_token_response");
+  }
+  if (typeof tokenData.refresh_token !== "string" || tokenData.refresh_token.length === 0) {
+    throw new InvalidTokenResponseError("missing_refresh_token");
+  }
 }
 
 /**
@@ -234,192 +279,213 @@ export async function GET(request: Request) {
   let expires_in: number;
   let scope: string;
   let emailAddress: string;
-
-  if (isMicrosoft) {
-    // ── Microsoft authorization-code exchange ────────────────────────────
-    const msSettings = settings as MicrosoftOAuthSettings;
-    const tenantId = msSettings.tenantId;
-
-    const tokenBody = new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      client_id: settings.clientId,
-      client_secret: settings.clientSecret,
-      redirect_uri: redirectUri,
-      scope: oauthProvider.scopes,
-    });
-
-    const tokenResponse = await fetch(oauthProvider.tokenUrl({ tenantId }), {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: tokenBody.toString(),
-    });
-
-    if (!tokenResponse.ok) {
-      await failOAuthExchange(session.user.id!, "microsoft", pendingId, "token_exchange_failed");
-      return errorRedirect(origin, "token_exchange_failed");
-    }
-
-    const tokenData = await tokenResponse.json();
-    access_token = tokenData.access_token;
-    refresh_token = tokenData.refresh_token;
-    expires_in = tokenData.expires_in;
-    scope = oauthProvider.scopes;
-
-    // Fetch profile from Microsoft Graph
-    const profileResponse = await fetch(oauthProvider.profileUrl, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
-
-    if (!profileResponse.ok) {
-      await failOAuthExchange(session.user.id!, "microsoft", pendingId, "profile_fetch_failed");
-      return errorRedirect(origin, "profile_fetch_failed");
-    }
-
-    const profileData = await profileResponse.json();
-    emailAddress = oauthProvider.extractEmail(profileData) ?? "";
-  } else {
-    // ── Google authorization-code exchange ───────────────────────────────
-    const tokenBody = new URLSearchParams({
-      code,
-      client_id: settings.clientId,
-      client_secret: settings.clientSecret,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-    });
-
-    const tokenResponse = await fetch(oauthProvider.tokenUrl({}), {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: tokenBody.toString(),
-    });
-
-    if (!tokenResponse.ok) {
-      await failOAuthExchange(session.user.id!, "google", pendingId, "token_exchange_failed");
-      return errorRedirect(origin, "token_exchange_failed");
-    }
-
-    const tokenData = await tokenResponse.json();
-    access_token = tokenData.access_token;
-    refresh_token = tokenData.refresh_token;
-    expires_in = tokenData.expires_in;
-    scope = tokenData.scope;
-
-    // Fetch email address from Gmail profile
-    const profileResponse = await fetch(oauthProvider.profileUrl, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
-
-    if (!profileResponse.ok) {
-      await failOAuthExchange(session.user.id!, "google", pendingId, "profile_fetch_failed");
-      return errorRedirect(origin, "profile_fetch_failed");
-    }
-
-    const profileData = await profileResponse.json();
-    emailAddress = oauthProvider.extractEmail(profileData) ?? "";
-  }
-
-  // 7. Persist integration — UPDATE pending record if possible, otherwise INSERT
-  const expiresAt = computeExpiresAt(expires_in);
-  const encryptedCredentials = encrypt(
-    JSON.stringify({
-      accessToken: access_token,
-      refreshToken: refresh_token,
-      expiresAt,
-      scope,
-    })
-  );
-
-  const connectionType = oauthProvider.connectionType;
-
-  const connectionData = {
-    emailAddress,
-    provider: oauthProvider.auditProvider,
-    connectedAt: new Date().toISOString(),
-  };
-
   let connection: typeof integrationConnections.$inferSelect;
 
-  // Check if this is a reconnect (state encodes reconnectConnectionId,
-  // decoded once at the top of the handler and reused here)
-  if (reconnectConnectionId) {
-    // Reconnect path: update the existing connection row so that
-    // agent_connection_permissions referencing it are preserved.
-    // Do NOT set status/lastError/lastErrorAt here — let clearIntegrationAuthError
-    // handle the auth_failed → active transition and write the integration.auth_recovered
-    // audit event. If the connection was already active this is a no-op there.
-    [connection] = await db
-      .update(integrationConnections)
-      .set({
-        name: emailAddress,
-        credentials: encryptedCredentials,
-        data: connectionData,
-        updatedAt: new Date(),
-      })
-      .where(eq(integrationConnections.id, reconnectConnectionId))
-      .returning();
+  // The whole region from token-response parsing through connection
+  // persistence is wrapped in one try/catch: a malformed token response
+  // (assertValidTokenResponse) or a throwing computeExpiresAt must convert to
+  // this route's standard failure handling (audit + errorRedirect) instead of
+  // surfacing as a raw 500. By this point the single-use authorization code
+  // is already burned, so an uncaught throw would strand the user with no
+  // way to recover except restarting the connect flow, and would leave the
+  // pending connection row behind for the 15-minute GC to reap.
+  try {
+    if (isMicrosoft) {
+      // ── Microsoft authorization-code exchange ────────────────────────────
+      const msSettings = settings as MicrosoftOAuthSettings;
+      const tenantId = msSettings.tenantId;
 
-    if (!connection) {
-      return errorRedirect(origin, "connection_not_found");
+      const tokenBody = new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        client_id: settings.clientId,
+        client_secret: settings.clientSecret,
+        redirect_uri: redirectUri,
+        scope: oauthProvider.scopes,
+      });
+
+      const tokenResponse = await fetch(oauthProvider.tokenUrl({ tenantId }), {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: tokenBody.toString(),
+      });
+
+      if (!tokenResponse.ok) {
+        await failOAuthExchange(session.user.id!, "microsoft", pendingId, "token_exchange_failed");
+        return errorRedirect(origin, "token_exchange_failed");
+      }
+
+      const tokenData = await tokenResponse.json();
+      assertValidTokenResponse(tokenData);
+      access_token = tokenData.access_token;
+      refresh_token = tokenData.refresh_token;
+      expires_in = tokenData.expires_in;
+      scope = oauthProvider.scopes;
+
+      // Fetch profile from Microsoft Graph
+      const profileResponse = await fetch(oauthProvider.profileUrl, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+
+      if (!profileResponse.ok) {
+        await failOAuthExchange(session.user.id!, "microsoft", pendingId, "profile_fetch_failed");
+        return errorRedirect(origin, "profile_fetch_failed");
+      }
+
+      const profileData = await profileResponse.json();
+      emailAddress = oauthProvider.extractEmail(profileData) ?? "";
+    } else {
+      // ── Google authorization-code exchange ───────────────────────────────
+      const tokenBody = new URLSearchParams({
+        code,
+        client_id: settings.clientId,
+        client_secret: settings.clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+      });
+
+      const tokenResponse = await fetch(oauthProvider.tokenUrl({}), {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: tokenBody.toString(),
+      });
+
+      if (!tokenResponse.ok) {
+        await failOAuthExchange(session.user.id!, "google", pendingId, "token_exchange_failed");
+        return errorRedirect(origin, "token_exchange_failed");
+      }
+
+      const tokenData = await tokenResponse.json();
+      assertValidTokenResponse(tokenData);
+      access_token = tokenData.access_token;
+      refresh_token = tokenData.refresh_token;
+      expires_in = tokenData.expires_in;
+      scope = tokenData.scope;
+
+      // Fetch email address from Gmail profile
+      const profileResponse = await fetch(oauthProvider.profileUrl, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+
+      if (!profileResponse.ok) {
+        await failOAuthExchange(session.user.id!, "google", pendingId, "profile_fetch_failed");
+        return errorRedirect(origin, "profile_fetch_failed");
+      }
+
+      const profileData = await profileResponse.json();
+      emailAddress = oauthProvider.extractEmail(profileData) ?? "";
     }
 
-    // Clear auth_failed state and write integration.auth_recovered audit if needed
-    // (no-op if the connection was already active)
-    await clearIntegrationAuthError({
-      connectionId: reconnectConnectionId,
-      actor: { type: "user", id: session.user.id! },
-    });
+    // 7. Persist integration — UPDATE pending record if possible, otherwise INSERT
+    const expiresAt = computeExpiresAt(expires_in);
+    const encryptedCredentials = encrypt(
+      JSON.stringify({
+        accessToken: access_token,
+        refreshToken: refresh_token,
+        expiresAt,
+        scope,
+      })
+    );
 
-    // 9a. Audit log for reconnect
-    // GDPR Art. 17: never record the plaintext email address. The audit row
-    // is HMAC-signed, so we cannot redact later. redactEmail() gives us a
-    // keyed hash + masked preview; the connectionId in `resource` is enough
-    // to look up the live mailbox name from the integrations table while it
-    // exists. `name` carries the masked preview (not the raw address) to
-    // satisfy the shared `{ id, name }` audit-detail contract for this event
-    // type. Mirrors the fresh-connect branch's redaction below.
-    const { emailPreview, emailHash } = redactEmail(connection.name);
-    deferAuditLog({
-      actorType: "user",
-      actorId: session.user.id!,
-      eventType: "integration.credentials_updated",
-      resource: `integration:${connection.id}`,
-      detail: {
-        id: connection.id,
-        name: emailPreview,
-        emailHash,
-        fields: ["oauth_tokens"],
-      },
-      outcome: "success",
-    });
-  } else {
-    // Original connect path: UPDATE pending record if possible, otherwise INSERT
-    const pendingId = cookies["oauth_pending_id"];
+    const connectionType = oauthProvider.connectionType;
 
-    if (pendingId) {
-      const rows = await db
-        .select()
-        .from(integrationConnections)
-        .where(
-          and(
-            eq(integrationConnections.id, pendingId),
-            eq(integrationConnections.status, "pending")
+    const connectionData = {
+      emailAddress,
+      provider: oauthProvider.auditProvider,
+      connectedAt: new Date().toISOString(),
+    };
+
+    // Check if this is a reconnect (state encodes reconnectConnectionId,
+    // decoded once at the top of the handler and reused here)
+    if (reconnectConnectionId) {
+      // Reconnect path: update the existing connection row so that
+      // agent_connection_permissions referencing it are preserved.
+      // Do NOT set status/lastError/lastErrorAt here — let clearIntegrationAuthError
+      // handle the auth_failed → active transition and write the integration.auth_recovered
+      // audit event. If the connection was already active this is a no-op there.
+      [connection] = await db
+        .update(integrationConnections)
+        .set({
+          name: emailAddress,
+          credentials: encryptedCredentials,
+          data: connectionData,
+          updatedAt: new Date(),
+        })
+        .where(eq(integrationConnections.id, reconnectConnectionId))
+        .returning();
+
+      if (!connection) {
+        return errorRedirect(origin, "connection_not_found");
+      }
+
+      // Clear auth_failed state and write integration.auth_recovered audit if needed
+      // (no-op if the connection was already active)
+      await clearIntegrationAuthError({
+        connectionId: reconnectConnectionId,
+        actor: { type: "user", id: session.user.id! },
+      });
+
+      // 9a. Audit log for reconnect
+      // GDPR Art. 17: never record the plaintext email address. The audit row
+      // is HMAC-signed, so we cannot redact later. redactEmail() gives us a
+      // keyed hash + masked preview; the connectionId in `resource` is enough
+      // to look up the live mailbox name from the integrations table while it
+      // exists. `name` carries the masked preview (not the raw address) to
+      // satisfy the shared `{ id, name }` audit-detail contract for this event
+      // type. Mirrors the fresh-connect branch's redaction below.
+      const { emailPreview, emailHash } = redactEmail(connection.name);
+      deferAuditLog({
+        actorType: "user",
+        actorId: session.user.id!,
+        eventType: "integration.credentials_updated",
+        resource: `integration:${connection.id}`,
+        detail: {
+          id: connection.id,
+          name: emailPreview,
+          emailHash,
+          fields: ["oauth_tokens"],
+        },
+        outcome: "success",
+      });
+    } else {
+      // Original connect path: UPDATE pending record if possible, otherwise INSERT
+      const pendingId = cookies["oauth_pending_id"];
+
+      if (pendingId) {
+        const rows = await db
+          .select()
+          .from(integrationConnections)
+          .where(
+            and(
+              eq(integrationConnections.id, pendingId),
+              eq(integrationConnections.status, "pending")
+            )
           )
-        )
-        .limit(1);
+          .limit(1);
 
-      if (rows.length > 0) {
-        [connection] = await db
-          .update(integrationConnections)
-          .set({
-            name: emailAddress,
-            status: "active",
-            credentials: encryptedCredentials,
-            data: connectionData,
-            updatedAt: new Date(),
-          })
-          .where(eq(integrationConnections.id, pendingId))
-          .returning();
+        if (rows.length > 0) {
+          [connection] = await db
+            .update(integrationConnections)
+            .set({
+              name: emailAddress,
+              status: "active",
+              credentials: encryptedCredentials,
+              data: connectionData,
+              updatedAt: new Date(),
+            })
+            .where(eq(integrationConnections.id, pendingId))
+            .returning();
+        } else {
+          [connection] = await db
+            .insert(integrationConnections)
+            .values({
+              type: connectionType,
+              name: emailAddress,
+              credentials: encryptedCredentials,
+              data: connectionData,
+            })
+            .returning();
+        }
       } else {
         [connection] = await db
           .insert(integrationConnections)
@@ -431,36 +497,37 @@ export async function GET(request: Request) {
           })
           .returning();
       }
-    } else {
-      [connection] = await db
-        .insert(integrationConnections)
-        .values({
+      // 9b. Audit log for new connection
+      // GDPR Art. 17: never record the plaintext email address. The audit row
+      // is HMAC-signed, so we cannot redact later. redactEmail() gives us a
+      // keyed hash + masked preview; the connectionId in `resource` is enough
+      // to look up the live mailbox name from the integrations table while it
+      // exists. Every provider emits the same `integration.created` event so an
+      // auditor filtering by eventType sees every mailbox connection
+      // regardless of provider; `type` in detail distinguishes them.
+      deferAuditLog({
+        actorType: "user",
+        actorId: session.user.id!,
+        eventType: "integration.created",
+        resource: `integration:${connection.id}`,
+        detail: {
           type: connectionType,
-          name: emailAddress,
-          credentials: encryptedCredentials,
-          data: connectionData,
-        })
-        .returning();
+          ...redactEmail(emailAddress),
+        },
+        outcome: "success",
+      });
     }
-    // 9b. Audit log for new connection
-    // GDPR Art. 17: never record the plaintext email address. The audit row
-    // is HMAC-signed, so we cannot redact later. redactEmail() gives us a
-    // keyed hash + masked preview; the connectionId in `resource` is enough
-    // to look up the live mailbox name from the integrations table while it
-    // exists. Every provider emits the same `integration.created` event so an
-    // auditor filtering by eventType sees every mailbox connection
-    // regardless of provider; `type` in detail distinguishes them.
-    deferAuditLog({
-      actorType: "user",
-      actorId: session.user.id!,
-      eventType: "integration.created",
-      resource: `integration:${connection.id}`,
-      detail: {
-        type: connectionType,
-        ...redactEmail(emailAddress),
-      },
-      outcome: "success",
-    });
+  } catch (err) {
+    // Catches: assertValidTokenResponse's InvalidTokenResponseError, and any
+    // other throw in this region (notably computeExpiresAt, which throws on
+    // a missing/non-numeric/negative expires_in). Anything unexpected here
+    // must still fail closed with an audited redirect, never a raw 500 — see
+    // this file's header comment. The provider id used for the audit/reason
+    // is best-effort: oauthProvider.id already reflects the resolved
+    // provider for this callback regardless of which branch threw.
+    const reason = err instanceof InvalidTokenResponseError ? err.reason : "invalid_token_response";
+    await failOAuthExchange(session.user.id!, oauthProvider.id, pendingId, reason);
+    return errorRedirect(origin, reason);
   }
 
   // 9. Clean up cookies and redirect

@@ -513,6 +513,127 @@ describe("GET /api/integrations/oauth/callback", () => {
     );
   });
 
+  describe("malformed token response (post-exchange hardening)", () => {
+    beforeEach(() => {
+      mockGetSession.mockResolvedValue(adminSession());
+      mockGetOAuthSettings.mockResolvedValue({
+        clientId: "test-client-id",
+        clientSecret: "test-client-secret",
+      });
+    });
+
+    it("redirects with error (not a 500) when expires_in is missing from the token response", async () => {
+      mockFetch
+        .mockResolvedValueOnce(mockTokenExchange({ expires_in: undefined }))
+        .mockResolvedValueOnce(mockProfileFetch());
+
+      const response = await GET(
+        makeRequest(
+          { code: "auth-code-123", state: VALID_STATE },
+          `oauth_state=${VALID_STATE}; oauth_pending_id=pending-conn-id`
+        )
+      );
+
+      expect(response.status).toBe(302);
+      const location = new URL(response.headers.get("Location")!);
+      expect(location.pathname).toBe("/settings");
+      expect(location.searchParams.get("error")).toBe("invalid_token_response");
+
+      // The pending row must be cleaned up, not left for the 15-minute GC.
+      expect(mockDeleteWhere).toHaveBeenCalled();
+
+      expect(mockAppendAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: "integration.created",
+          outcome: "failure",
+          detail: expect.objectContaining({
+            type: "google",
+            reason: "invalid_token_response",
+          }),
+        })
+      );
+    });
+
+    it("redirects with error (not a 500) when expires_in is a non-numeric string", async () => {
+      mockFetch
+        .mockResolvedValueOnce(mockTokenExchange({ expires_in: "3600" }))
+        .mockResolvedValueOnce(mockProfileFetch());
+
+      const response = await GET(
+        makeRequest(
+          { code: "auth-code-123", state: VALID_STATE },
+          `oauth_state=${VALID_STATE}; oauth_pending_id=pending-conn-id`
+        )
+      );
+
+      expect(response.status).toBe(302);
+      const location = new URL(response.headers.get("Location")!);
+      expect(location.searchParams.get("error")).toBe("invalid_token_response");
+      expect(mockDeleteWhere).toHaveBeenCalled();
+    });
+
+    it("redirects with error when access_token is missing from the token response", async () => {
+      mockFetch.mockResolvedValueOnce(mockTokenExchange({ access_token: undefined }));
+
+      const response = await GET(
+        makeRequest(
+          { code: "auth-code-123", state: VALID_STATE },
+          `oauth_state=${VALID_STATE}; oauth_pending_id=pending-conn-id`
+        )
+      );
+
+      expect(response.status).toBe(302);
+      const location = new URL(response.headers.get("Location")!);
+      expect(location.searchParams.get("error")).toBe("invalid_token_response");
+      expect(mockDeleteWhere).toHaveBeenCalled();
+
+      expect(mockAppendAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: "integration.created",
+          outcome: "failure",
+          detail: expect.objectContaining({
+            type: "google",
+            reason: "invalid_token_response",
+          }),
+        })
+      );
+
+      // The profile fetch must never run without an access token.
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("redirects with error (missing_refresh_token) on a fresh connect with no refresh_token in the token response", async () => {
+      mockFetch.mockResolvedValueOnce(mockTokenExchange({ refresh_token: undefined }));
+
+      const response = await GET(
+        makeRequest(
+          { code: "auth-code-123", state: VALID_STATE },
+          `oauth_state=${VALID_STATE}; oauth_pending_id=pending-conn-id`
+        )
+      );
+
+      expect(response.status).toBe(302);
+      const location = new URL(response.headers.get("Location")!);
+      expect(location.searchParams.get("error")).toBe("missing_refresh_token");
+      expect(mockDeleteWhere).toHaveBeenCalled();
+
+      expect(mockAppendAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: "integration.created",
+          outcome: "failure",
+          detail: expect.objectContaining({
+            type: "google",
+            reason: "missing_refresh_token",
+          }),
+        })
+      );
+
+      // No connection should have been persisted without a refresh token.
+      expect(mockUpdateSet).not.toHaveBeenCalled();
+      expect(mockValues).not.toHaveBeenCalled();
+    });
+  });
+
   describe("successful flow — without oauth_pending_id cookie (INSERT fallback)", () => {
     beforeEach(() => {
       mockGetSession.mockResolvedValue(adminSession());
