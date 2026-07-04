@@ -1,5 +1,13 @@
 export type Folder = "INBOX" | "SENT" | "DRAFTS" | "TRASH" | "SPAM";
 
+// Escape a value for embedding inside a double-quoted query string: backslashes
+// BEFORE quotes so a trailing "\" can't escape the closing quote. Used by both
+// the Gmail query builder and the Graph $search KQL builder; each adapter keeps
+// its own wrapping/quoting policy on top of this.
+export function escapeDoubleQuoted(v: string): string {
+  return v.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 // Shared by every adapter: the canonical-name validation and error message are
 // identical across providers, only the provider-specific value for each
 // folder differs (Gmail label IDs vs Graph well-known folder names). Sharing

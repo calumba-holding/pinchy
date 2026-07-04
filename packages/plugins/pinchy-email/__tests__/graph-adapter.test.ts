@@ -561,11 +561,66 @@ describe("GraphAdapter.search", () => {
     // Text-only terms take the plain $search path (no unread/sinceDays), so
     // this exercises the vulnerable branch directly. A literal quote or
     // backslash in the value must not be able to break out of the
-    // surrounding $search="..." KQL string.
+    // surrounding $search="..." KQL string. The value has no whitespace but
+    // DOES contain a quote/backslash, so — same trigger as Gmail's quote()
+    // (/[\s"\\]/) — it is phrase-quoted with escaped inner quotes too.
     await adapter.search({ from: 'o"brien\\example.com' });
     const url = (fetch as Mock).mock.calls[0][0] as string;
     const decoded = decodeURIComponent(url).replace(/\+/g, " ");
-    expect(decoded).toContain('$search="from:o\\"brien\\\\example.com"');
+    expect(decoded).toContain('$search="from:\\"o\\"brien\\\\example.com\\""');
+  });
+
+  it("phrase-quotes a multi-word $search value so KQL scopes the whole phrase to the field", async () => {
+    // Without inner phrase quotes, Graph's $search="subject:quarterly report"
+    // only scopes "quarterly" to subject — "report" becomes an unscoped
+    // free-text term matching from/subject/body anywhere. Wrapping the value
+    // in escaped inner quotes makes it a single KQL phrase, matching Gmail's
+    // buildGmailQuery behavior for the same input.
+    const adapter = new GraphAdapter({ accessToken: "tok" });
+    (fetch as Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ value: [] }),
+    });
+    await adapter.search({ subject: "quarterly report" });
+    const url = (fetch as Mock).mock.calls[0][0] as string;
+    const decoded = decodeURIComponent(url).replace(/\+/g, " ");
+    expect(decoded).toContain('$search="subject:\\"quarterly report\\""');
+  });
+
+  it("does NOT add inner phrase quotes around a single safe token (no over-quoting)", async () => {
+    const adapter = new GraphAdapter({ accessToken: "tok" });
+    (fetch as Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ value: [] }),
+    });
+    await adapter.search({ from: "alice@example.com" });
+    const url = (fetch as Mock).mock.calls[0][0] as string;
+    const decoded = decodeURIComponent(url).replace(/\+/g, " ");
+    expect(decoded).toContain('$search="from:alice@example.com"');
+  });
+
+  it("phrase-quotes a value with special characters, escaping inner quotes/backslashes", async () => {
+    const adapter = new GraphAdapter({ accessToken: "tok" });
+    (fetch as Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ value: [] }),
+    });
+    await adapter.search({ subject: 'a"b\\c' });
+    const url = (fetch as Mock).mock.calls[0][0] as string;
+    const decoded = decodeURIComponent(url).replace(/\+/g, " ");
+    expect(decoded).toContain('$search="subject:\\"a\\"b\\\\c\\""');
+  });
+
+  it("joins two phrase-quoted multi-word terms inside one outer $search pair", async () => {
+    const adapter = new GraphAdapter({ accessToken: "tok" });
+    (fetch as Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ value: [] }),
+    });
+    await adapter.search({ from: "a b", subject: "c d" });
+    const url = (fetch as Mock).mock.calls[0][0] as string;
+    const decoded = decodeURIComponent(url).replace(/\+/g, " ");
+    expect(decoded).toContain('$search="from:\\"a b\\" subject:\\"c d\\""');
   });
 });
 

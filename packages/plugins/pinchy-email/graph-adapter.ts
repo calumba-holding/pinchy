@@ -1,4 +1,4 @@
-import { createFolderMapper } from "./email-adapter.js";
+import { createFolderMapper, escapeDoubleQuoted } from "./email-adapter.js";
 import type {
   EmailAdapter,
   EmailAttachment,
@@ -28,13 +28,20 @@ function odataString(v: string): string {
   return v.replace(/'/g, "''");
 }
 
-// Escape a value for use inside a $search KQL string, which this adapter
-// always wraps in double quotes. Backslashes must be escaped BEFORE quotes so
-// a trailing "\" can't escape the closing quote; without this a literal quote
-// or backslash in a search term breaks out of the $search="..." string early
-// and can inject additional KQL.
-function kqlString(v: string): string {
-  return v.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+// Build a `field:value` KQL term for use inside the outer $search="..." string.
+// A property value that contains whitespace (or a double-quote/backslash) is
+// wrapped in ESCAPED inner quotes so KQL treats it as a single phrase scoped
+// to `field` — e.g. `subject:\"quarterly report\"`, which renders inside the
+// outer $search="..." wrapper as a live KQL phrase quote. Without this, Graph's
+// $search="subject:quarterly report" only scopes "quarterly" to subject;
+// "report" becomes an unscoped free-text term matching from/subject/body
+// anywhere, returning unrelated mail. A single safe token (no whitespace/
+// special chars) is left unquoted to avoid over-quoting. This mirrors Gmail's
+// buildGmailQuery quoting policy (same /[\s"\\]/ trigger) so both providers
+// behave identically for the same tool input.
+function kqlTerm(field: string, v: string): string {
+  const value = /[\s"\\]/.test(v) ? `\\"${escapeDoubleQuoted(v)}\\"` : v;
+  return `${field}:${value}`;
 }
 
 interface GraphMessage {
@@ -213,9 +220,9 @@ export class GraphAdapter implements EmailAdapter {
     // final $filter — required by buildOrderedFilter's Graph $orderby rule.
     const filters: string[] = [];
     const searchTerms: string[] = [];
-    if (opts.from) searchTerms.push(`from:${kqlString(opts.from)}`);
-    if (opts.to) searchTerms.push(`to:${kqlString(opts.to)}`);
-    if (opts.subject) searchTerms.push(`subject:${kqlString(opts.subject)}`);
+    if (opts.from) searchTerms.push(kqlTerm("from", opts.from));
+    if (opts.to) searchTerms.push(kqlTerm("to", opts.to));
+    if (opts.subject) searchTerms.push(kqlTerm("subject", opts.subject));
     if (opts.sinceDays != null) {
       const cutoff = new Date(
         Date.now() - opts.sinceDays * 86_400_000,

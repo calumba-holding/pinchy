@@ -1,5 +1,5 @@
 import { google } from "googleapis";
-import { createFolderMapper } from "./email-adapter.js";
+import { createFolderMapper, escapeDoubleQuoted } from "./email-adapter.js";
 import type {
   EmailAdapter,
   EmailAttachment,
@@ -22,12 +22,11 @@ const mapFolder = createFolderMapper({
 
 function buildGmailQuery(opts: SearchOptions): string {
   const parts: string[] = [];
-  // Escape backslashes BEFORE quotes so a trailing "\" can't escape the closing
-  // quote (e.g. `foo\` → `"foo\\"`, not the broken `"foo\"`).
+  // Wrap in outer quotes only when the value has whitespace or characters
+  // that would otherwise break the term boundary; escapeDoubleQuoted handles
+  // the backslash-before-quote escaping shared with the Graph adapter.
   const quote = (v: string) =>
-    /[\s"\\]/.test(v)
-      ? `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
-      : v;
+    /[\s"\\]/.test(v) ? `"${escapeDoubleQuoted(v)}"` : v;
   if (opts.from) parts.push(`from:${quote(opts.from)}`);
   if (opts.to) parts.push(`to:${quote(opts.to)}`);
   if (opts.subject) parts.push(`subject:${quote(opts.subject)}`);
