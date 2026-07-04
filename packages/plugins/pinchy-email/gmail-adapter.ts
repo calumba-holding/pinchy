@@ -44,6 +44,10 @@ function buildGmailQuery(opts: SearchOptions): string {
   // the backslash-before-quote escaping shared with the Graph adapter.
   const quote = (v: string) =>
     /[\s"\\]/.test(v) ? `"${escapeDoubleQuoted(v)}"` : v;
+  // Bare term (no `field:` prefix) — Gmail free-text search matches the
+  // whole message, including the body, unlike `subject:` which only scopes
+  // to the subject header.
+  if (opts.text) parts.push(quote(opts.text));
   if (opts.from) parts.push(`from:${quote(opts.from)}`);
   if (opts.to) parts.push(`to:${quote(opts.to)}`);
   if (opts.subject) parts.push(`subject:${quote(opts.subject)}`);

@@ -933,6 +933,39 @@ describe("email_search", () => {
     expect(result.isError).toBeUndefined();
     expect(mockSearch).toHaveBeenCalledWith({ subject: "invoice" });
   });
+
+  // Capability restoration (PR #328 follow-up): `text` is a NEW field for
+  // free-text/body search, distinct from the legacy `query` raw-query string
+  // rejected above. It must flow through into the adapter's SearchOptions.
+  it("forwards `text` into the adapter's SearchOptions", async () => {
+    mockSearch.mockResolvedValue([]);
+    const tools = createApi();
+    const tool = findTool(tools, "email_search", agentId)!;
+
+    const result = await tool.execute("call-1", {
+      text: "PO-1234",
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(mockSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "PO-1234" }),
+    );
+  });
+
+  it("combines `text` with other DSL fields when forwarding to the adapter", async () => {
+    mockSearch.mockResolvedValue([]);
+    const tools = createApi();
+    const tool = findTool(tools, "email_search", agentId)!;
+
+    await tool.execute("call-1", {
+      text: "invoice",
+      from: "b@test.com",
+    });
+
+    expect(mockSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "invoice", from: "b@test.com" }),
+    );
+  });
 });
 
 describe("email_draft", () => {

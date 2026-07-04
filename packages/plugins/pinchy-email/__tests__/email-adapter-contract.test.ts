@@ -11,14 +11,17 @@ import type {
 
 describe("EmailAdapter contract", () => {
   it("Folder is the five canonical values", () => {
-    expectTypeOf<Folder>().toEqualTypeOf<"INBOX" | "SENT" | "DRAFTS" | "TRASH" | "SPAM">();
+    expectTypeOf<Folder>().toEqualTypeOf<
+      "INBOX" | "SENT" | "DRAFTS" | "TRASH" | "SPAM"
+    >();
   });
 
-  it("SearchOptions has only the V1 DSL fields", () => {
+  it("SearchOptions has the V1 DSL fields plus the free-text `text` field", () => {
     expectTypeOf<SearchOptions>().toEqualTypeOf<{
       from?: string;
       to?: string;
       subject?: string;
+      text?: string;
       unread?: boolean;
       sinceDays?: number;
       folder?: Folder;
@@ -45,7 +48,9 @@ describe("EmailAdapter contract", () => {
     expectTypeOf<EmailAdapter["getAttachment"]>().parameters.toEqualTypeOf<
       [string, string]
     >();
-    expectTypeOf<EmailAdapter["getAttachment"]>().returns.resolves.toEqualTypeOf<{
+    expectTypeOf<
+      EmailAdapter["getAttachment"]
+    >().returns.resolves.toEqualTypeOf<{
       filename: string;
       mimeType: string;
       data: Buffer;

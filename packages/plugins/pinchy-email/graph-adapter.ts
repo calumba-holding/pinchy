@@ -44,6 +44,15 @@ function kqlTerm(field: string, v: string): string {
   return `${field}:${value}`;
 }
 
+// Same phrase-quoting policy as kqlTerm, but for a BARE free-text term (no
+// `field:` prefix) — Graph's $search does full-text across from/subject/body
+// when a term isn't scoped to a property. Kept as a separate helper (rather
+// than kqlTerm(field, v) with an empty field) so the "no colon for a bare
+// term" shape can't be accidentally reintroduced by a future edit to kqlTerm.
+function kqlBareTerm(v: string): string {
+  return /[\s"\\]/.test(v) ? `\\"${escapeDoubleQuoted(v)}\\"` : v;
+}
+
 interface GraphMessage {
   id: string;
   subject: string | null;
@@ -216,6 +225,8 @@ export class GraphAdapter implements EmailAdapter {
   }
 
   async search(opts: SearchOptions): Promise<EmailSummary[]> {
+    if (opts.text) return this.searchFreeText(opts);
+
     // receivedDateTime is pushed first (when present) so it always leads the
     // final $filter — required by buildOrderedFilter's Graph $orderby rule.
     const filters: string[] = [];
@@ -268,6 +279,53 @@ export class GraphAdapter implements EmailAdapter {
     const res = await this.req(`${path}?${params.toString()}`);
     const data = (await res.json()) as { value: GraphMessage[] };
     return data.value.map(toSummary);
+  }
+
+  /**
+   * Free-text search path (opts.text is set). Free text is inexpressible in
+   * OData $filter — there is no full-text operator — so this MUST use
+   * $search, built from the bare text term plus any from/to/subject terms.
+   * Microsoft Graph v1.0 forbids combining $search with $filter, and forbids
+   * $orderby with $search, so `unread` and `sinceDays` cannot be pushed into
+   * a server-side $filter here the way the non-text path does. Instead they
+   * are applied as CLIENT-SIDE post-filters on the page of results $search
+   * returns. This is best-effort, not exact: Graph can't combine full-text
+   * with structural filters server-side, and because $search has no
+   * $orderby, results are relevance-ranked (not date-sorted) within $top —
+   * an old but relevant message could be excluded from the fetched page
+   * before the client-side date filter ever sees it. folder and limit are
+   * unaffected: folder still scopes the path, and limit still caps $top.
+   */
+  private async searchFreeText(opts: SearchOptions): Promise<EmailSummary[]> {
+    const searchTerms: string[] = [kqlBareTerm(opts.text!)];
+    if (opts.from) searchTerms.push(kqlTerm("from", opts.from));
+    if (opts.to) searchTerms.push(kqlTerm("to", opts.to));
+    if (opts.subject) searchTerms.push(kqlTerm("subject", opts.subject));
+
+    const path = opts.folder
+      ? `/me/mailFolders/${mapFolder(opts.folder)}/messages`
+      : `/me/messages`;
+    const params = new URLSearchParams({
+      $top: String(opts.limit ?? 20),
+      $select: SUMMARY_SELECT,
+      $search: `"${searchTerms.join(" ")}"`,
+    });
+
+    const res = await this.req(`${path}?${params.toString()}`);
+    const data = (await res.json()) as { value: GraphMessage[] };
+    let summaries = data.value.map(toSummary);
+
+    if (opts.unread) {
+      summaries = summaries.filter((m) => m.unread);
+    }
+    if (opts.sinceDays != null) {
+      const cutoff = Date.now() - opts.sinceDays * 86_400_000;
+      summaries = summaries.filter((m) => {
+        const received = Date.parse(m.date);
+        return !Number.isNaN(received) && received >= cutoff;
+      });
+    }
+    return summaries;
   }
 
   async draft(opts: ComposeOptions): Promise<{ draftId: string }> {

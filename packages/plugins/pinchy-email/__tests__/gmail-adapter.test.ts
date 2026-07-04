@@ -754,6 +754,43 @@ describe("GmailAdapter", () => {
     });
   });
 
+  describe("search DSL → free-text `text` field (restores body/content search, PR #328 follow-up)", () => {
+    // PR #328 replaced the raw Gmail query string with a structured DSL that
+    // covers from/to/subject/unread/sinceDays/folder — a strict subset that
+    // lost free-text/body search entirely. `text` restores it: Gmail free-text
+    // search (a bare term with no `field:` prefix) matches sender, subject,
+    // AND body — unlike `subject`, which only scopes to the subject header.
+
+    it("adds a single-token `text` value as a bare, unquoted term", async () => {
+      mockList.mockResolvedValue({ data: { messages: [] } });
+      await adapter.search({ text: "PO-1234" });
+      expect(mockList).toHaveBeenCalledWith(
+        expect.objectContaining({ q: "PO-1234" }),
+      );
+    });
+
+    it("quotes a multi-word `text` value", async () => {
+      mockList.mockResolvedValue({ data: { messages: [] } });
+      await adapter.search({ text: "quarterly report" });
+      expect(mockList).toHaveBeenCalledWith(
+        expect.objectContaining({ q: '"quarterly report"' }),
+      );
+    });
+
+    it("combines `text` with other DSL fields", async () => {
+      mockList.mockResolvedValue({ data: { messages: [] } });
+      await adapter.search({ text: "invoice", from: "a@b.com" });
+      const q = mockList.mock.calls[0][0].q as string;
+      expect(q).toContain("invoice");
+      expect(q).toContain("from:a@b.com");
+    });
+
+    it("does not throw when `text` alone is the only filter field", async () => {
+      mockList.mockResolvedValue({ data: { messages: [] } });
+      await expect(adapter.search({ text: "x" })).resolves.not.toThrow();
+    });
+  });
+
   describe("search folder mapping (documented in: operators)", () => {
     // Gmail SEARCH (the `q` param) excludes Trash/Spam by default and only
     // documents `in:trash`/`in:spam` to reach them — `label:TRASH`/`label:SPAM`

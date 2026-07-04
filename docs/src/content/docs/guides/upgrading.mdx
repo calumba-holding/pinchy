@@ -169,7 +169,7 @@ email_search({ query: "from:alice@example.com is:unread" })
 email_search({ from: "alice@example.com", unread: true })
 ```
 
-Available filter fields: `from`, `to`, `subject`, `unread`, `sinceDays`, `folder`, `limit`. See the `email_search` tool description in your agent's tool list for the full field reference. The structured DSL is provider-agnostic — the same filters work for both Gmail and the new Microsoft 365 backend.
+Available filter fields: `from`, `to`, `subject`, `text`, `unread`, `sinceDays`, `folder`, `limit`. `text` is a free-text match across sender, subject, and body — use it for a content match (an invoice number, an order ID, a phrase from the message) that `subject` alone can't express. See the `email_search` tool description in your agent's tool list for the full field reference. The structured DSL is provider-agnostic — the same filters work for both Gmail and the new Microsoft 365 backend.
 
 The tighter agent tool boundary described below also changes runtime behaviour for existing agents, but it only removes built-ins that were never meant to be reachable — see the note under Upgrade notes.
 

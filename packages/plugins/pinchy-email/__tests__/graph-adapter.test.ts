@@ -624,6 +624,128 @@ describe("GraphAdapter.search", () => {
   });
 });
 
+describe("GraphAdapter.search — free-text `text` field (restores body/content search, PR #328 follow-up)", () => {
+  // Microsoft Graph v1.0 forbids combining $search with $filter, and forbids
+  // $orderby with $search. Free text is inexpressible in $filter (OData has
+  // no full-text operator), so any `text` value forces the $search path.
+  // unread/sinceDays then become CLIENT-SIDE post-filters on the fetched
+  // page — best-effort, not exact, because Graph can't combine full-text
+  // with structural filters server-side, and results are relevance-ranked
+  // (no $orderby) rather than date-sorted within $top.
+  beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("search({text}) uses $search with a bare term, no $filter, no $orderby", async () => {
+    const adapter = new GraphAdapter({ accessToken: "tok" });
+    (fetch as Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ value: [] }),
+    });
+    await adapter.search({ text: "PO-1234" });
+    const url = (fetch as Mock).mock.calls[0][0] as string;
+    const decoded = decodeURIComponent(url).replace(/\+/g, " ");
+    expect(decoded).toContain('$search="PO-1234"');
+    expect(decoded).not.toContain("$filter");
+    expect(decoded).not.toContain("$orderby");
+  });
+
+  it("search({text: 'a b'}) phrase-quotes a multi-word bare term", async () => {
+    const adapter = new GraphAdapter({ accessToken: "tok" });
+    (fetch as Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ value: [] }),
+    });
+    await adapter.search({ text: "a b" });
+    const url = (fetch as Mock).mock.calls[0][0] as string;
+    const decoded = decodeURIComponent(url).replace(/\+/g, " ");
+    expect(decoded).toContain('$search="\\"a b\\""');
+  });
+
+  it("search({text, unread:true}) keeps $search (with the text term) and client-side filters the result to unread only", async () => {
+    const adapter = new GraphAdapter({ accessToken: "tok" });
+    (fetch as Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        value: [
+          {
+            id: "read-1",
+            subject: "Invoice A",
+            bodyPreview: "read one",
+            receivedDateTime: "2026-07-01T10:00:00Z",
+            from: { emailAddress: { address: "a@b.com" } },
+            toRecipients: [],
+            isRead: true,
+          },
+          {
+            id: "unread-1",
+            subject: "Invoice B",
+            bodyPreview: "unread one",
+            receivedDateTime: "2026-07-02T10:00:00Z",
+            from: { emailAddress: { address: "a@b.com" } },
+            toRecipients: [],
+            isRead: false,
+          },
+        ],
+      }),
+    });
+    const result = await adapter.search({ text: "invoice", unread: true });
+    const url = (fetch as Mock).mock.calls[0][0] as string;
+    const decoded = decodeURIComponent(url).replace(/\+/g, " ");
+    expect(decoded).toContain('$search="invoice"');
+    expect(decoded).not.toContain("$filter");
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("unread-1");
+    expect(result[0].unread).toBe(true);
+  });
+
+  it("search({text, sinceDays}) client-side filters the result to messages received on/after the cutoff", async () => {
+    const adapter = new GraphAdapter({ accessToken: "tok" });
+    (fetch as Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        value: [
+          {
+            id: "old-1",
+            subject: "Old invoice",
+            bodyPreview: "old",
+            // Well outside a 7-day cutoff from "now" in any test run.
+            receivedDateTime: "2000-01-01T00:00:00Z",
+            from: { emailAddress: { address: "a@b.com" } },
+            toRecipients: [],
+            isRead: true,
+          },
+          {
+            id: "recent-1",
+            subject: "Recent invoice",
+            bodyPreview: "recent",
+            receivedDateTime: new Date().toISOString(),
+            from: { emailAddress: { address: "a@b.com" } },
+            toRecipients: [],
+            isRead: true,
+          },
+        ],
+      }),
+    });
+    const result = await adapter.search({ text: "x", sinceDays: 7 });
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("recent-1");
+  });
+
+  it("search({text}) alone does not throw ('at least one filter field' guard sees `text`)", async () => {
+    const adapter = new GraphAdapter({ accessToken: "tok" });
+    (fetch as Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ value: [] }),
+    });
+    await expect(adapter.search({ text: "x" })).resolves.not.toThrow();
+  });
+
+  it("search({}) still throws 'at least one filter' when text is also absent", async () => {
+    const adapter = new GraphAdapter({ accessToken: "tok" });
+    await expect(adapter.search({})).rejects.toThrow(/at least one/i);
+  });
+});
+
 describe("GraphAdapter.draft", () => {
   beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
   afterEach(() => vi.unstubAllGlobals());

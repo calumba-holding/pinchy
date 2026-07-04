@@ -650,6 +650,11 @@ const plugin = {
                 type: "string",
                 description: "Filter by subject text",
               },
+              text: {
+                type: "string",
+                description:
+                  "Free-text search across sender, subject, and body. Use this for content matches — e.g. an invoice number, an order ID, or a phrase mentioned in the message body. For a subject-only match use `subject` instead.",
+              },
               unread: {
                 type: "boolean",
                 description: "If true, return only unread emails",
@@ -701,6 +706,7 @@ const plugin = {
                   from: params.from as string | undefined,
                   to: params.to as string | undefined,
                   subject: params.subject as string | undefined,
+                  text: params.text as string | undefined,
                   unread: params.unread as boolean | undefined,
                   sinceDays: params.sinceDays as number | undefined,
                   folder: params.folder as

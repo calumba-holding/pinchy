@@ -58,6 +58,13 @@ export interface SearchOptions {
   from?: string;
   to?: string;
   subject?: string;
+  // Free-text search across sender, subject, and body (provider-native
+  // full-text search). Distinct from `subject`, which scopes matching to the
+  // subject field only. Restores the body/content search capability that the
+  // structured DSL (PR #328) dropped when it replaced the old raw query
+  // string — there was previously no field that could match, for example, an
+  // invoice number or phrase mentioned only in the message body.
+  text?: string;
   unread?: boolean;
   sinceDays?: number;
   folder?: Folder;
