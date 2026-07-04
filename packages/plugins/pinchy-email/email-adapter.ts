@@ -16,7 +16,8 @@ export function createFolderMapper(
   mapping: Record<Folder, string>,
 ): (f: Folder) => string {
   return function mapFolder(f: Folder): string {
-    const value = mapping[f];
+    const key = String(f).trim().toUpperCase();
+    const value = mapping[key as Folder];
     if (!value)
       throw new Error(
         `unknown folder: ${f}. Valid: INBOX, SENT, DRAFTS, TRASH, SPAM.`,

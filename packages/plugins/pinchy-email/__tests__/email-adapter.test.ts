@@ -45,4 +45,22 @@ describe("createFolderMapper", () => {
       "unknown folder: ARCHIVE. Valid: INBOX, SENT, DRAFTS, TRASH, SPAM.",
     );
   });
+
+  it("maps a lowercase folder name to the same value as its canonical form", () => {
+    expect(mapFolder("inbox" as Folder)).toBe("inbox-value");
+  });
+
+  it("maps a mixed-case folder name to the same value as its canonical form", () => {
+    expect(mapFolder("Inbox" as Folder)).toBe("inbox-value");
+  });
+
+  it("maps a folder name with surrounding whitespace to the same value as its canonical form", () => {
+    expect(mapFolder("  sent  " as Folder)).toBe("sent-value");
+  });
+
+  it("still throws for a genuinely unknown folder, quoting the original input", () => {
+    expect(() => mapFolder("archive" as Folder)).toThrow(
+      "unknown folder: archive. Valid: INBOX, SENT, DRAFTS, TRASH, SPAM.",
+    );
+  });
 });
