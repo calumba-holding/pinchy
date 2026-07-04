@@ -339,21 +339,6 @@ app.post("/v1.0/me/messages/:id/createReply", (req, res) => {
   res.status(201).json(reply);
 });
 
-// GET /v1.0/me/mailFolders/:wellKnown/messages — folder-scoped message list
-app.get("/v1.0/me/mailFolders/:wellKnown/messages", (req, res) => {
-  if (!requireBearer(req, res)) return;
-  const folder = req.params.wellKnown.toLowerCase();
-  requestLog.push({
-    endpoint: `/v1.0/me/mailFolders/${req.params.wellKnown}/messages`,
-    query: req.query,
-  });
-  const filtered = messages.filter((m) => {
-    if (!m.parentFolderId) return true;
-    return m.parentFolderId.toLowerCase() === folder;
-  });
-  res.json({ value: filtered, "@odata.count": filtered.length });
-});
-
 // ---- Control plane ----
 app.get("/control/health", (_req, res) => res.json({ ok: true }));
 app.post("/control/reset", (_req, res) => {
