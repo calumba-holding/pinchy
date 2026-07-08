@@ -149,7 +149,7 @@ If you need to roll back after an upgrade:
   backup step matters.
 </Aside>
 
-## Upgrading from v0.7.0 to %%PINCHY_VERSION%%
+## Upgrading from v0.7.0 to v0.8.0
 
 ### Breaking changes
 
@@ -179,13 +179,13 @@ The standard flow applies:
 
 ```bash
 cd /opt/pinchy
-sed -i 's/PINCHY_VERSION=v0.7.0/PINCHY_VERSION=%%PINCHY_VERSION%%/' .env
+sed -i 's/PINCHY_VERSION=v0.7.0/PINCHY_VERSION=v0.8.0/' .env
 docker compose pull && docker compose up -d && docker image prune -f
 ```
 
 #### Microsoft 365 (Outlook) email
 
-%%PINCHY_VERSION%% adds **Microsoft 365 (Outlook) email** support alongside Gmail. Connect a Microsoft work/school account under **Settings → Integrations**, and agents get the same `email_list`, `email_read`, `email_search`, `email_get_attachment`, `email_draft`, and `email_send` tools — backed by the Microsoft Graph API and governed by the same per-agent email permissions. Existing Gmail connections are unaffected.
+v0.8.0 adds **Microsoft 365 (Outlook) email** support alongside Gmail. Connect a Microsoft work/school account under **Settings → Integrations**, and agents get the same `email_list`, `email_read`, `email_search`, `email_get_attachment`, `email_draft`, and `email_send` tools — backed by the Microsoft Graph API and governed by the same per-agent email permissions. Existing Gmail connections are unaffected.
 
 Each email operation (Read, Create drafts, Send) is granted independently in the Permissions tab — checking one does not grant the others. If you're upgrading an agent that relied on Send also implying Read or Draft, re-check the operations it needs.
 
